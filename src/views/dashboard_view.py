@@ -6,6 +6,7 @@ from PyQt6.QtGui import QFont
 from PyQt6.QtCore import Qt
 from src.database.db import SessionLocal
 from src.controllers.report_controller import ReportController
+from src.controllers.profit_controller import ProfitController
 from src.models.models import Quote, Sale
 import datetime
 
@@ -17,6 +18,7 @@ class DashboardWindow(QWidget):
         
         self.db = SessionLocal()
         self.controller = ReportController(self.db)
+        self.profit_controller = ProfitController(self.db)
         self.main_window = main_window  # Reference to open other modules
         
         self.layout = QVBoxLayout()
@@ -79,6 +81,14 @@ class DashboardWindow(QWidget):
             "últimos 7 días"
         )
         metrics_layout.addWidget(self.ticket_widget, 2, 1)
+        
+        # Month Profit (NEW)
+        self.profit_widget = self.create_metric_widget(
+            "💰 Ganancia del Mes",
+            "$0",
+            "margen: 0%"
+        )
+        metrics_layout.addWidget(self.profit_widget, 3, 0, 1, 2)  # Span 2 columns
         
         # Refresh Button
         btn_refresh = QPushButton("🔄 Actualizar Dashboard")
@@ -190,6 +200,19 @@ class DashboardWindow(QWidget):
         week_summary = self.controller.get_sales_summary(week_start, today_end)
         self.ticket_widget.value_label.setText(f"${week_summary['average_ticket']:,.0f}")
         self.ticket_widget.subtitle_label.setText("últimos 7 días")
+        
+        # 7. Month Profitability (NEW)
+        try:
+            month_profit = self.profit_controller.get_month_profitability()
+            self.profit_widget.value_label.setText(f"${month_profit['total_profit']:,.0f}")
+            self.profit_widget.subtitle_label.setText(f"Margen: {month_profit['avg_margin']:.1f}%")
+            if month_profit['total_profit'] < 0:
+                self.profit_widget.value_label.setStyleSheet("color: red;")
+            else:
+                self.profit_widget.value_label.setStyleSheet("color: green;")
+        except:
+            self.profit_widget.value_label.setText("$0")
+            self.profit_widget.subtitle_label.setText("sin datos")
 
     def closeEvent(self, event):
         self.db.close()

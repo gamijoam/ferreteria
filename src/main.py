@@ -15,6 +15,8 @@ from src.views.label_view import LabelWindow
 from src.views.user_management_view import UserManagementWindow
 from src.views.dashboard_view import DashboardWindow
 from src.views.customer_view import CustomerWindow
+from src.views.supplier_view import SupplierWindow
+from src.views.purchase_view import PurchaseOrderWindow
 from src.models.models import UserRole
 
 class MainWindow(QMainWindow):
@@ -114,6 +116,22 @@ class MainWindow(QMainWindow):
             
             btn = self.create_module_button("👥", "Clientes", "Crédito y pagos", "#9C27B0")
             btn.clicked.connect(self.open_customers)
+            grid.addWidget(btn, row, col)
+            col += 1
+            
+            if col >= 3:
+                row += 1
+                col = 0
+        
+        # Suppliers & Purchase Orders (NEW)
+        if user.role in [UserRole.ADMIN, UserRole.WAREHOUSE]:
+            btn = self.create_module_button("🏭", "Proveedores", "Gestión de proveedores", "#9C27B0")
+            btn.clicked.connect(self.open_suppliers)
+            grid.addWidget(btn, row, col)
+            col += 1
+            
+            btn = self.create_module_button("📦", "Compras", "Órdenes de compra", "#9C27B0")
+            btn.clicked.connect(self.open_purchases)
             grid.addWidget(btn, row, col)
             col += 1
             
@@ -251,6 +269,14 @@ class MainWindow(QMainWindow):
     def open_dashboard(self):
         self.dashboard_window = DashboardWindow(main_window=self)
         self.dashboard_window.show()
+    
+    def open_suppliers(self):
+        self.supplier_window = SupplierWindow()
+        self.supplier_window.show()
+    
+    def open_purchases(self):
+        self.purchase_window = PurchaseOrderWindow(self.user)
+        self.purchase_window.show()
 
 def main():
     # Create tables

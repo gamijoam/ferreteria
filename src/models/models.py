@@ -28,9 +28,16 @@ class Supplier(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, index=True, nullable=False)
-    contact_info = Column(Text, nullable=True)
+    contact_person = Column(String, nullable=True)
+    phone = Column(String, nullable=True)
+    email = Column(String, nullable=True)
+    address = Column(Text, nullable=True)
+    notes = Column(Text, nullable=True)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     products = relationship("Product", back_populates="supplier")
+    purchase_orders = relationship("PurchaseOrder", back_populates="supplier")
 
     def __repr__(self):
         return f"<Supplier(name='{self.name}')>"
@@ -43,6 +50,7 @@ class Product(Base):
     sku = Column(String, unique=True, index=True, nullable=True) # Barcode
     description = Column(Text, nullable=True)
     price = Column(Float, nullable=False, default=0.0)
+    cost_price = Column(Float, default=0.0)  # NEW: Cost for profit margin calculation
     stock = Column(Integer, default=0) # Base units
 
     # Core Logic for Hardware Store
@@ -262,3 +270,38 @@ class QuoteDetail(Base):
 
     def __repr__(self):
         return f"<QuoteDetail(product={self.product_id}, qty={self.quantity})>"
+
+class PurchaseOrder(Base):
+    __tablename__ = "purchase_orders"
+
+    id = Column(Integer, primary_key=True, index=True)
+    supplier_id = Column(Integer, ForeignKey("suppliers.id"), nullable=False)
+    order_date = Column(DateTime, default=datetime.datetime.utcnow)
+    expected_delivery = Column(DateTime, nullable=True)
+    status = Column(String, default="PENDING")  # PENDING, RECEIVED, CANCELLED
+    total_amount = Column(Float, default=0.0)
+    notes = Column(Text, nullable=True)
+    received_date = Column(DateTime, nullable=True)
+    received_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+    supplier = relationship("Supplier", back_populates="purchase_orders")
+    details = relationship("PurchaseOrderDetail", back_populates="order")
+
+    def __repr__(self):
+        return f"<PurchaseOrder(id={self.id}, supplier={self.supplier_id}, status='{self.status}')>"
+
+class PurchaseOrderDetail(Base):
+    __tablename__ = "purchase_order_details"
+
+    id = Column(Integer, primary_key=True, index=True)
+    order_id = Column(Integer, ForeignKey("purchase_orders.id"), nullable=False)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
+    quantity = Column(Integer, nullable=False)
+    unit_cost = Column(Float, nullable=False)  # Cost per unit
+    subtotal = Column(Float, nullable=False)
+
+    order = relationship("PurchaseOrder", back_populates="details")
+    product = relationship("Product")
+
+    def __repr__(self):
+        return f"<PurchaseOrderDetail(product={self.product_id}, qty={self.quantity}, cost={self.unit_cost})>"

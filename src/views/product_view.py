@@ -30,6 +30,12 @@ class ProductWindow(QWidget):
         self.name_input = QLineEdit()
         self.sku_input = QLineEdit()
         self.price_input = QLineEdit()
+        self.price_input.textChanged.connect(self.calculate_margin)
+        self.cost_input = QLineEdit()  # NEW: Cost price
+        self.cost_input.setPlaceholderText("Precio de costo")
+        self.cost_input.textChanged.connect(self.calculate_margin)
+        self.margin_label = QLabel("Margen: -")  # NEW: Margin display
+        self.margin_label.setStyleSheet("font-weight: bold; color: green;")
         self.stock_input = QLineEdit()
         self.stock_input.setPlaceholderText("Cantidad inicial (Unidades base)")
         
@@ -46,7 +52,9 @@ class ProductWindow(QWidget):
         
         form_layout.addRow("Nombre:", self.name_input)
         form_layout.addRow("SKU / Código:", self.sku_input)
+        form_layout.addRow("Precio Costo:", self.cost_input)
         form_layout.addRow("Precio Venta:", self.price_input)
+        form_layout.addRow("", self.margin_label)
         form_layout.addRow("Stock Inicial:", self.stock_input)
         form_layout.addRow("Tipo Unidad:", self.unit_type_combo)
         form_layout.addRow("", self.is_box_check)
@@ -61,9 +69,9 @@ class ProductWindow(QWidget):
         
         # Table Area
         self.table = QTableWidget()
-        self.table.setColumnCount(7)
+        self.table.setColumnCount(9)
         self.table.setHorizontalHeaderLabels([
-            "ID", "Nombre", "SKU", "Precio", "Stock", "Es Caja?", "Factor"
+            "ID", "Nombre", "SKU", "Costo", "Precio", "Margen%", "Stock", "Es Caja?", "Factor"
         ])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.layout.addWidget(self.table)
@@ -82,10 +90,24 @@ class ProductWindow(QWidget):
             self.table.setItem(row, 0, QTableWidgetItem(str(prod.id)))
             self.table.setItem(row, 1, QTableWidgetItem(prod.name))
             self.table.setItem(row, 2, QTableWidgetItem(prod.sku or ""))
-            self.table.setItem(row, 3, QTableWidgetItem(str(prod.price)))
-            self.table.setItem(row, 4, QTableWidgetItem(str(prod.stock)))
-            self.table.setItem(row, 5, QTableWidgetItem("Sí" if prod.is_box else "No"))
-            self.table.setItem(row, 6, QTableWidgetItem(str(prod.conversion_factor)))
+            self.table.setItem(row, 3, QTableWidgetItem(f"${prod.cost_price:,.2f}"))
+            self.table.setItem(row, 4, QTableWidgetItem(f"${prod.price:,.2f}"))
+            
+            # Calculate margin
+            if prod.price > 0:
+                margin = ((prod.price - prod.cost_price) / prod.price) * 100
+                margin_item = QTableWidgetItem(f"{margin:.1f}%")
+                if margin < 0:
+                    margin_item.setForeground(Qt.GlobalColor.red)
+                else:
+                    margin_item.setForeground(Qt.GlobalColor.darkGreen)
+                self.table.setItem(row, 5, margin_item)
+            else:
+                self.table.setItem(row, 5, QTableWidgetItem("-"))
+            
+            self.table.setItem(row, 6, QTableWidgetItem(str(prod.stock)))
+            self.table.setItem(row, 7, QTableWidgetItem("Sí" if prod.is_box else "No"))
+            self.table.setItem(row, 8, QTableWidgetItem(str(prod.conversion_factor)))
 
     def save_product(self):
         try:
@@ -105,6 +127,7 @@ class ProductWindow(QWidget):
                 name=name,
                 sku=sku,
                 price=price,
+                cost_price=float(self.cost_input.text() or 0),
                 stock=stock,
                 is_box=is_box,
                 conversion_factor=factor,
@@ -122,13 +145,35 @@ class ProductWindow(QWidget):
             self.db.rollback()
             QMessageBox.critical(self, "Error", f"Error al guardar: {str(e)}")
 
+    def calculate_margin(self):
+        """Calculate and display profit margin"""
+        try:
+            cost = float(self.cost_input.text() or 0)
+            price = float(self.price_input.text() or 0)
+            
+            if price > 0:
+                margin = ((price - cost) / price) * 100
+                if margin < 0:
+                    self.margin_label.setText(f"Margen: {margin:.1f}% (PÉRDIDA)")
+                    self.margin_label.setStyleSheet("font-weight: bold; color: red;")
+                else:
+                    self.margin_label.setText(f"Margen: {margin:.1f}%")
+                    self.margin_label.setStyleSheet("font-weight: bold; color: green;")
+            else:
+                self.margin_label.setText("Margen: -")
+                self.margin_label.setStyleSheet("font-weight: bold; color: gray;")
+        except:
+            self.margin_label.setText("Margen: -")
+    
     def clear_form(self):
         self.name_input.clear()
         self.sku_input.clear()
         self.price_input.clear()
+        self.cost_input.clear()
         self.stock_input.clear()
         self.is_box_check.setChecked(False)
         self.conversion_factor_input.setText("1")
+        self.margin_label.setText("Margen: -")
 
     def closeEvent(self, event):
         self.db.close()
