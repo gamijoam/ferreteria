@@ -52,6 +52,7 @@ class Product(Base):
     price = Column(Float, nullable=False, default=0.0)
     cost_price = Column(Float, default=0.0)  # NEW: Cost for profit margin calculation
     stock = Column(Integer, default=0) # Base units
+    is_active = Column(Boolean, default=True) # Logical delete
 
     # Core Logic for Hardware Store
     is_box = Column(Boolean, default=False)

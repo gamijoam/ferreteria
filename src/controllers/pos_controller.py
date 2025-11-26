@@ -13,9 +13,9 @@ class POSController:
         Retorna (Success: bool, Message: str)
         """
         # Try finding by SKU first, then Name
-        product = self.db.query(Product).filter(Product.sku == sku_or_name).first()
+        product = self.db.query(Product).filter(Product.sku == sku_or_name, Product.is_active == True).first()
         if not product:
-            product = self.db.query(Product).filter(Product.name.ilike(f"%{sku_or_name}%")).first()
+            product = self.db.query(Product).filter(Product.name.ilike(f"%{sku_or_name}%"), Product.is_active == True).first()
         
         if not product:
             return False, "Producto no encontrado"

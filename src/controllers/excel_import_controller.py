@@ -1,155 +1,150 @@
-import os
 import pandas as pd
 from src.database.db import SessionLocal
-from src.models.models import Product, Supplier, Category, Customer
+from src.models.models import Product
 from sqlalchemy.exc import IntegrityError
 
 class ExcelImportController:
-    """Controller to import Excel files from a folder into the database.
-    
-    Expected file naming conventions (case‑insensitive):
-    - *products*.xlsx  → imports rows into the Product table
-    - *suppliers*.xlsx → imports rows into the Supplier table
-    - *categories*.xlsx → imports rows into the Category table
-    - *customers*.xlsx → imports rows into the Customer table
-    
-    The Excel columns should match the model fields (or a subset). Missing
-    optional columns are ignored. The function is tolerant to extra columns.
     """
+    Simple and robust Excel import controller for products.
+    
+    Expected Excel format:
+    - Single file with a sheet named "Productos" or "Products"
+    - Columns: nombre, codigo, precio, costo, stock, descripcion
+    - Optional columns can be empty
+    """
+    
     def __init__(self):
         self.db = SessionLocal()
-
-    def import_folder(self, folder_path: str) -> dict:
-        """Import all supported Excel files from *folder_path*.
-        Returns a dict with summary of imported rows and any errors.
+    
+    def import_products_from_file(self, file_path: str) -> dict:
         """
-        summary = {
-            "products": 0,
-            "suppliers": 0,
-            "categories": 0,
-            "customers": 0,
-            "errors": []
+        Import products from an Excel file.
+        
+        Returns:
+            dict with keys:
+                - success: int (number of products imported)
+                - errors: list of error messages
+                - skipped: int (number of rows skipped)
+        """
+        result = {
+            "success": 0,
+            "errors": [],
+            "skipped": 0
         }
-        if not os.path.isdir(folder_path):
-            summary["errors"].append(f"Folder not found: {folder_path}")
-            return summary
         
-        for filename in os.listdir(folder_path):
-            if not filename.lower().endswith('.xlsx'):
-                continue
-            file_path = os.path.join(folder_path, filename)
-            try:
-                # Read all sheets from the Excel file
-                xls = pd.read_excel(file_path, sheet_name=None)
-            except Exception as e:
-                summary["errors"].append(f"Failed to read {filename}: {e}")
-                continue
+        try:
+            # Read Excel file
+            excel_file = pd.ExcelFile(file_path)
             
-            # Iterate through each sheet in the Excel file
-            for sheet_name, df in xls.items():
-                lowered_sheet_name = sheet_name.lower()
-                # Use a more descriptive name for error reporting
-                source_name = f"{filename} (sheet: {sheet_name})"
-
-                if 'product' in lowered_sheet_name:
-                    summary["products"] += self._import_products(df, source_name, summary)
-                elif 'supplier' in lowered_sheet_name:
-                    summary["suppliers"] += self._import_suppliers(df, source_name, summary)
-                elif 'category' in lowered_sheet_name:
-                    summary["categories"] += self._import_categories(df, source_name, summary)
-                elif 'customer' in lowered_sheet_name:
-                    summary["customers"] += self._import_customers(df, source_name, summary)
-                else:
-                    summary["errors"].append(f"Unrecognized sheet type in {source_name}")
+            # Find the products sheet
+            sheet_name = None
+            for name in excel_file.sheet_names:
+                if 'product' in name.lower() or 'producto' in name.lower():
+                    sheet_name = name
+                    break
+            
+            if not sheet_name:
+                result["errors"].append("No se encontró una hoja llamada 'Productos' o 'Products' en el archivo Excel.")
+                return result
+            
+            # Read the sheet
+            df = pd.read_excel(file_path, sheet_name=sheet_name)
+            
+            # Normalize column names (remove spaces, lowercase)
+            df.columns = df.columns.str.strip().str.lower()
+            
+            # Process each row
+            for index, row in df.iterrows():
+                row_number = index + 2  # +2 because Excel is 1-indexed and has header
+                
+                try:
+                    # Extract and validate required fields
+                    nombre = self._get_value(row, ['nombre', 'name', 'producto', 'product'])
+                    codigo = self._get_value(row, ['codigo', 'sku', 'code'])
+                    
+                    # Skip empty rows
+                    if pd.isna(nombre) and pd.isna(codigo):
+                        result["skipped"] += 1
+                        continue
+                    
+                    # Validate required fields
+                    if pd.isna(nombre) or str(nombre).strip() == '':
+                        result["errors"].append(f"Fila {row_number}: El nombre es obligatorio")
+                        continue
+                    
+                    # Extract optional fields with defaults
+                    precio = self._get_float_value(row, ['precio', 'price', 'precio_venta'], default=0.0)
+                    costo = self._get_float_value(row, ['costo', 'cost', 'precio_costo', 'cost_price'], default=0.0)
+                    stock = self._get_int_value(row, ['stock', 'cantidad', 'quantity'], default=0)
+                    descripcion = self._get_value(row, ['descripcion', 'description', 'desc'])
+                    
+                    # Create product
+                    product = Product(
+                        name=str(nombre).strip(),
+                        sku=str(codigo).strip() if not pd.isna(codigo) else None,
+                        price=precio,
+                        cost_price=costo,
+                        stock=stock,
+                        description=str(descripcion).strip() if not pd.isna(descripcion) else None,
+                        is_active=True
+                    )
+                    
+                    self.db.add(product)
+                    result["success"] += 1
+                    
+                except IntegrityError as e:
+                    self.db.rollback()
+                    if 'sku' in str(e).lower():
+                        result["errors"].append(f"Fila {row_number}: El código '{codigo}' ya existe en la base de datos")
+                    else:
+                        result["errors"].append(f"Fila {row_number}: Error de integridad - {str(e)}")
+                except Exception as e:
+                    self.db.rollback()
+                    result["errors"].append(f"Fila {row_number}: {str(e)}")
+            
+            # Commit all successful imports
+            if result["success"] > 0:
+                try:
+                    self.db.commit()
+                except Exception as e:
+                    self.db.rollback()
+                    result["errors"].append(f"Error al guardar en la base de datos: {str(e)}")
+                    result["success"] = 0
+            
+        except FileNotFoundError:
+            result["errors"].append(f"No se encontró el archivo: {file_path}")
+        except Exception as e:
+            result["errors"].append(f"Error al leer el archivo Excel: {str(e)}")
+        finally:
+            self.db.close()
         
-        self.db.commit()
-        self.db.close()
-        return summary
-
-    # ---------------------------------------------------------------------
-    # Individual import helpers
-    # ---------------------------------------------------------------------
-    def _import_products(self, df, filename, summary):
-        count = 0
-        for _, row in df.iterrows():
-            try:
-                prod = Product(
-                    name=row.get('name') or row.get('nombre'),
-                    sku=row.get('sku') or row.get('codigo'),
-                    price=float(row.get('price') or row.get('precio') or 0),
-                    cost_price=float(row.get('cost_price') or row.get('costo') or 0),
-                    stock=int(row.get('stock') or 0),
-                    is_box=bool(row.get('is_box') or False),
-                    conversion_factor=int(row.get('conversion_factor') or 1),
-                    unit_type=row.get('unit_type') or 'Unidad',
-                    category_id=self._lookup_category_id(row.get('category')),
-                    supplier_id=self._lookup_supplier_id(row.get('supplier')),
-                )
-                self.db.add(prod)
-                count += 1
-            except Exception as e:
-                summary["errors"].append(f"Product row error in {filename}: {e}")
-        return count
-
-    def _import_suppliers(self, df, filename, summary):
-        count = 0
-        for _, row in df.iterrows():
-            try:
-                sup = Supplier(
-                    name=row.get('name') or row.get('nombre'),
-                    contact_person=row.get('contact_person') or row.get('contacto'),
-                    phone=row.get('phone') or row.get('telefono'),
-                    email=row.get('email'),
-                    address=row.get('address') or row.get('direccion'),
-                    notes=row.get('notes') or row.get('notas'),
-                    is_active=bool(row.get('is_active', True)),
-                )
-                self.db.add(sup)
-                count += 1
-            except Exception as e:
-                summary["errors"].append(f"Supplier row error in {filename}: {e}")
-        return count
-
-    def _import_categories(self, df, filename, summary):
-        count = 0
-        for _, row in df.iterrows():
-            try:
-                cat = Category(
-                    name=row.get('name') or row.get('nombre'),
-                    description=row.get('description') or row.get('descripcion')
-                )
-                self.db.add(cat)
-                count += 1
-            except Exception as e:
-                summary["errors"].append(f"Category row error in {filename}: {e}")
-        return count
-
-    def _import_customers(self, df, filename, summary):
-        count = 0
-        for _, row in df.iterrows():
-            try:
-                cust = Customer(
-                    name=row.get('name') or row.get('nombre'),
-                    phone=row.get('phone') or row.get('telefono'),
-                    address=row.get('address') or row.get('direccion')
-                )
-                self.db.add(cust)
-                count += 1
-            except Exception as e:
-                summary["errors"].append(f"Customer row error in {filename}: {e}")
-        return count
-
-    # ---------------------------------------------------------------------
-    # Helper look‑ups (simple name → id queries)
-    # ---------------------------------------------------------------------
-    def _lookup_category_id(self, name):
-        if not name:
-            return None
-        cat = self.db.query(Category).filter(Category.name == name).first()
-        return cat.id if cat else None
-
-    def _lookup_supplier_id(self, name):
-        if not name:
-            return None
-        sup = self.db.query(Supplier).filter(Supplier.name == name).first()
-        return sup.id if sup else None
+        return result
+    
+    def _get_value(self, row, possible_names):
+        """Get value from row trying multiple column names"""
+        for name in possible_names:
+            if name in row.index:
+                value = row[name]
+                if not pd.isna(value):
+                    return value
+        return None
+    
+    def _get_float_value(self, row, possible_names, default=0.0):
+        """Get float value from row, return default if not found or invalid"""
+        value = self._get_value(row, possible_names)
+        if value is None or pd.isna(value):
+            return default
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            return default
+    
+    def _get_int_value(self, row, possible_names, default=0):
+        """Get integer value from row, return default if not found or invalid"""
+        value = self._get_value(row, possible_names)
+        if value is None or pd.isna(value):
+            return default
+        try:
+            return int(float(value))  # Convert through float to handle "10.0"
+        except (ValueError, TypeError):
+            return default

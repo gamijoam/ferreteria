@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, 
     QCheckBox, QPushButton, QTableWidget, QTableWidgetItem, 
-    QHeaderView, QMessageBox, QFrame, QComboBox
+    QHeaderView, QMessageBox, QFrame, QComboBox, QCompleter
 )
 from PyQt6.QtGui import QKeySequence, QFont, QShortcut
 from PyQt6.QtCore import Qt
@@ -40,6 +40,9 @@ class POSWindow(QWidget):
         self.input_scan.setFont(QFont("Arial", 16))
         self.input_scan.setPlaceholderText("Ingrese SKU o Nombre y presione ENTER")
         self.input_scan.returnPressed.connect(self.handle_add_item)
+        
+        # Setup autocomplete
+        self.setup_autocomplete()
         
         self.check_box_mode = QCheckBox("Vender por Caja (F2)")
         self.check_box_mode.setFont(QFont("Arial", 12))
@@ -135,11 +138,39 @@ class POSWindow(QWidget):
         customers = self.customer_controller.get_all_customers()
         for c in customers:
             self.customer_combo.addItem(c.name, c.id)
+    
+    def setup_autocomplete(self):
+        """Setup autocomplete for product search"""
+        from src.models.models import Product
+        
+        # Get all active products
+        products = self.db.query(Product).filter(Product.is_active == True).all()
+        
+        # Create list of suggestions: "Name - SKU - $Price"
+        suggestions = []
+        for p in products:
+            sku_part = f" - {p.sku}" if p.sku else ""
+            suggestion = f"{p.name}{sku_part} - ${p.price:,.0f}"
+            suggestions.append(suggestion)
+        
+        # Create completer
+        completer = QCompleter(suggestions)
+        completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        completer.setFilterMode(Qt.MatchFlag.MatchContains)
+        
+        # Set completer to input
+        self.input_scan.setCompleter(completer)
 
     def handle_add_item(self):
         text = self.input_scan.text().strip()
         if not text:
             return
+        
+        # If text contains " - $" it's from autocomplete, extract the product name/SKU
+        if " - $" in text:
+            # Format is "Name - SKU - $Price" or "Name - $Price"
+            # Extract just the name part (before first " - ")
+            text = text.split(" - ")[0].strip()
             
         is_box = self.check_box_mode.isChecked()
         qty = 1 

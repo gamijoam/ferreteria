@@ -1,0 +1,71 @@
+=================================================================
+    GUÍA DE IMPORTACIÓN DE PRODUCTOS DESDE EXCEL
+=================================================================
+
+PASO 1: GENERAR LA PLANTILLA
+-----------------------------
+1. Ejecuta el siguiente comando en la terminal:
+   
+   python src/scripts/generate_import_template.py
+
+2. Esto creará el archivo:
+   documentos/PLANTILLA_PRODUCTOS.xlsx
+
+
+PASO 2: LLENAR LA PLANTILLA
+----------------------------
+Abre el archivo PLANTILLA_PRODUCTOS.xlsx en Excel y llena las columnas:
+
+COLUMNAS OBLIGATORIAS:
+  - nombre: Nombre del producto (REQUERIDO)
+
+COLUMNAS OPCIONALES (puedes dejarlas vacías):
+  - codigo: Código o SKU del producto
+  - precio: Precio de venta (si está vacío, se usará 0)
+  - costo: Precio de costo (si está vacío, se usará 0)
+  - stock: Cantidad en inventario (si está vacío, se usará 0)
+  - descripcion: Descripción del producto
+
+IMPORTANTE:
+  - El nombre NO puede estar vacío
+  - Si dejas precio, costo o stock vacíos, el sistema los pondrá en 0
+  - Puedes editar estos valores después desde el módulo "Productos"
+  - Los códigos (SKU) deben ser únicos
+
+
+PASO 3: IMPORTAR EL ARCHIVO
+----------------------------
+1. Abre el sistema ERP
+2. Inicia sesión como ADMIN
+3. Haz clic en el botón "Importar Excel"
+4. Selecciona tu archivo Excel
+5. El sistema mostrará un resumen:
+   - Productos importados exitosamente
+   - Filas omitidas (vacías)
+   - Errores encontrados (si los hay)
+
+
+ERRORES COMUNES Y SOLUCIONES
+-----------------------------
+1. "El código 'XXX' ya existe"
+   → Ese SKU ya está en la base de datos. Usa otro código.
+
+2. "El nombre es obligatorio"
+   → Asegúrate de que la columna 'nombre' no esté vacía.
+
+3. "No se encontró una hoja llamada 'Productos'"
+   → La hoja del Excel debe llamarse "Productos" o "Products".
+
+
+RECOMENDACIONES
+---------------
+- Importa primero un archivo pequeño (5-10 productos) para probar
+- Revisa los productos importados en el módulo "Productos"
+- Edita los precios y stock después si es necesario
+- Guarda una copia de respaldo de tu archivo Excel
+
+
+SOPORTE
+-------
+Si tienes problemas, revisa el mensaje de error que muestra el sistema.
+Cada error indica la fila exacta donde ocurrió el problema.

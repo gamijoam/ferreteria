@@ -1,8 +1,9 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, 
     QCheckBox, QComboBox, QPushButton, QTableWidget, QTableWidgetItem, 
-    QHeaderView, QMessageBox, QGroupBox, QFormLayout, QTabWidget
+    QHeaderView, QMessageBox, QGroupBox, QFormLayout, QTabWidget, QCompleter
 )
+from PyQt6.QtCore import Qt
 from src.database.db import SessionLocal
 from src.models.models import Product
 from src.controllers.inventory_controller import InventoryController
@@ -42,9 +43,15 @@ class InventoryWindow(QWidget):
         form_group = QGroupBox("Registrar Compra / Entrada")
         form_layout = QFormLayout()
         
-        self.product_combo = QComboBox()
-        self.load_products_combo()
-        self.product_combo.currentIndexChanged.connect(self.on_product_select)
+        # Product search with autocomplete
+        self.product_search = QLineEdit()
+        self.product_search.setPlaceholderText("Buscar producto por nombre o código...")
+        self.setup_product_autocomplete()
+        self.product_search.returnPressed.connect(self.on_product_selected)
+        
+        self.selected_product_id = None
+        self.selected_product_label = QLabel("Ningún producto seleccionado")
+        self.selected_product_label.setStyleSheet("font-weight: bold; color: #666;")
         
         self.qty_input = QLineEdit()
         self.qty_input.setPlaceholderText("Cantidad")
@@ -57,7 +64,8 @@ class InventoryWindow(QWidget):
         btn_add = QPushButton("Registrar Entrada")
         btn_add.clicked.connect(self.handle_add_stock)
         
-        form_layout.addRow("Producto:", self.product_combo)
+        form_layout.addRow("Producto:", self.product_search)
+        form_layout.addRow("", self.selected_product_label)
         form_layout.addRow("Stock Actual:", self.current_stock_label)
         form_layout.addRow("Cantidad:", self.qty_input)
         form_layout.addRow("", self.is_box_check)
@@ -94,22 +102,44 @@ class InventoryWindow(QWidget):
         self.kardex_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         layout.addWidget(self.kardex_table)
 
-    def load_products_combo(self):
-        self.product_combo.clear()
-        products = self.db.query(Product).all()
+    def setup_product_autocomplete(self):
+        """Setup autocomplete for product search in entry tab"""
+        products = self.db.query(Product).filter(Product.is_active == True).all()
+        
+        # Create list of suggestions with product data
+        self.product_map = {}  # Map suggestion text to product
+        suggestions = []
         for p in products:
-            self.product_combo.addItem(f"{p.name} (SKU: {p.sku})", p.id)
-
-    def load_history_products(self):
-        # Same list but for the history tab
-        products = self.db.query(Product).all()
-        for p in products:
-            self.history_product_combo.addItem(f"{p.name}", p.id)
-
-    def on_product_select(self):
-        product_id = self.product_combo.currentData()
-        if product_id:
-            product = self.db.query(Product).get(product_id)
+            sku_part = f" - {p.sku}" if p.sku else ""
+            suggestion = f"{p.name}{sku_part}"
+            suggestions.append(suggestion)
+            self.product_map[suggestion] = p
+        
+        # Create completer
+        completer = QCompleter(suggestions)
+        completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        completer.setFilterMode(Qt.MatchFlag.MatchContains)
+        self.product_search.setCompleter(completer)
+    
+    def on_product_selected(self):
+        """Handle product selection from autocomplete"""
+        text = self.product_search.text().strip()
+        if not text:
+            return
+        
+        # Find product in map
+        product = self.product_map.get(text)
+        if not product:
+            # Try to find by name or SKU
+            product = self.db.query(Product).filter(
+                (Product.name.ilike(f"%{text}%")) | (Product.sku == text),
+                Product.is_active == True
+            ).first()
+        
+        if product:
+            self.selected_product_id = product.id
+            self.selected_product_label.setText(f"✓ {product.name}")
+            self.selected_product_label.setStyleSheet("font-weight: bold; color: green;")
             self.current_stock_label.setText(f"Stock Actual: {product.stock} {product.unit_type}")
             
             if product.is_box:
@@ -119,10 +149,27 @@ class InventoryWindow(QWidget):
                 self.is_box_check.setEnabled(False)
                 self.is_box_check.setChecked(False)
                 self.is_box_check.setText("Es Caja / Pack")
+        else:
+            self.selected_product_id = None
+            self.selected_product_label.setText("Producto no encontrado")
+            self.selected_product_label.setStyleSheet("font-weight: bold; color: red;")
+    
+    def load_products_combo(self):
+        # This method is no longer used but kept for compatibility
+        pass
+    
+    def load_history_products(self):
+        """Load products for history tab combo box"""
+        products = self.db.query(Product).filter(Product.is_active == True).all()
+        for p in products:
+            self.history_product_combo.addItem(f"{p.name}", p.id)
 
     def handle_add_stock(self):
         try:
-            product_id = self.product_combo.currentData()
+            if not self.selected_product_id:
+                QMessageBox.warning(self, "Error", "Por favor seleccione un producto primero")
+                return
+            
             qty_text = self.qty_input.text()
             
             if not qty_text.isdigit():
@@ -132,11 +179,15 @@ class InventoryWindow(QWidget):
             qty = int(qty_text)
             is_box = self.is_box_check.isChecked()
             
-            self.controller.add_stock(product_id, qty, is_box)
+            self.controller.add_stock(self.selected_product_id, qty, is_box)
             
             QMessageBox.information(self, "Éxito", "Stock actualizado correctamente")
             self.qty_input.clear()
-            self.on_product_select() # Refresh label
+            self.product_search.clear()
+            self.selected_product_id = None
+            self.selected_product_label.setText("Ningún producto seleccionado")
+            self.selected_product_label.setStyleSheet("font-weight: bold; color: #666;")
+            self.current_stock_label.setText("Stock Actual: -")
             
         except Exception as e:
             QMessageBox.critical(self, "Error", str(e))

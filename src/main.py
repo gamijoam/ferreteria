@@ -162,6 +162,16 @@ class MainWindow(QMainWindow):
             grid.addWidget(btn, row, col)
             col += 1
 
+            if col >= 3:
+                row += 1
+                col = 0
+
+            # Excel Import Button
+            btn = self.create_module_button("📄", "Importar Excel", "Cargar productos", "#009688")
+            btn.clicked.connect(self.open_excel_import)
+            grid.addWidget(btn, row, col)
+            col += 1
+
         main_layout.addStretch()
 
         # Footer
@@ -269,19 +279,36 @@ class MainWindow(QMainWindow):
         self.purchase_window.show()
 
     def open_excel_import(self):
-        """Open a dialog to select a folder and import all Excel files"""
-        folder = QFileDialog.getExistingDirectory(self, "Seleccionar carpeta de Excel", "./documentos")
-        if not folder:
+        """Open a dialog to select an Excel file and import products"""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, 
+            "Seleccionar archivo Excel de productos", 
+            "./documentos",
+            "Excel Files (*.xlsx *.xls)"
+        )
+        if not file_path:
             return
+        
         controller = ExcelImportController()
-        result = controller.import_folder(folder)
-        # Build a readable summary
-        msg = "Resumen de importación:\n"
-        for key in ["products", "suppliers", "categories", "customers"]:
-            msg += f"- {key.capitalize()}: {result.get(key, 0)} filas\n"
-        if result.get("errors"):
-            msg += "\nErrores:\n" + "\n".join(result["errors"]) + "\n"
-        QMessageBox.information(self, "Importación completada", msg)
+        result = controller.import_products_from_file(file_path)
+        
+        # Build summary message
+        msg = "=== RESUMEN DE IMPORTACION ===\n\n"
+        msg += f"Productos importados: {result['success']}\n"
+        msg += f"Filas omitidas (vacias): {result['skipped']}\n"
+        
+        if result['errors']:
+            msg += f"\nErrores encontrados: {len(result['errors'])}\n\n"
+            # Show first 10 errors
+            for error in result['errors'][:10]:
+                msg += f"  - {error}\n"
+            if len(result['errors']) > 10:
+                msg += f"\n  ... y {len(result['errors']) - 10} errores mas\n"
+        
+        if result['success'] > 0:
+            QMessageBox.information(self, "Importacion completada", msg)
+        else:
+            QMessageBox.warning(self, "Importacion fallida", msg)
 
     def closeEvent(self, event):
         # Ensure DB session is closed if needed (handled elsewhere)
