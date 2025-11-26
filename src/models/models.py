@@ -34,7 +34,7 @@ class Supplier(Base):
     address = Column(Text, nullable=True)
     notes = Column(Text, nullable=True)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.datetime.now)
 
     products = relationship("Product", back_populates="supplier")
     purchase_orders = relationship("PurchaseOrder", back_populates="supplier")
@@ -72,7 +72,7 @@ class Kardex(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
-    date = Column(DateTime, default=datetime.datetime.utcnow)
+    date = Column(DateTime, default=datetime.datetime.now)
     movement_type = Column(Enum(MovementType), nullable=False)
     quantity = Column(Integer, nullable=False) # Positive or Negative
     balance_after = Column(Integer, nullable=False)
@@ -87,7 +87,7 @@ class Sale(Base):
     __tablename__ = "sales"
 
     id = Column(Integer, primary_key=True, index=True)
-    date = Column(DateTime, default=datetime.datetime.utcnow)
+    date = Column(DateTime, default=datetime.datetime.now)
     total_amount = Column(Float, nullable=False)
     payment_method = Column(String, default="Efectivo") # Efectivo, Tarjeta, Credito
     
@@ -123,7 +123,7 @@ class CashSession(Base):
     __tablename__ = "cash_sessions"
 
     id = Column(Integer, primary_key=True, index=True)
-    start_time = Column(DateTime, default=datetime.datetime.utcnow)
+    start_time = Column(DateTime, default=datetime.datetime.now)
     end_time = Column(DateTime, nullable=True)
     initial_cash = Column(Float, default=0.0)
     final_cash_reported = Column(Float, nullable=True) # What user counted
@@ -144,7 +144,7 @@ class CashMovement(Base):
     type = Column(String, nullable=False) # EXPENSE, WITHDRAWAL, DEPOSIT
     amount = Column(Float, nullable=False)
     description = Column(Text, nullable=True)
-    date = Column(DateTime, default=datetime.datetime.utcnow)
+    date = Column(DateTime, default=datetime.datetime.now)
 
     session = relationship("CashSession", back_populates="movements")
 
@@ -173,7 +173,7 @@ class Return(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     sale_id = Column(Integer, ForeignKey("sales.id"), nullable=False)
-    date = Column(DateTime, default=datetime.datetime.utcnow)
+    date = Column(DateTime, default=datetime.datetime.now)
     total_refunded = Column(Float, nullable=False)
     reason = Column(Text, nullable=True)
 
@@ -217,7 +217,7 @@ class Payment(Base):
     id = Column(Integer, primary_key=True, index=True)
     customer_id = Column(Integer, ForeignKey("customers.id"), nullable=False)
     amount = Column(Float, nullable=False)
-    date = Column(DateTime, default=datetime.datetime.utcnow)
+    date = Column(DateTime, default=datetime.datetime.now)
     description = Column(Text, nullable=True)
 
     customer = relationship("Customer", back_populates="payments")
@@ -243,7 +243,7 @@ class Quote(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     customer_id = Column(Integer, ForeignKey("customers.id"), nullable=True)
-    date = Column(DateTime, default=datetime.datetime.utcnow)
+    date = Column(DateTime, default=datetime.datetime.now)
     total_amount = Column(Float, nullable=False)
     status = Column(String, default="PENDING")  # PENDING, CONVERTED, EXPIRED
     notes = Column(Text, nullable=True)
@@ -276,7 +276,7 @@ class PurchaseOrder(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     supplier_id = Column(Integer, ForeignKey("suppliers.id"), nullable=False)
-    order_date = Column(DateTime, default=datetime.datetime.utcnow)
+    order_date = Column(DateTime, default=datetime.datetime.now)
     expected_delivery = Column(DateTime, nullable=True)
     status = Column(String, default="PENDING")  # PENDING, RECEIVED, CANCELLED
     total_amount = Column(Float, default=0.0)

@@ -1,7 +1,19 @@
 import sys
-from PyQt6.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget, QLabel, QDialog
+from PyQt6.QtWidgets import (
+    QApplication,
+    QMainWindow,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+    QLabel,
+    QDialog,
+    QFileDialog,
+    QMessageBox,
+    QGridLayout,
+)
 from PyQt6.QtCore import Qt
 from src.database.db import engine, Base
+from src.controllers.excel_import_controller import ExcelImportController
 from src.views.product_view import ProductWindow
 from src.views.inventory_view import InventoryWindow
 from src.views.pos_view import POSWindow
@@ -25,7 +37,7 @@ class MainWindow(QMainWindow):
         self.user = user
         self.setWindowTitle(f"🏪 Sistema Ferretería ERP")
         self.resize(900, 700)
-        
+
         # Set window style
         self.setStyleSheet("""
             QMainWindow {
@@ -33,160 +45,136 @@ class MainWindow(QMainWindow):
                     stop:0 #E3F2FD, stop:1 #BBDEFB);
             }
         """)
-        
+
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-        
+
         main_layout = QVBoxLayout()
         central_widget.setLayout(main_layout)
-        
+
         # Header
         header = QWidget()
         header.setStyleSheet("background-color: #1976D2; border-radius: 10px; padding: 20px;")
         header_layout = QVBoxLayout()
         header.setLayout(header_layout)
-        
+
         title = QLabel("🏪 SISTEMA FERRETERÍA ERP")
         title.setStyleSheet("color: white; font-size: 28pt; font-weight: bold;")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header_layout.addWidget(title)
-        
+
         user_label = QLabel(f"👤 Usuario: {user.username} | Rol: {user.role.value}")
         user_label.setStyleSheet("color: white; font-size: 12pt;")
         user_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header_layout.addWidget(user_label)
-        
+
         main_layout.addWidget(header)
-        
+
         # Dashboard Button (Prominent)
-        from PyQt6.QtWidgets import QGridLayout
         btn_dashboard = self.create_module_button(
-            "📊", "DASHBOARD", 
+            "📊", "DASHBOARD",
             "Vista general del negocio",
             "#2196F3"
         )
         btn_dashboard.clicked.connect(self.open_dashboard)
         main_layout.addWidget(btn_dashboard)
-        
+
         # Modules Grid
         grid = QGridLayout()
         grid.setSpacing(15)
         main_layout.addLayout(grid)
-        
+
         row, col = 0, 0
-        
+
         # Products & Inventory
         if user.role in [UserRole.ADMIN, UserRole.WAREHOUSE]:
             btn = self.create_module_button("📦", "Productos", "Gestión de productos", "#4CAF50")
             btn.clicked.connect(self.open_products)
             grid.addWidget(btn, row, col)
             col += 1
-            
+
             btn = self.create_module_button("📥", "Inventario", "Control de stock", "#4CAF50")
             btn.clicked.connect(self.open_inventory)
             grid.addWidget(btn, row, col)
             col += 1
-            
+
             if col >= 3:
                 row += 1
                 col = 0
-        
+
         # POS & Cash
         if user.role in [UserRole.ADMIN, UserRole.CASHIER]:
             btn = self.create_module_button("🛒", "Punto de Venta", "Ventas rápidas", "#FF9800")
             btn.clicked.connect(self.open_pos)
             grid.addWidget(btn, row, col)
             col += 1
-            
+
             btn = self.create_module_button("💵", "Caja", "Control de efectivo", "#FF9800")
             btn.clicked.connect(self.open_cash)
             grid.addWidget(btn, row, col)
             col += 1
-            
+
             if col >= 3:
                 row += 1
                 col = 0
-        
+
         # Returns & Customers
         if user.role in [UserRole.ADMIN, UserRole.CASHIER]:
             btn = self.create_module_button("↩️", "Devoluciones", "Gestión de returns", "#F44336")
             btn.clicked.connect(self.open_returns)
             grid.addWidget(btn, row, col)
             col += 1
-            
+
             btn = self.create_module_button("👥", "Clientes", "Crédito y pagos", "#9C27B0")
             btn.clicked.connect(self.open_customers)
             grid.addWidget(btn, row, col)
             col += 1
-            
-            if col >= 3:
-                row += 1
-                col = 0
-        
-        # Suppliers & Purchase Orders (NEW)
-        if user.role in [UserRole.ADMIN, UserRole.WAREHOUSE]:
-            btn = self.create_module_button("🏭", "Proveedores", "Gestión de proveedores", "#9C27B0")
-            btn.clicked.connect(self.open_suppliers)
-            grid.addWidget(btn, row, col)
-            col += 1
-            
-            btn = self.create_module_button("📦", "Compras", "Órdenes de compra", "#9C27B0")
-            btn.clicked.connect(self.open_purchases)
-            grid.addWidget(btn, row, col)
-            col += 1
-            
-            if col >= 3:
-                row += 1
-                col = 0
-        
-        # Quotes & Prices
-        if user.role in [UserRole.ADMIN, UserRole.CASHIER]:
-            btn = self.create_module_button("📋", "Cotizaciones", "Presupuestos", "#00BCD4")
-            btn.clicked.connect(self.open_quotes)
-            grid.addWidget(btn, row, col)
-            col += 1
-        
+
         if user.role == UserRole.ADMIN:
             btn = self.create_module_button("💰", "Precios", "Mayoristas", "#00BCD4")
             btn.clicked.connect(self.open_price_rules)
             grid.addWidget(btn, row, col)
             col += 1
-            
+
             if col >= 3:
                 row += 1
                 col = 0
-        
+
         # Labels & Users
         if user.role in [UserRole.ADMIN, UserRole.WAREHOUSE]:
             btn = self.create_module_button("🏷️", "Etiquetas", "Impresión", "#607D8B")
             btn.clicked.connect(self.open_labels)
             grid.addWidget(btn, row, col)
             col += 1
-        
+
         if user.role == UserRole.ADMIN:
             btn = self.create_module_button("👤", "Usuarios", "Gestión de accesos", "#607D8B")
             btn.clicked.connect(self.open_user_management)
             grid.addWidget(btn, row, col)
             col += 1
-            
+
             if col >= 3:
                 row += 1
                 col = 0
-            
+
             btn = self.create_module_button("📊", "Reportes", "Análisis avanzado", "#3F51B5")
             btn.clicked.connect(self.open_reports)
             grid.addWidget(btn, row, col)
-        
+            col += 1
+
         main_layout.addStretch()
-        
+
         # Footer
         footer = QLabel("Sistema ERP v2.0 | Desarrollado con PyQt6")
         footer.setStyleSheet("color: #666; font-size: 9pt; padding: 10px;")
         footer.setAlignment(Qt.AlignmentFlag.AlignCenter)
         main_layout.addWidget(footer)
 
+    # -----------------------------------------------------------------
+    # UI helper methods
+    # -----------------------------------------------------------------
     def create_module_button(self, icon, title, subtitle, color):
-        """Create a modern card-style button"""
+        """Create a modern card‑style button"""
         btn = QPushButton()
         btn.setMinimumHeight(100)
         btn.setStyleSheet(f"""
@@ -207,12 +195,11 @@ class MainWindow(QMainWindow):
                 background-color: {self.darken_color(color, 0.3)};
             }}
         """)
-        
         btn.setText(f"{icon}  {title}\n{subtitle}")
         return btn
-    
+
     def darken_color(self, hex_color, factor=0.15):
-        """Darken a hex color"""
+        """Darken a hex colour by *factor*"""
         hex_color = hex_color.lstrip('#')
         r, g, b = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
         r = int(r * (1 - factor))
@@ -220,6 +207,9 @@ class MainWindow(QMainWindow):
         b = int(b * (1 - factor))
         return f'#{r:02x}{g:02x}{b:02x}'
 
+    # -----------------------------------------------------------------
+    # Open window helpers
+    # -----------------------------------------------------------------
     def open_products(self):
         self.product_window = ProductWindow()
         self.product_window.show()
@@ -269,14 +259,33 @@ class MainWindow(QMainWindow):
     def open_dashboard(self):
         self.dashboard_window = DashboardWindow(main_window=self)
         self.dashboard_window.show()
-    
+
     def open_suppliers(self):
         self.supplier_window = SupplierWindow()
         self.supplier_window.show()
-    
+
     def open_purchases(self):
         self.purchase_window = PurchaseOrderWindow(self.user)
         self.purchase_window.show()
+
+    def open_excel_import(self):
+        """Open a dialog to select a folder and import all Excel files"""
+        folder = QFileDialog.getExistingDirectory(self, "Seleccionar carpeta de Excel", "./documentos")
+        if not folder:
+            return
+        controller = ExcelImportController()
+        result = controller.import_folder(folder)
+        # Build a readable summary
+        msg = "Resumen de importación:\n"
+        for key in ["products", "suppliers", "categories", "customers"]:
+            msg += f"- {key.capitalize()}: {result.get(key, 0)} filas\n"
+        if result.get("errors"):
+            msg += "\nErrores:\n" + "\n".join(result["errors"]) + "\n"
+        QMessageBox.information(self, "Importación completada", msg)
+
+    def closeEvent(self, event):
+        # Ensure DB session is closed if needed (handled elsewhere)
+        event.accept()
 
 def main():
     # Create tables
@@ -285,11 +294,11 @@ def main():
     print("Tablas creadas exitosamente.")
 
     app = QApplication(sys.argv)
-    
+
     # Apply modern theme
     from src.theme import MODERN_THEME
     app.setStyleSheet(MODERN_THEME)
-    
+
     # Show Login First
     login = LoginDialog()
     if login.exec() == QDialog.DialogCode.Accepted:
