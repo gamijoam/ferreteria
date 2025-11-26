@@ -11,7 +11,7 @@ class InventoryWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Gestión de Inventario (Bodega) - Módulo 2")
-        self.resize(1000, 700)
+        self.resize(1200, 750)
         
         self.db = SessionLocal()
         self.controller = InventoryController(self.db)

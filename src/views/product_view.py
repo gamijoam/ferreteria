@@ -12,7 +12,7 @@ class ProductWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Gestión de Productos - Módulo 1")
-        self.resize(1000, 600)
+        self.resize(1200, 750)
         
         self.db = SessionLocal()
         

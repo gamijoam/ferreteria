@@ -13,7 +13,7 @@ class AdvancedReportWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Reportes Avanzados - Módulo 12")
-        self.resize(1200, 700)
+        self.resize(1200, 750)
         
         self.db = SessionLocal()
         self.controller = ReportController(self.db)

@@ -14,7 +14,7 @@ class POSWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Punto de Venta (POS) - Módulo 3")
-        self.resize(1200, 800)
+        self.resize(1200, 750)
         
         self.db = SessionLocal()
         self.controller = POSController(self.db)
@@ -188,7 +188,21 @@ class POSWindow(QWidget):
             self.table.setItem(i, 4, subtotal_item)
             
             # Delete Button
-            btn_del = QPushButton("X")
+            btn_del = QPushButton("Eliminar")
+            btn_del.setFixedWidth(70)
+            btn_del.setStyleSheet("""
+                QPushButton {
+                    background-color: #F44336;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    padding: 6px;
+                    font-size: 9pt;
+                }
+                QPushButton:hover {
+                    background-color: #D32F2F;
+                }
+            """)
             btn_del.clicked.connect(lambda checked, idx=i: self.remove_item(idx))
             self.table.setCellWidget(i, 5, btn_del)
             

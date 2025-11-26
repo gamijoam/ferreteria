@@ -1,5 +1,6 @@
 import sys
 from PyQt6.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget, QLabel, QDialog
+from PyQt6.QtCore import Qt
 from src.database.db import engine, Base
 from src.views.product_view import ProductWindow
 from src.views.inventory_view import InventoryWindow
@@ -20,92 +21,186 @@ class MainWindow(QMainWindow):
     def __init__(self, user):
         super().__init__()
         self.user = user
-        self.setWindowTitle(f"Sistema Ferretería - Usuario: {user.username} ({user.role.value})")
-        self.resize(400, 600)
+        self.setWindowTitle(f"🏪 Sistema Ferretería ERP")
+        self.resize(900, 700)
+        
+        # Set window style
+        self.setStyleSheet("""
+            QMainWindow {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 #E3F2FD, stop:1 #BBDEFB);
+            }
+        """)
         
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         
-        layout = QVBoxLayout()
-        central_widget.setLayout(layout)
+        main_layout = QVBoxLayout()
+        central_widget.setLayout(main_layout)
         
-        # Dashboard (All roles)
-        btn_dashboard = QPushButton("📊 DASHBOARD")
-        btn_dashboard.setStyleSheet("background-color: #2196F3; color: white; padding: 15px; font-size: 16px; font-weight: bold;")
+        # Header
+        header = QWidget()
+        header.setStyleSheet("background-color: #1976D2; border-radius: 10px; padding: 20px;")
+        header_layout = QVBoxLayout()
+        header.setLayout(header_layout)
+        
+        title = QLabel("🏪 SISTEMA FERRETERÍA ERP")
+        title.setStyleSheet("color: white; font-size: 28pt; font-weight: bold;")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        header_layout.addWidget(title)
+        
+        user_label = QLabel(f"👤 Usuario: {user.username} | Rol: {user.role.value}")
+        user_label.setStyleSheet("color: white; font-size: 12pt;")
+        user_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        header_layout.addWidget(user_label)
+        
+        main_layout.addWidget(header)
+        
+        # Dashboard Button (Prominent)
+        from PyQt6.QtWidgets import QGridLayout
+        btn_dashboard = self.create_module_button(
+            "📊", "DASHBOARD", 
+            "Vista general del negocio",
+            "#2196F3"
+        )
         btn_dashboard.clicked.connect(self.open_dashboard)
-        layout.addWidget(btn_dashboard)
+        main_layout.addWidget(btn_dashboard)
         
-        layout.addWidget(QLabel("---"))
+        # Modules Grid
+        grid = QGridLayout()
+        grid.setSpacing(15)
+        main_layout.addLayout(grid)
         
-        # Products: Admin & Warehouse
+        row, col = 0, 0
+        
+        # Products & Inventory
         if user.role in [UserRole.ADMIN, UserRole.WAREHOUSE]:
-            btn_products = QPushButton("Módulo 1: Productos")
-            btn_products.clicked.connect(self.open_products)
-            layout.addWidget(btn_products)
+            btn = self.create_module_button("📦", "Productos", "Gestión de productos", "#4CAF50")
+            btn.clicked.connect(self.open_products)
+            grid.addWidget(btn, row, col)
+            col += 1
+            
+            btn = self.create_module_button("📥", "Inventario", "Control de stock", "#4CAF50")
+            btn.clicked.connect(self.open_inventory)
+            grid.addWidget(btn, row, col)
+            col += 1
+            
+            if col >= 3:
+                row += 1
+                col = 0
         
-        # Inventory: Admin & Warehouse
+        # POS & Cash
+        if user.role in [UserRole.ADMIN, UserRole.CASHIER]:
+            btn = self.create_module_button("🛒", "Punto de Venta", "Ventas rápidas", "#FF9800")
+            btn.clicked.connect(self.open_pos)
+            grid.addWidget(btn, row, col)
+            col += 1
+            
+            btn = self.create_module_button("💵", "Caja", "Control de efectivo", "#FF9800")
+            btn.clicked.connect(self.open_cash)
+            grid.addWidget(btn, row, col)
+            col += 1
+            
+            if col >= 3:
+                row += 1
+                col = 0
+        
+        # Returns & Customers
+        if user.role in [UserRole.ADMIN, UserRole.CASHIER]:
+            btn = self.create_module_button("↩️", "Devoluciones", "Gestión de returns", "#F44336")
+            btn.clicked.connect(self.open_returns)
+            grid.addWidget(btn, row, col)
+            col += 1
+            
+            btn = self.create_module_button("👥", "Clientes", "Crédito y pagos", "#9C27B0")
+            btn.clicked.connect(self.open_customers)
+            grid.addWidget(btn, row, col)
+            col += 1
+            
+            if col >= 3:
+                row += 1
+                col = 0
+        
+        # Quotes & Prices
+        if user.role in [UserRole.ADMIN, UserRole.CASHIER]:
+            btn = self.create_module_button("📋", "Cotizaciones", "Presupuestos", "#00BCD4")
+            btn.clicked.connect(self.open_quotes)
+            grid.addWidget(btn, row, col)
+            col += 1
+        
+        if user.role == UserRole.ADMIN:
+            btn = self.create_module_button("💰", "Precios", "Mayoristas", "#00BCD4")
+            btn.clicked.connect(self.open_price_rules)
+            grid.addWidget(btn, row, col)
+            col += 1
+            
+            if col >= 3:
+                row += 1
+                col = 0
+        
+        # Labels & Users
         if user.role in [UserRole.ADMIN, UserRole.WAREHOUSE]:
-            btn_inventory = QPushButton("Módulo 2: Inventario (Bodega)")
-            btn_inventory.clicked.connect(self.open_inventory)
-            layout.addWidget(btn_inventory)
+            btn = self.create_module_button("🏷️", "Etiquetas", "Impresión", "#607D8B")
+            btn.clicked.connect(self.open_labels)
+            grid.addWidget(btn, row, col)
+            col += 1
         
-        # POS: Admin & Cashier
-        if user.role in [UserRole.ADMIN, UserRole.CASHIER]:
-            btn_pos = QPushButton("Módulo 3: Punto de Venta (POS)")
-            btn_pos.clicked.connect(self.open_pos)
-            layout.addWidget(btn_pos)
+        if user.role == UserRole.ADMIN:
+            btn = self.create_module_button("👤", "Usuarios", "Gestión de accesos", "#607D8B")
+            btn.clicked.connect(self.open_user_management)
+            grid.addWidget(btn, row, col)
+            col += 1
+            
+            if col >= 3:
+                row += 1
+                col = 0
+            
+            btn = self.create_module_button("📊", "Reportes", "Análisis avanzado", "#3F51B5")
+            btn.clicked.connect(self.open_reports)
+            grid.addWidget(btn, row, col)
         
-        # Cash: Admin & Cashier
-        if user.role in [UserRole.ADMIN, UserRole.CASHIER]:
-            btn_cash = QPushButton("Módulo 4: Caja y Finanzas")
-            btn_cash.clicked.connect(self.open_cash)
-            layout.addWidget(btn_cash)
-
-        # Returns: Admin & Cashier (Usually requires auth, but for now open to both)
-        if user.role in [UserRole.ADMIN, UserRole.CASHIER]:
-            btn_returns = QPushButton("Módulo 6: Devoluciones")
-            btn_returns.clicked.connect(self.open_returns)
-            layout.addWidget(btn_returns)
-
-        # Customers: Admin & Cashier
-        if user.role in [UserRole.ADMIN, UserRole.CASHIER]:
-            btn_customers = QPushButton("Módulo 7: Clientes y Crédito")
-            btn_customers.clicked.connect(self.open_customers)
-            layout.addWidget(btn_customers)
-
-        # Price Rules: Admin Only
-        if user.role == UserRole.ADMIN:
-            btn_prices = QPushButton("Módulo 8: Precios Mayoristas")
-            btn_prices.clicked.connect(self.open_price_rules)
-            layout.addWidget(btn_prices)
-
-        # Quotes: Admin & Cashier
-        if user.role in [UserRole.ADMIN, UserRole.CASHIER]:
-            btn_quotes = QPushButton("Módulo 9: Cotizaciones")
-            btn_quotes.clicked.connect(self.open_quotes)
-            layout.addWidget(btn_quotes)
-
-        # Labels: Admin & Warehouse
-        if user.role in [UserRole.ADMIN, UserRole.WAREHOUSE]:
-            btn_labels = QPushButton("Módulo 10: Etiquetas")
-            btn_labels.clicked.connect(self.open_labels)
-            layout.addWidget(btn_labels)
-
-        # User Management: Admin Only
-        if user.role == UserRole.ADMIN:
-            btn_users = QPushButton("Módulo 11: Gestión de Usuarios")
-            btn_users.clicked.connect(self.open_user_management)
-            layout.addWidget(btn_users)
-
-        # Reports: Admin Only
-        if user.role == UserRole.ADMIN:
-            btn_reports = QPushButton("Módulo 12: Reportes Avanzados")
-            btn_reports.clicked.connect(self.open_reports)
-            layout.addWidget(btn_reports)
+        main_layout.addStretch()
         
-        container = QWidget()
-        container.setLayout(layout)
-        self.setCentralWidget(container)
+        # Footer
+        footer = QLabel("Sistema ERP v2.0 | Desarrollado con PyQt6")
+        footer.setStyleSheet("color: #666; font-size: 9pt; padding: 10px;")
+        footer.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        main_layout.addWidget(footer)
+
+    def create_module_button(self, icon, title, subtitle, color):
+        """Create a modern card-style button"""
+        btn = QPushButton()
+        btn.setMinimumHeight(100)
+        btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {color};
+                color: white;
+                border: none;
+                border-radius: 12px;
+                padding: 15px;
+                text-align: left;
+                font-size: 14pt;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: {self.darken_color(color)};
+            }}
+            QPushButton:pressed {{
+                background-color: {self.darken_color(color, 0.3)};
+            }}
+        """)
+        
+        btn.setText(f"{icon}  {title}\n{subtitle}")
+        return btn
+    
+    def darken_color(self, hex_color, factor=0.15):
+        """Darken a hex color"""
+        hex_color = hex_color.lstrip('#')
+        r, g, b = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+        r = int(r * (1 - factor))
+        g = int(g * (1 - factor))
+        b = int(b * (1 - factor))
+        return f'#{r:02x}{g:02x}{b:02x}'
 
     def open_products(self):
         self.product_window = ProductWindow()
@@ -164,6 +259,10 @@ def main():
     print("Tablas creadas exitosamente.")
 
     app = QApplication(sys.argv)
+    
+    # Apply modern theme
+    from src.theme import MODERN_THEME
+    app.setStyleSheet(MODERN_THEME)
     
     # Show Login First
     login = LoginDialog()

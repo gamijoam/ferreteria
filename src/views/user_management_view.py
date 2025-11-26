@@ -11,7 +11,7 @@ class UserManagementWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Gestión de Usuarios - Módulo 11")
-        self.resize(900, 600)
+        self.resize(1200, 750)
         
         self.db = SessionLocal()
         self.controller = AuthController(self.db)
@@ -103,6 +103,7 @@ class UserManagementWindow(QWidget):
         
         for i, user in enumerate(users):
             self.user_table.insertRow(i)
+            self.user_table.setRowHeight(i, 50)  # Set row height for better button visibility
             self.user_table.setItem(i, 0, QTableWidgetItem(str(user.id)))
             self.user_table.setItem(i, 1, QTableWidgetItem(user.username))
             self.user_table.setItem(i, 2, QTableWidgetItem(user.role.value))
@@ -113,13 +114,56 @@ class UserManagementWindow(QWidget):
             btn_layout = QHBoxLayout()
             btn_layout.setContentsMargins(0, 0, 0, 0)
             
+            
             btn_edit = QPushButton("Editar")
+            btn_edit.setFixedWidth(60)
+            btn_edit.setStyleSheet("""
+                QPushButton {
+                    background-color: #2196F3;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    padding: 6px;
+                    font-size: 9pt;
+                }
+                QPushButton:hover {
+                    background-color: #1976D2;
+                }
+            """)
             btn_edit.clicked.connect(lambda checked, u=user: self.edit_user(u))
             
-            btn_deactivate = QPushButton("Desactivar" if user.is_active else "Activar")
+            btn_deactivate = QPushButton("Activar" if not user.is_active else "Desact.")
+            btn_deactivate.setFixedWidth(60)
+            btn_deactivate.setStyleSheet("""
+                QPushButton {
+                    background-color: #FF9800;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    padding: 6px;
+                    font-size: 9pt;
+                }
+                QPushButton:hover {
+                    background-color: #F57C00;
+                }
+            """)
             btn_deactivate.clicked.connect(lambda checked, u=user: self.toggle_user_status(u))
             
-            btn_password = QPushButton("Cambiar Contraseña")
+            btn_password = QPushButton("Contraseña")
+            btn_password.setFixedWidth(80)
+            btn_password.setStyleSheet("""
+                QPushButton {
+                    background-color: #607D8B;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    padding: 6px;
+                    font-size: 9pt;
+                }
+                QPushButton:hover {
+                    background-color: #455A64;
+                }
+            """)
             btn_password.clicked.connect(lambda checked, u=user: self.change_password(u))
             
             btn_layout.addWidget(btn_edit)

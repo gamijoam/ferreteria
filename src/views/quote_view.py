@@ -9,7 +9,7 @@ class QuoteWindow(QWidget):
     def __init__(self, pos_window=None):
         super().__init__()
         self.setWindowTitle("Cotizaciones - Módulo 9")
-        self.resize(900, 600)
+        self.resize(1200, 750)
         
         self.db = SessionLocal()
         self.controller = QuoteController(self.db)
@@ -45,6 +45,7 @@ class QuoteWindow(QWidget):
         
         for i, quote in enumerate(quotes):
             self.table.insertRow(i)
+            self.table.setRowHeight(i, 50)  # Set row height for better button visibility
             self.table.setItem(i, 0, QTableWidgetItem(str(quote.id)))
             self.table.setItem(i, 1, QTableWidgetItem(quote.date.strftime('%Y-%m-%d %H:%M')))
             self.table.setItem(i, 2, QTableWidgetItem(quote.customer.name if quote.customer else "N/A"))
@@ -56,10 +57,43 @@ class QuoteWindow(QWidget):
             btn_layout = QHBoxLayout()
             btn_layout.setContentsMargins(0, 0, 0, 0)
             
+            
             btn_print = QPushButton("Imprimir")
+            btn_print.setFixedWidth(70)
+            btn_print.setStyleSheet("""
+                QPushButton {
+                    background-color: #2196F3;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    padding: 6px;
+                    font-size: 9pt;
+                }
+                QPushButton:hover {
+                    background-color: #1976D2;
+                }
+            """)
             btn_print.clicked.connect(lambda checked, q=quote: self.print_quote(q))
             
-            btn_convert = QPushButton("Convertir a Venta")
+            btn_convert = QPushButton("Convertir")
+            btn_convert.setFixedWidth(70)
+            btn_convert.setStyleSheet("""
+                QPushButton {
+                    background-color: #4CAF50;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    padding: 6px;
+                    font-size: 9pt;
+                }
+                QPushButton:hover {
+                    background-color: #388E3C;
+                }
+                QPushButton:disabled {
+                    background-color: #BDBDBD;
+                    color: #757575;
+                }
+            """)
             btn_convert.clicked.connect(lambda checked, q=quote: self.convert_to_sale(q))
             if quote.status == "CONVERTED":
                 btn_convert.setEnabled(False)

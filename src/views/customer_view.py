@@ -10,7 +10,7 @@ class CustomerWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Gestión de Clientes - Módulo 7")
-        self.resize(900, 600)
+        self.resize(1200, 750)
         
         self.db = SessionLocal()
         self.controller = CustomerController(self.db)

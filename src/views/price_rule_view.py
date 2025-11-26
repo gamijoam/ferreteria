@@ -10,7 +10,7 @@ class PriceRuleWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Precios Mayoristas - Módulo 8")
-        self.resize(800, 600)
+        self.resize(1200, 750)
         
         self.db = SessionLocal()
         self.current_product = None
@@ -93,11 +93,26 @@ class PriceRuleWindow(QWidget):
         self.table.setRowCount(0)
         for i, rule in enumerate(rules):
             self.table.insertRow(i)
+            self.table.setRowHeight(i, 50)  # Set row height for better button visibility
             self.table.setItem(i, 0, QTableWidgetItem(str(rule.id)))
             self.table.setItem(i, 1, QTableWidgetItem(str(rule.min_quantity)))
             self.table.setItem(i, 2, QTableWidgetItem(f"${rule.price:,.2f}"))
             
             btn_del = QPushButton("Eliminar")
+            btn_del.setFixedWidth(70)
+            btn_del.setStyleSheet("""
+                QPushButton {
+                    background-color: #F44336;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    padding: 6px;
+                    font-size: 9pt;
+                }
+                QPushButton:hover {
+                    background-color: #D32F2F;
+                }
+            """)
             btn_del.clicked.connect(lambda checked, r=rule: self.delete_rule(r))
             self.table.setCellWidget(i, 3, btn_del)
 

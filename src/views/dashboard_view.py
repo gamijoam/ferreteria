@@ -13,7 +13,7 @@ class DashboardWindow(QWidget):
     def __init__(self, main_window=None):
         super().__init__()
         self.setWindowTitle("Dashboard Ejecutivo - Módulo 13")
-        self.resize(1000, 700)
+        self.resize(1200, 750)
         
         self.db = SessionLocal()
         self.controller = ReportController(self.db)

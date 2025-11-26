@@ -9,7 +9,7 @@ class ReturnDialog(QDialog):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Procesar Devolución - Módulo 6")
-        self.resize(800, 500)
+        self.resize(1200, 750)
         
         self.db = SessionLocal()
         self.controller = ReturnController(self.db)

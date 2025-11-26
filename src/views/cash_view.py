@@ -10,7 +10,7 @@ class CashWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Caja y Finanzas - Módulo 4")
-        self.resize(600, 400)
+        self.resize(1200, 750)
         
         self.db = SessionLocal()
         self.controller = CashController(self.db)

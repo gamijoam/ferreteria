@@ -10,7 +10,7 @@ class LabelWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Impresión de Etiquetas - Módulo 10")
-        self.resize(700, 600)
+        self.resize(1200, 750)
         
         self.db = SessionLocal()
         self.controller = LabelController(self.db)
