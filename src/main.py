@@ -29,13 +29,22 @@ from src.views.dashboard_view import DashboardWindow
 from src.views.customer_view import CustomerWindow
 from src.views.supplier_view import SupplierWindow
 from src.views.purchase_view import PurchaseOrderWindow
+from src.views.config_view import ConfigDialog
 from src.models.models import UserRole
+from src.controllers.config_controller import ConfigController
+from src.database.db import SessionLocal
 
 class MainWindow(QMainWindow):
     def __init__(self, user):
         super().__init__()
         self.user = user
-        self.setWindowTitle(f"🏪 Sistema Ferretería ERP")
+        
+        # Load business config
+        self.db = SessionLocal()
+        self.config_controller = ConfigController(self.db)
+        self.business_info = self.config_controller.get_business_info()
+        
+        self.setWindowTitle(f"🏪 {self.business_info['name']} - ERP")
         self.resize(900, 700)
 
         # Set window style
@@ -58,7 +67,7 @@ class MainWindow(QMainWindow):
         header_layout = QVBoxLayout()
         header.setLayout(header_layout)
 
-        title = QLabel("🏪 SISTEMA FERRETERÍA ERP")
+        title = QLabel(f"🏪 {self.business_info['name'].upper()}")
         title.setStyleSheet("color: white; font-size: 28pt; font-weight: bold;")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header_layout.addWidget(title)
@@ -97,12 +106,17 @@ class MainWindow(QMainWindow):
             btn.clicked.connect(self.open_inventory)
             grid.addWidget(btn, row, col)
             col += 1
+            
+            btn = self.create_module_button("🚚", "Proveedores", "Gestión de proveedores", "#4CAF50")
+            btn.clicked.connect(self.open_suppliers)
+            grid.addWidget(btn, row, col)
+            col += 1
 
             if col >= 3:
                 row += 1
                 col = 0
 
-        # POS & Cash
+        # POS & Cash & Purchases
         if user.role in [UserRole.ADMIN, UserRole.CASHIER]:
             btn = self.create_module_button("🛒", "Punto de Venta", "Ventas rápidas", "#FF9800")
             btn.clicked.connect(self.open_pos)
@@ -113,12 +127,18 @@ class MainWindow(QMainWindow):
             btn.clicked.connect(self.open_cash)
             grid.addWidget(btn, row, col)
             col += 1
+            
+        if user.role in [UserRole.ADMIN, UserRole.WAREHOUSE]:
+            btn = self.create_module_button("🛍️", "Compras", "Órdenes de compra", "#FF9800")
+            btn.clicked.connect(self.open_purchases)
+            grid.addWidget(btn, row, col)
+            col += 1
 
-            if col >= 3:
-                row += 1
-                col = 0
+        if col >= 3:
+            row += 1
+            col = 0
 
-        # Returns & Customers
+        # Returns & Customers & Quotes
         if user.role in [UserRole.ADMIN, UserRole.CASHIER]:
             btn = self.create_module_button("↩️", "Devoluciones", "Gestión de returns", "#F44336")
             btn.clicked.connect(self.open_returns)
@@ -129,10 +149,9 @@ class MainWindow(QMainWindow):
             btn.clicked.connect(self.open_customers)
             grid.addWidget(btn, row, col)
             col += 1
-
-        if user.role == UserRole.ADMIN:
-            btn = self.create_module_button("💰", "Precios", "Mayoristas", "#00BCD4")
-            btn.clicked.connect(self.open_price_rules)
+            
+            btn = self.create_module_button("📝", "Cotizaciones", "Presupuestos", "#9C27B0")
+            btn.clicked.connect(self.open_quotes)
             grid.addWidget(btn, row, col)
             col += 1
 
@@ -140,7 +159,13 @@ class MainWindow(QMainWindow):
                 row += 1
                 col = 0
 
-        # Labels & Users
+        # Admin & Management Tools
+        if user.role == UserRole.ADMIN:
+            btn = self.create_module_button("💰", "Precios", "Mayoristas", "#00BCD4")
+            btn.clicked.connect(self.open_price_rules)
+            grid.addWidget(btn, row, col)
+            col += 1
+
         if user.role in [UserRole.ADMIN, UserRole.WAREHOUSE]:
             btn = self.create_module_button("🏷️", "Etiquetas", "Impresión", "#607D8B")
             btn.clicked.connect(self.open_labels)
@@ -148,25 +173,25 @@ class MainWindow(QMainWindow):
             col += 1
 
         if user.role == UserRole.ADMIN:
-            btn = self.create_module_button("👤", "Usuarios", "Gestión de accesos", "#607D8B")
+            btn = self.create_module_button("👥", "Usuarios", "Gestión de accesos", "#607D8B")
             btn.clicked.connect(self.open_user_management)
             grid.addWidget(btn, row, col)
             col += 1
-
+            
             if col >= 3:
                 row += 1
                 col = 0
+
+            btn = self.create_module_button("⚙️", "Configuración", "Datos del negocio", "#607D8B")
+            btn.clicked.connect(self.open_config)
+            grid.addWidget(btn, row, col)
+            col += 1
 
             btn = self.create_module_button("📊", "Reportes", "Análisis avanzado", "#3F51B5")
             btn.clicked.connect(self.open_reports)
             grid.addWidget(btn, row, col)
             col += 1
 
-            if col >= 3:
-                row += 1
-                col = 0
-
-            # Excel Import Button
             btn = self.create_module_button("📄", "Importar Excel", "Cargar productos", "#009688")
             btn.clicked.connect(self.open_excel_import)
             grid.addWidget(btn, row, col)
@@ -220,6 +245,20 @@ class MainWindow(QMainWindow):
     # -----------------------------------------------------------------
     # Open window helpers
     # -----------------------------------------------------------------
+    def open_config(self):
+        dialog = ConfigDialog(self)
+        if dialog.exec():
+            # Refresh title if changed
+            info = self.config_controller.get_business_info()
+            self.setWindowTitle(f"🏪 {info['name']} - ERP")
+            
+            # Find and update title label if possible
+            # This is a bit hacky but works for immediate feedback
+            for widget in self.findChildren(QLabel):
+                if "🏪" in widget.text():
+                    widget.setText(f"🏪 {info['name'].upper()}")
+                    break
+
     def open_products(self):
         self.product_window = ProductWindow()
         self.product_window.show()

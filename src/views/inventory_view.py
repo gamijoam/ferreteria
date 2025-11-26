@@ -81,15 +81,19 @@ class InventoryWindow(QWidget):
         
         # Filter
         filter_layout = QHBoxLayout()
-        self.history_product_combo = QComboBox()
-        self.history_product_combo.addItem("Seleccione Producto...", None)
-        self.load_history_products()
+        
+        self.history_product_search = QLineEdit()
+        self.history_product_search.setPlaceholderText("Buscar producto por nombre o código...")
+        self.setup_history_product_autocomplete()
+        self.history_product_search.returnPressed.connect(self.on_history_product_selected)
+        
+        self.selected_history_product_id = None
         
         btn_refresh = QPushButton("Ver Historial")
         btn_refresh.clicked.connect(self.load_kardex)
         
         filter_layout.addWidget(QLabel("Producto:"))
-        filter_layout.addWidget(self.history_product_combo)
+        filter_layout.addWidget(self.history_product_search)
         filter_layout.addWidget(btn_refresh)
         layout.addLayout(filter_layout)
         
@@ -158,12 +162,6 @@ class InventoryWindow(QWidget):
         # This method is no longer used but kept for compatibility
         pass
     
-    def load_history_products(self):
-        """Load products for history tab combo box"""
-        products = self.db.query(Product).filter(Product.is_active == True).all()
-        for p in products:
-            self.history_product_combo.addItem(f"{p.name}", p.id)
-
     def handle_add_stock(self):
         try:
             if not self.selected_product_id:
@@ -192,21 +190,68 @@ class InventoryWindow(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Error", str(e))
 
-    def load_kardex(self):
-        product_id = self.history_product_combo.currentData()
-        if not product_id:
+    def setup_history_product_autocomplete(self):
+        """Setup autocomplete for product search in history tab"""
+        products = self.db.query(Product).filter(Product.is_active == True).all()
+        
+        # Reuse the same map logic or create new one
+        self.history_product_map = {}
+        suggestions = []
+        for p in products:
+            sku_part = f" - {p.sku}" if p.sku else ""
+            suggestion = f"{p.name}{sku_part}"
+            suggestions.append(suggestion)
+            self.history_product_map[suggestion] = p
+        
+        completer = QCompleter(suggestions)
+        completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        completer.setFilterMode(Qt.MatchFlag.MatchContains)
+        self.history_product_search.setCompleter(completer)
+
+    def on_history_product_selected(self):
+        text = self.history_product_search.text().strip()
+        if not text:
             return
             
-        records = self.controller.get_kardex(product_id)
+        product = self.history_product_map.get(text)
+        if not product:
+            product = self.db.query(Product).filter(
+                (Product.name.ilike(f"%{text}%")) | (Product.sku == text),
+                Product.is_active == True
+            ).first()
+            
+        if product:
+            self.selected_history_product_id = product.id
+            self.load_kardex()
+        else:
+            self.selected_history_product_id = None
+            QMessageBox.warning(self, "Error", "Producto no encontrado")
+
+    def load_history_products(self):
+        pass
+
+    def load_kardex(self):
+        if not self.selected_history_product_id:
+            return
+
         self.kardex_table.setRowCount(0)
         
-        for row, rec in enumerate(records):
+        movements = self.controller.get_kardex(self.selected_history_product_id)
+        
+        for row, mov in enumerate(movements):
             self.kardex_table.insertRow(row)
-            self.kardex_table.setItem(row, 0, QTableWidgetItem(str(rec.date)))
-            self.kardex_table.setItem(row, 1, QTableWidgetItem(rec.movement_type.value))
-            self.kardex_table.setItem(row, 2, QTableWidgetItem(str(rec.quantity)))
-            self.kardex_table.setItem(row, 3, QTableWidgetItem(str(rec.balance_after)))
-            self.kardex_table.setItem(row, 4, QTableWidgetItem(rec.description))
+            self.kardex_table.setItem(row, 0, QTableWidgetItem(mov.date.strftime("%Y-%m-%d %H:%M")))
+            self.kardex_table.setItem(row, 1, QTableWidgetItem(mov.movement_type.value))
+            
+            qty_item = QTableWidgetItem(str(mov.quantity))
+            if mov.quantity > 0:
+                qty_item.setForeground(Qt.GlobalColor.green)
+            else:
+                qty_item.setForeground(Qt.GlobalColor.red)
+            self.kardex_table.setItem(row, 2, qty_item)
+            
+            self.kardex_table.setItem(row, 3, QTableWidgetItem(str(mov.balance_after)))
+            self.kardex_table.setItem(row, 4, QTableWidgetItem(mov.description or ""))
 
     def closeEvent(self, event):
         self.db.close()

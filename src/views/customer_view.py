@@ -1,8 +1,9 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, 
     QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox, 
-    QTabWidget, QFormLayout, QGroupBox, QComboBox, QInputDialog
+    QTabWidget, QFormLayout, QGroupBox, QComboBox, QInputDialog, QCompleter
 )
+from PyQt6.QtCore import Qt
 from src.database.db import SessionLocal
 from src.controllers.customer_controller import CustomerController
 
@@ -69,14 +70,19 @@ class CustomerWindow(QWidget):
         
         # Customer selector
         selector_layout = QHBoxLayout()
-        self.debt_customer_combo = QComboBox()
-        self.load_customers_combo()
+        
+        self.customer_search = QLineEdit()
+        self.customer_search.setPlaceholderText("Buscar cliente por nombre...")
+        self.setup_customer_autocomplete()
+        self.customer_search.returnPressed.connect(self.on_customer_selected)
+        
+        self.selected_customer_id = None
         
         btn_check = QPushButton("Ver Deuda")
         btn_check.clicked.connect(self.check_debt)
         
         selector_layout.addWidget(QLabel("Cliente:"))
-        selector_layout.addWidget(self.debt_customer_combo)
+        selector_layout.addWidget(self.customer_search)
         selector_layout.addWidget(btn_check)
         layout.addLayout(selector_layout)
         
@@ -125,29 +131,62 @@ class CustomerWindow(QWidget):
             self.customer_table.setItem(i, 3, QTableWidgetItem(c.address or ""))
 
     def load_customers_combo(self):
-        self.debt_customer_combo.clear()
-        customers = self.controller.get_all_customers()
-        for c in customers:
-            self.debt_customer_combo.addItem(c.name, c.id)
+        # Kept for compatibility
+        pass
 
-    def check_debt(self):
-        customer_id = self.debt_customer_combo.currentData()
-        if not customer_id:
+    def setup_customer_autocomplete(self):
+        """Setup autocomplete for customer search"""
+        customers = self.controller.get_all_customers()
+        
+        self.customer_map = {}
+        suggestions = []
+        for c in customers:
+            suggestion = c.name
+            suggestions.append(suggestion)
+            self.customer_map[suggestion] = c
+            
+        completer = QCompleter(suggestions)
+        completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        completer.setFilterMode(Qt.MatchFlag.MatchContains)
+        self.customer_search.setCompleter(completer)
+
+    def on_customer_selected(self):
+        text = self.customer_search.text().strip()
+        if not text:
             return
             
-        debt = self.controller.get_customer_debt(customer_id)
+        customer = self.customer_map.get(text)
+        if not customer:
+            # Try finding by name
+            # Note: This is a simple check, could be improved
+            for name, c in self.customer_map.items():
+                if text.lower() in name.lower():
+                    customer = c
+                    break
+        
+        if customer:
+            self.selected_customer_id = customer.id
+            self.check_debt()
+        else:
+            self.selected_customer_id = None
+            QMessageBox.warning(self, "Error", "Cliente no encontrado")
+
+    def check_debt(self):
+        if not self.selected_customer_id:
+            return
+            
+        debt = self.controller.get_customer_debt(self.selected_customer_id)
         self.lbl_debt.setText(f"Deuda Actual: ${debt:,.0f}")
 
     def record_payment(self):
-        customer_id = self.debt_customer_combo.currentData()
-        if not customer_id:
+        if not self.selected_customer_id:
             QMessageBox.warning(self, "Error", "Seleccione un cliente")
             return
             
         amount, ok = QInputDialog.getDouble(self, "Registrar Pago", "Monto del pago:")
         if ok and amount > 0:
             try:
-                self.controller.record_payment(customer_id, amount)
+                self.controller.record_payment(self.selected_customer_id, amount)
                 QMessageBox.information(self, "Éxito", "Pago registrado")
                 self.check_debt()  # Refresh
             except Exception as e:

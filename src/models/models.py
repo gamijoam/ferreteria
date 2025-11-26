@@ -306,3 +306,12 @@ class PurchaseOrderDetail(Base):
 
     def __repr__(self):
         return f"<PurchaseOrderDetail(product={self.product_id}, qty={self.quantity}, cost={self.unit_cost})>"
+
+class BusinessConfig(Base):
+    __tablename__ = "business_config"
+
+    key = Column(String, primary_key=True, index=True)
+    value = Column(Text, nullable=True)
+
+    def __repr__(self):
+        return f"<BusinessConfig(key='{self.key}', value='{self.value}')>"
