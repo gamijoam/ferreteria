@@ -6,8 +6,13 @@ from src.views.inventory_view import InventoryWindow
 from src.views.pos_view import POSWindow
 from src.views.cash_view import CashWindow
 from src.views.login_view import LoginDialog
-from src.views.report_view import ReportWindow
+from src.views.advanced_report_view import AdvancedReportWindow
 from src.views.return_view import ReturnDialog
+from src.views.price_rule_view import PriceRuleWindow
+from src.views.quote_view import QuoteWindow
+from src.views.label_view import LabelWindow
+from src.views.user_management_view import UserManagementWindow
+from src.views.dashboard_view import DashboardWindow
 from src.views.customer_view import CustomerWindow
 from src.models.models import UserRole
 
@@ -16,11 +21,21 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.user = user
         self.setWindowTitle(f"Sistema Ferretería - Usuario: {user.username} ({user.role.value})")
-        self.resize(400, 400)
+        self.resize(400, 600)
+        
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
         
         layout = QVBoxLayout()
+        central_widget.setLayout(layout)
         
-        # Role Based Access Control
+        # Dashboard (All roles)
+        btn_dashboard = QPushButton("📊 DASHBOARD")
+        btn_dashboard.setStyleSheet("background-color: #2196F3; color: white; padding: 15px; font-size: 16px; font-weight: bold;")
+        btn_dashboard.clicked.connect(self.open_dashboard)
+        layout.addWidget(btn_dashboard)
+        
+        layout.addWidget(QLabel("---"))
         
         # Products: Admin & Warehouse
         if user.role in [UserRole.ADMIN, UserRole.WAREHOUSE]:
@@ -58,9 +73,33 @@ class MainWindow(QMainWindow):
             btn_customers.clicked.connect(self.open_customers)
             layout.addWidget(btn_customers)
 
+        # Price Rules: Admin Only
+        if user.role == UserRole.ADMIN:
+            btn_prices = QPushButton("Módulo 8: Precios Mayoristas")
+            btn_prices.clicked.connect(self.open_price_rules)
+            layout.addWidget(btn_prices)
+
+        # Quotes: Admin & Cashier
+        if user.role in [UserRole.ADMIN, UserRole.CASHIER]:
+            btn_quotes = QPushButton("Módulo 9: Cotizaciones")
+            btn_quotes.clicked.connect(self.open_quotes)
+            layout.addWidget(btn_quotes)
+
+        # Labels: Admin & Warehouse
+        if user.role in [UserRole.ADMIN, UserRole.WAREHOUSE]:
+            btn_labels = QPushButton("Módulo 10: Etiquetas")
+            btn_labels.clicked.connect(self.open_labels)
+            layout.addWidget(btn_labels)
+
+        # User Management: Admin Only
+        if user.role == UserRole.ADMIN:
+            btn_users = QPushButton("Módulo 11: Gestión de Usuarios")
+            btn_users.clicked.connect(self.open_user_management)
+            layout.addWidget(btn_users)
+
         # Reports: Admin Only
         if user.role == UserRole.ADMIN:
-            btn_reports = QPushButton("Módulo 5: Reportes y Seguridad")
+            btn_reports = QPushButton("Módulo 12: Reportes Avanzados")
             btn_reports.clicked.connect(self.open_reports)
             layout.addWidget(btn_reports)
         
@@ -85,7 +124,7 @@ class MainWindow(QMainWindow):
         self.cash_window.show()
 
     def open_reports(self):
-        self.report_window = ReportWindow()
+        self.report_window = AdvancedReportWindow()
         self.report_window.show()
 
     def open_returns(self):
@@ -95,6 +134,28 @@ class MainWindow(QMainWindow):
     def open_customers(self):
         self.customer_window = CustomerWindow()
         self.customer_window.show()
+
+    def open_price_rules(self):
+        self.price_rule_window = PriceRuleWindow()
+        self.price_rule_window.show()
+
+    def open_quotes(self):
+        # Pass POS reference if open
+        pos_ref = getattr(self, 'pos_window', None)
+        self.quote_window = QuoteWindow(pos_window=pos_ref)
+        self.quote_window.show()
+
+    def open_labels(self):
+        self.label_window = LabelWindow()
+        self.label_window.show()
+
+    def open_user_management(self):
+        self.user_mgmt_window = UserManagementWindow()
+        self.user_mgmt_window.show()
+
+    def open_dashboard(self):
+        self.dashboard_window = DashboardWindow(main_window=self)
+        self.dashboard_window.show()
 
 def main():
     # Create tables

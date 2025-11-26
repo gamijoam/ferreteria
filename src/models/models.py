@@ -216,3 +216,49 @@ class Payment(Base):
 
     def __repr__(self):
         return f"<Payment(customer={self.customer_id}, amount={self.amount})>"
+
+class PriceRule(Base):
+    __tablename__ = "price_rules"
+
+    id = Column(Integer, primary_key=True, index=True)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
+    min_quantity = Column(Integer, nullable=False)  # Minimum qty to apply this price
+    price = Column(Float, nullable=False)  # Special price for this tier
+
+    product = relationship("Product")
+
+    def __repr__(self):
+        return f"<PriceRule(product={self.product_id}, min_qty={self.min_quantity}, price={self.price})>"
+
+class Quote(Base):
+    __tablename__ = "quotes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    customer_id = Column(Integer, ForeignKey("customers.id"), nullable=True)
+    date = Column(DateTime, default=datetime.datetime.utcnow)
+    total_amount = Column(Float, nullable=False)
+    status = Column(String, default="PENDING")  # PENDING, CONVERTED, EXPIRED
+    notes = Column(Text, nullable=True)
+
+    customer = relationship("Customer")
+    details = relationship("QuoteDetail", back_populates="quote")
+
+    def __repr__(self):
+        return f"<Quote(id={self.id}, total={self.total_amount}, status='{self.status}')>"
+
+class QuoteDetail(Base):
+    __tablename__ = "quote_details"
+
+    id = Column(Integer, primary_key=True, index=True)
+    quote_id = Column(Integer, ForeignKey("quotes.id"), nullable=False)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
+    quantity = Column(Integer, nullable=False)
+    unit_price = Column(Float, nullable=False)
+    subtotal = Column(Float, nullable=False)
+    is_box_sale = Column(Boolean, default=False)
+
+    quote = relationship("Quote", back_populates="details")
+    product = relationship("Product")
+
+    def __repr__(self):
+        return f"<QuoteDetail(product={self.product_id}, qty={self.quantity})>"

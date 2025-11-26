@@ -44,3 +44,53 @@ class AuthController:
         self.db.add(new_user)
         self.db.commit()
         return new_user
+
+    def get_all_users(self):
+        """Get all users"""
+        return self.db.query(User).all()
+
+    def get_user_by_id(self, user_id: int):
+        """Get user by ID"""
+        return self.db.query(User).get(user_id)
+
+    def update_user(self, user_id: int, username: str = None, role: UserRole = None, is_active: bool = None):
+        """Update user details"""
+        user = self.db.query(User).get(user_id)
+        if not user:
+            raise ValueError("Usuario no encontrado")
+        
+        if username and username != user.username:
+            # Check if new username already exists
+            existing = self.db.query(User).filter(User.username == username, User.id != user_id).first()
+            if existing:
+                raise ValueError("El nombre de usuario ya existe")
+            user.username = username
+        
+        if role is not None:
+            user.role = role
+        
+        if is_active is not None:
+            user.is_active = is_active
+        
+        self.db.commit()
+        return user
+
+    def change_password(self, user_id: int, new_password: str):
+        """Change user password"""
+        user = self.db.query(User).get(user_id)
+        if not user:
+            raise ValueError("Usuario no encontrado")
+        
+        user.password_hash = self._hash_password(new_password)
+        self.db.commit()
+        return user
+
+    def deactivate_user(self, user_id: int):
+        """Deactivate user (soft delete)"""
+        user = self.db.query(User).get(user_id)
+        if not user:
+            raise ValueError("Usuario no encontrado")
+        
+        user.is_active = False
+        self.db.commit()
+        return user

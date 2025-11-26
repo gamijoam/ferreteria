@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from src.models.models import Product, Sale, SaleDetail, Kardex, MovementType
+from src.models.models import Product, Sale, SaleDetail, Kardex, MovementType, PriceRule
 import datetime
 
 class POSController:
@@ -34,6 +34,20 @@ class POSController:
         if product.stock < units_to_deduct:
             return False, f"Stock insuficiente. Disponible: {product.stock} Unidades"
 
+        # Check for Price Rules (Wholesale pricing)
+        # Find the best matching rule: highest min_quantity that quantity meets
+        applicable_rules = self.db.query(PriceRule).filter(
+            PriceRule.product_id == product.id,
+            PriceRule.min_quantity <= quantity
+        ).order_by(PriceRule.min_quantity.desc()).all()
+        
+        if applicable_rules:
+            # Use the first rule (highest min_quantity that applies)
+            best_rule = applicable_rules[0]
+            price_to_use = best_rule.price
+            if is_box:
+                price_to_use = best_rule.price * product.conversion_factor
+        
         # Add to cart
         subtotal = price_to_use * quantity
         
@@ -70,11 +84,29 @@ class POSController:
         # Check Stock
         if product.stock < units_to_deduct:
             return False, f"Stock insuficiente. Disponible: {product.stock} Unidades"
+        
+        # Recalculate price based on new quantity (check price rules)
+        price_to_use = product.price
+        if item["is_box"]:
+            price_to_use = product.price * product.conversion_factor
+        
+        # Check for Price Rules (Wholesale pricing)
+        applicable_rules = self.db.query(PriceRule).filter(
+            PriceRule.product_id == product.id,
+            PriceRule.min_quantity <= new_quantity
+        ).order_by(PriceRule.min_quantity.desc()).all()
+        
+        if applicable_rules:
+            best_rule = applicable_rules[0]
+            price_to_use = best_rule.price
+            if item["is_box"]:
+                price_to_use = best_rule.price * product.conversion_factor
             
         # Update item
         item["quantity"] = new_quantity
         item["units_deducted"] = units_to_deduct
-        item["subtotal"] = item["unit_price"] * new_quantity
+        item["unit_price"] = price_to_use  # Update unit price
+        item["subtotal"] = price_to_use * new_quantity
         
         return True, "Cantidad actualizada"
 

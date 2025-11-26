@@ -8,6 +8,7 @@ from PyQt6.QtCore import Qt
 from src.database.db import SessionLocal
 from src.controllers.pos_controller import POSController
 from src.controllers.customer_controller import CustomerController
+from src.controllers.quote_controller import QuoteController
 
 class POSWindow(QWidget):
     def __init__(self):
@@ -18,6 +19,7 @@ class POSWindow(QWidget):
         self.db = SessionLocal()
         self.controller = POSController(self.db)
         self.customer_controller = CustomerController(self.db)
+        self.quote_controller = QuoteController(self.db)
         
         self.layout = QVBoxLayout()
         self.setLayout(self.layout)
@@ -87,8 +89,14 @@ class POSWindow(QWidget):
         btn_pay.setStyleSheet("background-color: #007bff; color: white; padding: 10px;")
         btn_pay.clicked.connect(self.handle_payment)
         
+        btn_quote = QPushButton("GUARDAR COTIZACIÓN (F4)")
+        btn_quote.setFont(QFont("Arial", 14, QFont.Weight.Bold))
+        btn_quote.setStyleSheet("background-color: #ff9800; color: white; padding: 10px;")
+        btn_quote.clicked.connect(self.save_as_quote)
+        
         bottom_layout.addWidget(self.lbl_total)
         bottom_layout.addStretch()
+        bottom_layout.addWidget(btn_quote)
         bottom_layout.addWidget(btn_pay)
         
         self.layout.addWidget(bottom_frame)
@@ -100,6 +108,7 @@ class POSWindow(QWidget):
         QShortcut(QKeySequence("F1"), self, self.focus_input)
         QShortcut(QKeySequence("F2"), self, self.toggle_box_mode)
         QShortcut(QKeySequence("F3"), self, self.toggle_credit)
+        QShortcut(QKeySequence("F4"), self, self.save_as_quote)
         QShortcut(QKeySequence("F12"), self, self.handle_payment)
         QShortcut(QKeySequence("Del"), self, self.remove_selected_item)
 
@@ -263,6 +272,51 @@ class POSWindow(QWidget):
                 QMessageBox.critical(self, "Error", msg)
         
         self.focus_input()
+
+    def save_as_quote(self):
+        """Save current cart as a quote (F4)"""
+        if not self.controller.cart:
+            QMessageBox.warning(self, "Alerta", "El carrito está vacío")
+            return
+        
+        from PyQt6.QtWidgets import QInputDialog
+        
+        # Ask for customer (optional)
+        customer_id = None
+        if self.customer_combo.count() > 1:  # Has customers
+            customer_name, ok = QInputDialog.getItem(
+                self, "Cliente", 
+                "Seleccione cliente (opcional):",
+                [self.customer_combo.itemText(i) for i in range(self.customer_combo.count())],
+                0, False
+            )
+            if ok and customer_name != "Seleccione Cliente...":
+                customer_id = self.customer_combo.findText(customer_name)
+                if customer_id > 0:
+                    customer_id = self.customer_combo.itemData(customer_id)
+        
+        # Ask for notes
+        notes, ok = QInputDialog.getText(
+            self, "Notas", 
+            "Notas de la cotización (opcional):"
+        )
+        if not ok:
+            return
+        
+        try:
+            quote = self.quote_controller.save_quote(
+                self.controller.cart, 
+                customer_id=customer_id, 
+                notes=notes
+            )
+            QMessageBox.information(
+                self, "Éxito", 
+                f"Cotización #{quote.id} guardada exitosamente"
+            )
+            self.controller.cart.clear()
+            self.refresh_table()
+        except Exception as e:
+            QMessageBox.critical(self, "Error", str(e))
 
     def closeEvent(self, event):
         self.db.close()
