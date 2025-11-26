@@ -51,7 +51,7 @@ class Product(Base):
     description = Column(Text, nullable=True)
     price = Column(Float, nullable=False, default=0.0)
     cost_price = Column(Float, default=0.0)  # NEW: Cost for profit margin calculation
-    stock = Column(Integer, default=0) # Base units
+    stock = Column(Float, default=0.0) # Base units
     is_active = Column(Boolean, default=True) # Logical delete
 
     # Core Logic for Hardware Store
@@ -75,8 +75,8 @@ class Kardex(Base):
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
     date = Column(DateTime, default=datetime.datetime.now)
     movement_type = Column(Enum(MovementType), nullable=False)
-    quantity = Column(Integer, nullable=False) # Positive or Negative
-    balance_after = Column(Integer, nullable=False)
+    quantity = Column(Float, nullable=False) # Positive or Negative
+    balance_after = Column(Float, nullable=False)
     description = Column(Text, nullable=True)
 
     product = relationship("Product")
@@ -109,7 +109,7 @@ class SaleDetail(Base):
     id = Column(Integer, primary_key=True, index=True)
     sale_id = Column(Integer, ForeignKey("sales.id"), nullable=False)
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
-    quantity = Column(Integer, nullable=False) # Units sold
+    quantity = Column(Float, nullable=False) # Units sold
     unit_price = Column(Float, nullable=False) # Price at moment of sale
     subtotal = Column(Float, nullable=False)
     is_box_sale = Column(Boolean, default=False) # Was it sold as a box?
@@ -190,7 +190,7 @@ class ReturnDetail(Base):
     id = Column(Integer, primary_key=True, index=True)
     return_id = Column(Integer, ForeignKey("returns.id"), nullable=False)
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
-    quantity = Column(Integer, nullable=False) # Units returned
+    quantity = Column(Float, nullable=False) # Units returned
 
     return_obj = relationship("Return", back_populates="details")
     product = relationship("Product")
@@ -231,7 +231,7 @@ class PriceRule(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
-    min_quantity = Column(Integer, nullable=False)  # Minimum qty to apply this price
+    min_quantity = Column(Float, nullable=False)  # Minimum qty to apply this price
     price = Column(Float, nullable=False)  # Special price for this tier
 
     product = relationship("Product")
@@ -261,7 +261,7 @@ class QuoteDetail(Base):
     id = Column(Integer, primary_key=True, index=True)
     quote_id = Column(Integer, ForeignKey("quotes.id"), nullable=False)
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
-    quantity = Column(Integer, nullable=False)
+    quantity = Column(Float, nullable=False)
     unit_price = Column(Float, nullable=False)
     subtotal = Column(Float, nullable=False)
     is_box_sale = Column(Boolean, default=False)
@@ -297,7 +297,7 @@ class PurchaseOrderDetail(Base):
     id = Column(Integer, primary_key=True, index=True)
     order_id = Column(Integer, ForeignKey("purchase_orders.id"), nullable=False)
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
-    quantity = Column(Integer, nullable=False)
+    quantity = Column(Float, nullable=False)
     unit_cost = Column(Float, nullable=False)  # Cost per unit
     subtotal = Column(Float, nullable=False)
 

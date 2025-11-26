@@ -43,5 +43,38 @@ class InventoryController:
         self.db.refresh(product)
         return product
 
-    def get_kardex(self, product_id: int):
-        return self.db.query(Kardex).filter(Kardex.product_id == product_id).order_by(Kardex.date.desc()).all()
+    def remove_stock(self, product_id: int, quantity: float, description: str = "Ajuste de Salida"):
+        """
+        Registra una salida de mercancía (Ajuste / Merma / Donación).
+        """
+        product = self.db.query(Product).filter(Product.id == product_id).first()
+        if not product:
+            raise ValueError("Producto no encontrado")
+
+        if product.stock < quantity:
+            raise ValueError(f"Stock insuficiente. Stock actual: {product.stock}")
+
+        # Actualizar Stock
+        product.stock -= quantity
+        
+        # Crear Kardex
+        kardex_entry = Kardex(
+            product_id=product.id,
+            movement_type=MovementType.ADJUSTMENT_OUT,
+            quantity=quantity,
+            balance_after=product.stock,
+            description=description
+        )
+        
+        self.db.add(kardex_entry)
+        self.db.commit()
+        self.db.refresh(product)
+        return product
+
+    def get_kardex(self, product_id: int = None):
+        query = self.db.query(Kardex).join(Product)
+        
+        if product_id:
+            query = query.filter(Kardex.product_id == product_id)
+            
+        return query.order_by(Kardex.date.desc()).all()

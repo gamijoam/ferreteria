@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QLineEdit, QPushButton, 
-    QMessageBox, QLabel, QGroupBox
+    QMessageBox, QLabel, QGroupBox, QComboBox
 )
 from src.database.db import SessionLocal
 from src.controllers.config_controller import ConfigController
@@ -35,8 +35,12 @@ class ConfigDialog(QDialog):
         self.address_input = QLineEdit()
         self.phone_input = QLineEdit()
         
+        self.business_type_combo = QComboBox()
+        self.business_type_combo.addItems(["Ferretería", "Pescadería/Frutería", "Otro"])
+        
         form_layout.addRow("Nombre del Negocio:", self.name_input)
         form_layout.addRow("RIF / NIT:", self.rif_input)
+        form_layout.addRow("Tipo de Negocio:", self.business_type_combo)
         form_layout.addRow("Dirección:", self.address_input)
         form_layout.addRow("Teléfono:", self.phone_input)
         
@@ -68,6 +72,12 @@ class ConfigDialog(QDialog):
         self.rif_input.setText(info["rif"])
         self.address_input.setText(info["address"])
         self.phone_input.setText(info["phone"])
+        
+        # Load business type
+        business_type = self.controller.get_config("BUSINESS_TYPE", "Ferretería")
+        index = self.business_type_combo.findText(business_type)
+        if index >= 0:
+            self.business_type_combo.setCurrentIndex(index)
 
     def save_config(self):
         try:
@@ -81,6 +91,10 @@ class ConfigDialog(QDialog):
                 return
                 
             self.controller.update_business_info(name, rif, address, phone)
+            
+            # Save business type
+            business_type = self.business_type_combo.currentText()
+            self.controller.set_config("BUSINESS_TYPE", business_type)
             
             QMessageBox.information(self, "Éxito", "Configuración guardada correctamente.\nReinicie la aplicación para ver algunos cambios.")
             self.accept()

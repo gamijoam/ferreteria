@@ -7,7 +7,7 @@ class POSController:
         self.db = db
         self.cart = [] # List of dicts
 
-    def add_to_cart(self, sku_or_name: str, quantity: int, is_box: bool):
+    def add_to_cart(self, sku_or_name: str, quantity: float, is_box: bool):
         """
         Busca producto y agrega al carrito.
         Retorna (Success: bool, Message: str)
@@ -60,13 +60,14 @@ class POSController:
             "unit_price": price_to_use, # Price of the item (box or unit)
             "subtotal": subtotal,
             "is_box": is_box,
+            "unit_type": product.unit_type,  # NEW: Store unit type (Kg, Metro, etc.)
             "product_obj": product # Keep ref for finalization
         }
         
         self.cart.append(item)
         return True, "Agregado al carrito"
 
-    def update_quantity(self, index: int, new_quantity: int):
+    def update_quantity(self, index: int, new_quantity: float):
         """
         Actualiza la cantidad de un item en el carrito.
         """

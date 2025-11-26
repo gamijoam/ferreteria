@@ -1,9 +1,9 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, 
     QCheckBox, QComboBox, QPushButton, QTableWidget, QTableWidgetItem, 
-    QHeaderView, QMessageBox, QGroupBox, QFormLayout, QTabWidget, QCompleter
+    QHeaderView, QMessageBox, QGroupBox, QFormLayout, QTabWidget, QCompleter, QDoubleSpinBox
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QLocale
 from src.database.db import SessionLocal
 from src.models.models import Product
 from src.controllers.inventory_controller import InventoryController
@@ -28,12 +28,15 @@ class InventoryWindow(QWidget):
         self.layout.addWidget(self.tabs)
         
         self.entry_tab = QWidget()
+        self.stock_out_tab = QWidget()
         self.history_tab = QWidget()
         
         self.tabs.addTab(self.entry_tab, "Entrada de Mercancía")
+        self.tabs.addTab(self.stock_out_tab, "Salida / Ajuste")
         self.tabs.addTab(self.history_tab, "Kardex / Historial")
         
         self.setup_entry_tab()
+        self.setup_stock_out_tab()
         self.setup_history_tab()
 
     def setup_entry_tab(self):
@@ -53,8 +56,13 @@ class InventoryWindow(QWidget):
         self.selected_product_label = QLabel("Ningún producto seleccionado")
         self.selected_product_label.setStyleSheet("font-weight: bold; color: #666;")
         
-        self.qty_input = QLineEdit()
-        self.qty_input.setPlaceholderText("Cantidad")
+        self.qty_input = QDoubleSpinBox()
+        self.qty_input.setRange(0, 1000000)
+        self.qty_input.setDecimals(3)
+        self.qty_input.setSingleStep(1)
+        self.qty_input.setValue(1)
+        # Force dot as decimal separator
+        self.qty_input.setLocale(QLocale(QLocale.Language.English, QLocale.Country.UnitedStates))
         
         self.is_box_check = QCheckBox("Es Caja / Pack")
         self.is_box_check.setEnabled(False) # Will enable if product allows
@@ -92,16 +100,20 @@ class InventoryWindow(QWidget):
         btn_refresh = QPushButton("Ver Historial")
         btn_refresh.clicked.connect(self.load_kardex)
         
+        btn_all = QPushButton("Ver Todos")
+        btn_all.clicked.connect(self.load_all_kardex)
+        
         filter_layout.addWidget(QLabel("Producto:"))
         filter_layout.addWidget(self.history_product_search)
         filter_layout.addWidget(btn_refresh)
+        filter_layout.addWidget(btn_all)
         layout.addLayout(filter_layout)
         
         # Table
         self.kardex_table = QTableWidget()
-        self.kardex_table.setColumnCount(5)
+        self.kardex_table.setColumnCount(6)
         self.kardex_table.setHorizontalHeaderLabels([
-            "Fecha", "Tipo", "Cantidad", "Saldo", "Descripción"
+            "Fecha", "Producto", "Tipo", "Cantidad", "Saldo", "Descripción"
         ])
         self.kardex_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         layout.addWidget(self.kardex_table)
@@ -165,27 +177,138 @@ class InventoryWindow(QWidget):
     def handle_add_stock(self):
         try:
             if not self.selected_product_id:
-                QMessageBox.warning(self, "Error", "Por favor seleccione un producto primero")
+                QMessageBox.warning(self, "Error", "Seleccione un producto primero")
                 return
             
-            qty_text = self.qty_input.text()
+            qty = self.qty_input.value()
             
-            if not qty_text.isdigit():
+            if qty <= 0:
                 QMessageBox.warning(self, "Error", "Ingrese una cantidad válida")
                 return
                 
-            qty = int(qty_text)
             is_box = self.is_box_check.isChecked()
             
             self.controller.add_stock(self.selected_product_id, qty, is_box)
             
             QMessageBox.information(self, "Éxito", "Stock actualizado correctamente")
-            self.qty_input.clear()
+            self.qty_input.setValue(1)
             self.product_search.clear()
             self.selected_product_id = None
             self.selected_product_label.setText("Ningún producto seleccionado")
             self.selected_product_label.setStyleSheet("font-weight: bold; color: #666;")
             self.current_stock_label.setText("Stock Actual: -")
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Error", str(e))
+
+    def setup_stock_out_tab(self):
+        layout = QVBoxLayout()
+        self.stock_out_tab.setLayout(layout)
+        
+        form_group = QGroupBox("Registrar Salida / Ajuste / Merma")
+        form_layout = QFormLayout()
+        
+        # Product search
+        self.out_product_search = QLineEdit()
+        self.out_product_search.setPlaceholderText("Buscar producto por nombre o código...")
+        self.setup_stock_out_product_autocomplete()
+        self.out_product_search.returnPressed.connect(self.on_stock_out_product_selected)
+        
+        self.selected_out_product_id = None
+        self.selected_out_product_label = QLabel("Ningún producto seleccionado")
+        self.selected_out_product_label.setStyleSheet("font-weight: bold; color: #666;")
+        
+        self.out_current_stock_label = QLabel("Stock Actual: -")
+        
+        self.out_qty_input = QDoubleSpinBox()
+        self.out_qty_input.setRange(0, 1000000)
+        self.out_qty_input.setDecimals(3)
+        self.out_qty_input.setSingleStep(1)
+        self.out_qty_input.setValue(1)
+        self.out_qty_input.setLocale(QLocale(QLocale.Language.English, QLocale.Country.UnitedStates))
+        
+        self.out_reason_combo = QComboBox()
+        self.out_reason_combo.addItems(["Ajuste de Inventario", "Merma / Dañado", "Donación", "Uso Interno", "Otro"])
+        self.out_reason_combo.setEditable(True)
+        
+        btn_remove = QPushButton("Registrar Salida")
+        btn_remove.setStyleSheet("background-color: #d32f2f; color: white; font-weight: bold;")
+        btn_remove.clicked.connect(self.handle_remove_stock)
+        
+        form_layout.addRow("Producto:", self.out_product_search)
+        form_layout.addRow("", self.selected_out_product_label)
+        form_layout.addRow("Stock Actual:", self.out_current_stock_label)
+        form_layout.addRow("Cantidad a Retirar:", self.out_qty_input)
+        form_layout.addRow("Motivo:", self.out_reason_combo)
+        form_layout.addRow(btn_remove)
+        
+        form_group.setLayout(form_layout)
+        layout.addWidget(form_group)
+        layout.addStretch()
+
+    def setup_stock_out_product_autocomplete(self):
+        products = self.db.query(Product).filter(Product.is_active == True).all()
+        
+        self.out_product_map = {}
+        suggestions = []
+        for p in products:
+            sku_part = f" - {p.sku}" if p.sku else ""
+            suggestion = f"{p.name}{sku_part}"
+            suggestions.append(suggestion)
+            self.out_product_map[suggestion] = p
+        
+        completer = QCompleter(suggestions)
+        completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        completer.setFilterMode(Qt.MatchFlag.MatchContains)
+        self.out_product_search.setCompleter(completer)
+
+    def on_stock_out_product_selected(self):
+        text = self.out_product_search.text().strip()
+        if not text:
+            return
+            
+        product = self.out_product_map.get(text)
+        if not product:
+            product = self.db.query(Product).filter(
+                (Product.name.ilike(f"%{text}%")) | (Product.sku == text),
+                Product.is_active == True
+            ).first()
+        
+        if product:
+            self.selected_out_product_id = product.id
+            self.selected_out_product_label.setText(f"✓ {product.name}")
+            self.selected_out_product_label.setStyleSheet("font-weight: bold; color: green;")
+            self.out_current_stock_label.setText(f"Stock Actual: {product.stock} {product.unit_type}")
+        else:
+            self.selected_out_product_id = None
+            self.selected_out_product_label.setText("Producto no encontrado")
+            self.selected_out_product_label.setStyleSheet("font-weight: bold; color: red;")
+
+    def handle_remove_stock(self):
+        try:
+            if not self.selected_out_product_id:
+                QMessageBox.warning(self, "Error", "Seleccione un producto primero")
+                return
+            
+            qty = self.out_qty_input.value()
+            if qty <= 0:
+                QMessageBox.warning(self, "Error", "Ingrese una cantidad válida")
+                return
+                
+            reason = self.out_reason_combo.currentText()
+            if not reason:
+                QMessageBox.warning(self, "Error", "Ingrese un motivo")
+                return
+            
+            self.controller.remove_stock(self.selected_out_product_id, qty, reason)
+            
+            QMessageBox.information(self, "Éxito", "Salida de stock registrada correctamente")
+            self.out_qty_input.setValue(1)
+            self.out_product_search.clear()
+            self.selected_out_product_id = None
+            self.selected_out_product_label.setText("Ningún producto seleccionado")
+            self.selected_out_product_label.setStyleSheet("font-weight: bold; color: #666;")
+            self.out_current_stock_label.setText("Stock Actual: -")
             
         except Exception as e:
             QMessageBox.critical(self, "Error", str(e))
@@ -230,28 +353,38 @@ class InventoryWindow(QWidget):
     def load_history_products(self):
         pass
 
-    def load_kardex(self):
-        if not self.selected_history_product_id:
-            return
+    def load_all_kardex(self):
+        self.history_product_search.clear()
+        self.selected_history_product_id = None
+        self.load_kardex()
 
+    def load_kardex(self):
+        # Allow loading all history if no product selected
+        product_id = self.selected_history_product_id
+        
         self.kardex_table.setRowCount(0)
         
-        movements = self.controller.get_kardex(self.selected_history_product_id)
+        movements = self.controller.get_kardex(product_id)
         
         for row, mov in enumerate(movements):
             self.kardex_table.insertRow(row)
             self.kardex_table.setItem(row, 0, QTableWidgetItem(mov.date.strftime("%Y-%m-%d %H:%M")))
-            self.kardex_table.setItem(row, 1, QTableWidgetItem(mov.movement_type.value))
+            
+            # Product Name (Need to fetch if not already available in mov object via relationship)
+            product_name = mov.product.name if mov.product else "Desconocido"
+            self.kardex_table.setItem(row, 1, QTableWidgetItem(product_name))
+            
+            self.kardex_table.setItem(row, 2, QTableWidgetItem(mov.movement_type.value))
             
             qty_item = QTableWidgetItem(str(mov.quantity))
             if mov.quantity > 0:
                 qty_item.setForeground(Qt.GlobalColor.green)
             else:
                 qty_item.setForeground(Qt.GlobalColor.red)
-            self.kardex_table.setItem(row, 2, qty_item)
+            self.kardex_table.setItem(row, 3, qty_item)
             
-            self.kardex_table.setItem(row, 3, QTableWidgetItem(str(mov.balance_after)))
-            self.kardex_table.setItem(row, 4, QTableWidgetItem(mov.description or ""))
+            self.kardex_table.setItem(row, 4, QTableWidgetItem(str(mov.balance_after)))
+            self.kardex_table.setItem(row, 5, QTableWidgetItem(mov.description or ""))
 
     def closeEvent(self, event):
         self.db.close()

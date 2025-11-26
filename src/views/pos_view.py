@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, 
     QCheckBox, QPushButton, QTableWidget, QTableWidgetItem, 
-    QHeaderView, QMessageBox, QFrame, QComboBox, QCompleter
+    QHeaderView, QMessageBox, QFrame, QComboBox, QCompleter, QDoubleSpinBox
 )
 from PyQt6.QtGui import QKeySequence, QFont, QShortcut
 from PyQt6.QtCore import Qt
@@ -57,7 +57,7 @@ class POSWindow(QWidget):
         self.load_customers()
         
         top_layout.addWidget(lbl_scan)
-        top_layout.addWidget(self.input_scan)
+        top_layout.addWidget(self.input_scan, 3)
         top_layout.addWidget(self.check_box_mode)
         top_layout.addWidget(self.check_credit)
         top_layout.addWidget(self.customer_combo)
@@ -150,7 +150,7 @@ class POSWindow(QWidget):
         suggestions = []
         for p in products:
             sku_part = f" - {p.sku}" if p.sku else ""
-            suggestion = f"{p.name}{sku_part} - ${p.price:,.0f}"
+            suggestion = f"{p.name}{sku_part} - ${p.price:,.2f}"
             suggestions.append(suggestion)
         
         # Create completer
@@ -173,7 +173,7 @@ class POSWindow(QWidget):
             text = text.split(" - ")[0].strip()
             
         is_box = self.check_box_mode.isChecked()
-        qty = 1 
+        qty = 1.0 
         
         success, msg = self.controller.add_to_cart(text, qty, is_box)
         
@@ -203,18 +203,22 @@ class POSWindow(QWidget):
             qty_item = QTableWidgetItem(str(item["quantity"]))
             self.table.setItem(i, 1, qty_item)
             
-            # Type (Not editable)
-            type_item = QTableWidgetItem("CAJA" if item["is_box"] else "UNID")
+            # Type (Not editable) - Show unit type (Kg, Metro, etc.) or CAJA
+            if item["is_box"]:
+                type_text = "CAJA"
+            else:
+                type_text = item.get("unit_type", "Unidad")
+            type_item = QTableWidgetItem(type_text)
             type_item.setFlags(type_item.flags() ^ Qt.ItemFlag.ItemIsEditable)
             self.table.setItem(i, 2, type_item)
             
             # Unit Price (Not editable)
-            price_item = QTableWidgetItem(f"${item['unit_price']:,.0f}")
+            price_item = QTableWidgetItem(f"${item['unit_price']:,.2f}")
             price_item.setFlags(price_item.flags() ^ Qt.ItemFlag.ItemIsEditable)
             self.table.setItem(i, 3, price_item)
             
             # Subtotal (Not editable)
-            subtotal_item = QTableWidgetItem(f"${item['subtotal']:,.0f}")
+            subtotal_item = QTableWidgetItem(f"${item['subtotal']:,.2f}")
             subtotal_item.setFlags(subtotal_item.flags() ^ Qt.ItemFlag.ItemIsEditable)
             self.table.setItem(i, 4, subtotal_item)
             
@@ -239,7 +243,7 @@ class POSWindow(QWidget):
             
             total += item["subtotal"]
             
-        self.lbl_total.setText(f"Total: ${total:,.0f}")
+        self.lbl_total.setText(f"Total: ${total:,.2f}")
         
         self.table.blockSignals(False)
 
@@ -248,10 +252,11 @@ class POSWindow(QWidget):
         if column == 1:
             try:
                 new_qty_str = self.table.item(row, column).text()
-                if not new_qty_str.isdigit():
-                    raise ValueError("Debe ser un número")
+                try:
+                    new_qty = float(new_qty_str)
+                except ValueError:
+                    raise ValueError("Debe ser un número válido")
                 
-                new_qty = int(new_qty_str)
                 if new_qty <= 0:
                     raise ValueError("Debe ser mayor a 0")
                 

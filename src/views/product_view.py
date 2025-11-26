@@ -2,10 +2,10 @@ import sys
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, 
     QCheckBox, QComboBox, QPushButton, QTableWidget, QTableWidgetItem, 
-    QHeaderView, QMessageBox, QFormLayout, QGroupBox, QDialog
+    QHeaderView, QMessageBox, QFormLayout, QGroupBox, QDialog, QDoubleSpinBox
 )
 from PyQt6.QtGui import QColor, QFont
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QLocale
 from src.database.db import SessionLocal
 from src.controllers.product_controller import ProductController
 
@@ -38,8 +38,13 @@ class ProductFormDialog(QDialog):
         self.cost_input.textChanged.connect(self.calculate_margin)
         self.margin_label = QLabel("Margen: -")
         self.margin_label.setStyleSheet("font-weight: bold; color: green;")
-        self.stock_input = QLineEdit()
-        self.stock_input.setPlaceholderText("Cantidad (Unidades base)")
+        
+        self.stock_input = QDoubleSpinBox()
+        self.stock_input.setRange(0, 1000000)
+        self.stock_input.setDecimals(3)
+        self.stock_input.setSingleStep(1)
+        # Force dot as decimal separator
+        self.stock_input.setLocale(QLocale(QLocale.Language.English, QLocale.Country.UnitedStates))
         
         self.is_box_check = QCheckBox("Es Caja / Pack")
         self.is_box_check.toggled.connect(self.toggle_box_fields)
@@ -110,7 +115,7 @@ class ProductFormDialog(QDialog):
         self.sku_input.setText(product.sku or "")
         self.price_input.setText(str(product.price))
         self.cost_input.setText(str(product.cost_price))
-        self.stock_input.setText(str(product.stock))
+        self.stock_input.setValue(float(product.stock))
         self.is_box_check.setChecked(product.is_box)
         self.conversion_factor_input.setText(str(product.conversion_factor))
         self.unit_type_combo.setCurrentText(product.unit_type)
@@ -123,7 +128,7 @@ class ProductFormDialog(QDialog):
             "sku": self.sku_input.text().strip() or None,
             "price": float(self.price_input.text() or 0),
             "cost_price": float(self.cost_input.text() or 0),
-            "stock": int(self.stock_input.text() or 0),
+            "stock": self.stock_input.value(),
             "is_box": self.is_box_check.isChecked(),
             "conversion_factor": int(self.conversion_factor_input.text() or 1),
             "unit_type": self.unit_type_combo.currentText()

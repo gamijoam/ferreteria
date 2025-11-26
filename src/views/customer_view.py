@@ -1,7 +1,8 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, 
-    QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox, 
-    QTabWidget, QFormLayout, QGroupBox, QComboBox, QInputDialog, QCompleter
+    QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, 
+    QMessageBox, QFormLayout, QTabWidget, QCompleter, QDialog, QDoubleSpinBox,
+    QGroupBox
 )
 from PyQt6.QtCore import Qt
 from src.database.db import SessionLocal
@@ -176,21 +177,92 @@ class CustomerWindow(QWidget):
             return
             
         debt = self.controller.get_customer_debt(self.selected_customer_id)
-        self.lbl_debt.setText(f"Deuda Actual: ${debt:,.0f}")
+        self.lbl_debt.setText(f"Deuda Actual: ${debt:,.2f}")
 
     def record_payment(self):
         if not self.selected_customer_id:
             QMessageBox.warning(self, "Error", "Seleccione un cliente")
             return
-            
-        amount, ok = QInputDialog.getDouble(self, "Registrar Pago", "Monto del pago:")
-        if ok and amount > 0:
-            try:
-                self.controller.record_payment(self.selected_customer_id, amount)
-                QMessageBox.information(self, "Éxito", "Pago registrado")
-                self.check_debt()  # Refresh
-            except Exception as e:
-                QMessageBox.critical(self, "Error", str(e))
+        
+        # Get current debt
+        current_debt = self.controller.get_customer_debt(self.selected_customer_id)
+        
+        # Create custom dialog
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Registrar Pago")
+        dialog.setMinimumWidth(350)
+        
+        layout = QVBoxLayout()
+        dialog.setLayout(layout)
+        
+        # Show current debt
+        debt_label = QLabel(f"Deuda Actual: ${current_debt:,.2f}")
+        debt_label.setStyleSheet("font-size: 16px; font-weight: bold; color: red; padding: 10px;")
+        layout.addWidget(debt_label)
+        
+        # Payment input with QDoubleSpinBox
+        form_layout = QFormLayout()
+        amount_spin = QDoubleSpinBox()
+        amount_spin.setRange(0.01, 999999.99)
+        amount_spin.setDecimals(2)
+        amount_spin.setSingleStep(0.50)
+        amount_spin.setValue(current_debt if current_debt > 0 else 0.01)
+        amount_spin.setPrefix("$ ")
+        amount_spin.setStyleSheet("font-size: 18px; padding: 5px;")
+        
+        # Force dot as decimal separator (not comma)
+        from PyQt6.QtCore import QLocale
+        amount_spin.setLocale(QLocale(QLocale.Language.English, QLocale.Country.UnitedStates))
+        
+        amount_spin.selectAll()
+        
+        form_layout.addRow("Monto del Pago:", amount_spin)
+        layout.addLayout(form_layout)
+        
+        # Instructions
+        instructions = QLabel("Use las flechas ↑↓ o escriba el monto.\nEjemplo: 1.50 para un peso cincuenta centavos")
+        instructions.setStyleSheet("color: #666; font-size: 10px; padding: 5px;")
+        layout.addWidget(instructions)
+        
+        # Buttons
+        btn_layout = QHBoxLayout()
+        btn_ok = QPushButton("Registrar Pago")
+        btn_ok.setStyleSheet("background-color: green; color: white; padding: 10px; font-size: 12px;")
+        btn_ok.clicked.connect(dialog.accept)
+        
+        btn_cancel = QPushButton("Cancelar")
+        btn_cancel.setStyleSheet("background-color: gray; color: white; padding: 10px; font-size: 12px;")
+        btn_cancel.clicked.connect(dialog.reject)
+        
+        btn_layout.addWidget(btn_cancel)
+        btn_layout.addWidget(btn_ok)
+        layout.addLayout(btn_layout)
+        
+        # Show dialog
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            amount = amount_spin.value()
+            if amount > 0:
+                try:
+                    self.controller.record_payment(self.selected_customer_id, amount)
+                    new_debt = self.controller.get_customer_debt(self.selected_customer_id)
+                    
+                    if new_debt < 0:
+                        QMessageBox.information(
+                            self, 
+                            "Éxito", 
+                            f"Pago de ${amount:,.2f} registrado.\n\n"
+                            f"El cliente tiene un CRÉDITO A FAVOR de ${abs(new_debt):,.2f}"
+                        )
+                    else:
+                        QMessageBox.information(
+                            self, 
+                            "Éxito", 
+                            f"Pago de ${amount:,.2f} registrado.\n\n"
+                            f"Deuda restante: ${new_debt:,.2f}"
+                        )
+                    self.check_debt()  # Refresh
+                except Exception as e:
+                    QMessageBox.critical(self, "Error", str(e))
 
     def closeEvent(self, event):
         self.db.close()
