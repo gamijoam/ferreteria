@@ -9,7 +9,7 @@ class ReturnController:
     def find_sale(self, sale_id: int):
         return self.db.query(Sale).filter(Sale.id == sale_id).first()
 
-    def process_return(self, sale_id: int, items_to_return: list, reason: str):
+    def process_return(self, sale_id: int, items_to_return: list, reason: str, refund_currency: str = "USD", exchange_rate: float = 1.0):
         """
         items_to_return: List of dicts {product_id, quantity}
         """
@@ -53,7 +53,7 @@ class ReturnController:
             if qty_return > detail.quantity:
                  raise ValueError(f"No puedes devolver más de lo comprado ({detail.quantity})")
 
-            # Calculate refund amount for this item
+            # Calculate refund amount for this item (Always in USD base)
             # Price per unit * qty
             refund_amount = detail.unit_price * qty_return
             total_refund += refund_amount
@@ -86,10 +86,18 @@ class ReturnController:
         # Check if session is open
         session = self.db.query(CashSession).filter(CashSession.status == "OPEN").first()
         if session:
+            # Determine amount to record in cash movement based on currency
+            amount_to_record = total_refund
+            if refund_currency == "Bs":
+                # Convert USD refund amount to Bs
+                amount_to_record = total_refund * exchange_rate
+            
             cash_movement = CashMovement(
                 session_id=session.id,
                 type="EXPENSE", # Refund is an expense/withdrawal
-                amount=total_refund,
+                amount=amount_to_record,
+                currency=refund_currency,
+                exchange_rate=exchange_rate,
                 description=f"Devolución Venta #{sale.id}: {reason}"
             )
             self.db.add(cash_movement)

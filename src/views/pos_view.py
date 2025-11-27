@@ -84,6 +84,7 @@ class POSWindow(QWidget):
         self.currency_combo = QComboBox()
         self.currency_combo.setFont(QFont("Arial", 11))
         self.currency_combo.addItems(["USD", "Bs"])
+        self.currency_combo.setCurrentIndex(1)  # Default to Bs
         self.currency_combo.currentTextChanged.connect(self.on_currency_changed)
         
         currency_layout.addRow("Venta en:", self.currency_combo)
