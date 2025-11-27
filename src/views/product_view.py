@@ -46,6 +46,13 @@ class ProductFormDialog(QDialog):
         # Force dot as decimal separator
         self.stock_input.setLocale(QLocale(QLocale.Language.English, QLocale.Country.UnitedStates))
         
+        self.min_stock_input = QDoubleSpinBox()
+        self.min_stock_input.setRange(0, 1000000)
+        self.min_stock_input.setDecimals(3)
+        self.min_stock_input.setSingleStep(1)
+        self.min_stock_input.setValue(5.0)
+        self.min_stock_input.setLocale(QLocale(QLocale.Language.English, QLocale.Country.UnitedStates))
+        
         self.is_box_check = QCheckBox("Es Caja / Pack")
         self.is_box_check.toggled.connect(self.toggle_box_fields)
         
@@ -63,6 +70,7 @@ class ProductFormDialog(QDialog):
         form_layout.addRow("Precio Venta:", self.price_input)
         form_layout.addRow("", self.margin_label)
         form_layout.addRow("Stock:", self.stock_input)
+        form_layout.addRow("Stock Mínimo (Alerta):", self.min_stock_input)
         form_layout.addRow("Tipo Unidad:", self.unit_type_combo)
         form_layout.addRow("", self.is_box_check)
         form_layout.addRow("Factor Conversión:", self.conversion_factor_input)
@@ -116,6 +124,7 @@ class ProductFormDialog(QDialog):
         self.price_input.setText(str(product.price))
         self.cost_input.setText(str(product.cost_price))
         self.stock_input.setValue(float(product.stock))
+        self.min_stock_input.setValue(float(product.min_stock if hasattr(product, 'min_stock') else 5.0))
         self.is_box_check.setChecked(product.is_box)
         self.conversion_factor_input.setText(str(product.conversion_factor))
         self.unit_type_combo.setCurrentText(product.unit_type)
@@ -129,6 +138,7 @@ class ProductFormDialog(QDialog):
             "price": float(self.price_input.text() or 0),
             "cost_price": float(self.cost_input.text() or 0),
             "stock": self.stock_input.value(),
+            "min_stock": self.min_stock_input.value(),
             "is_box": self.is_box_check.isChecked(),
             "conversion_factor": int(self.conversion_factor_input.text() or 1),
             "unit_type": self.unit_type_combo.currentText()
@@ -195,9 +205,9 @@ class ProductWindow(QWidget):
         
         # Table
         self.table = QTableWidget()
-        self.table.setColumnCount(11)
+        self.table.setColumnCount(12)
         self.table.setHorizontalHeaderLabels([
-            "ID", "Nombre", "SKU", "Costo", "Precio", "Margen%", "Stock", "Es Caja?", "Factor", "Editar", "Eliminar"
+            "ID", "Nombre", "SKU", "Costo", "Precio", "Margen%", "Stock", "Min.", "Es Caja?", "Factor", "Editar", "Eliminar"
         ])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.setFont(QFont("Arial", 10))
@@ -284,21 +294,30 @@ class ProductWindow(QWidget):
             else:
                 self.table.setItem(row, 5, QTableWidgetItem("-"))
             
-            self.table.setItem(row, 6, QTableWidgetItem(str(prod.stock)))
-            self.table.setItem(row, 7, QTableWidgetItem("Sí" if prod.is_box else "No"))
-            self.table.setItem(row, 8, QTableWidgetItem(str(prod.conversion_factor)))
+            stock_item = QTableWidgetItem(str(prod.stock))
+            min_stock = prod.min_stock if hasattr(prod, 'min_stock') else 5.0
+            
+            if prod.stock <= min_stock:
+                stock_item.setForeground(QColor("red"))
+                stock_item.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+                stock_item.setBackground(QColor("#FFEBEE")) # Light red background
+            
+            self.table.setItem(row, 6, stock_item)
+            self.table.setItem(row, 7, QTableWidgetItem(str(min_stock)))
+            self.table.setItem(row, 8, QTableWidgetItem("Sí" if prod.is_box else "No"))
+            self.table.setItem(row, 9, QTableWidgetItem(str(prod.conversion_factor)))
             
             # Edit Button
             btn_edit = QPushButton("✏ Editar")
             btn_edit.setStyleSheet("background-color: #2196F3; color: white; padding: 6px; border-radius: 4px;")
             btn_edit.clicked.connect(lambda checked, pid=prod.id: self.open_edit_product_dialog(pid))
-            self.table.setCellWidget(row, 9, btn_edit)
+            self.table.setCellWidget(row, 10, btn_edit)
             
             # Delete Button
             btn_delete = QPushButton("🗑 Eliminar")
             btn_delete.setStyleSheet("background-color: #F44336; color: white; padding: 6px; border-radius: 4px;")
             btn_delete.clicked.connect(lambda checked, pid=prod.id: self.delete_product(pid))
-            self.table.setCellWidget(row, 10, btn_delete)
+            self.table.setCellWidget(row, 11, btn_delete)
 
     def filter_products(self):
         """Filter products based on search text"""

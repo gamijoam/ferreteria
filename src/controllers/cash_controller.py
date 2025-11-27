@@ -10,16 +10,20 @@ class CashController:
     def get_current_session(self):
         return self.db.query(CashSession).filter(CashSession.status == "OPEN").first()
 
-    def open_session(self, initial_amount: float):
+    def open_session(self, initial_usd: float, initial_bs: float = 0.0):
         if self.get_current_session():
             raise ValueError("Ya existe una caja abierta.")
         
-        new_session = CashSession(initial_cash=initial_amount, status="OPEN")
+        new_session = CashSession(
+            initial_cash=initial_usd, 
+            initial_cash_bs=initial_bs,
+            status="OPEN"
+        )
         self.db.add(new_session)
         self.db.commit()
         return new_session
 
-    def add_movement(self, type: str, amount: float, description: str):
+    def add_movement(self, type: str, amount: float, description: str, currency: str = "USD", exchange_rate: float = 1.0):
         session = self.get_current_session()
         if not session:
             raise ValueError("No hay caja abierta.")
@@ -28,6 +32,8 @@ class CashController:
             session_id=session.id,
             type=type,
             amount=amount,
+            currency=currency,
+            exchange_rate=exchange_rate,
             description=description
         )
         self.db.add(movement)
@@ -39,54 +45,102 @@ class CashController:
         if not session:
             return None
             
-        # Sum Sales since session start
-        # Note: Ideally we link Sales to Session ID directly, but for now we filter by time
-        # A robust system links Sale -> Session. Let's assume time-based for simplicity in this iteration
-        # or we can query Sales where date >= session.start_time
+        # 1. Sales Breakdown (USD and Bs)
+        # We need to sum separately based on payment method
         
-        sales_total = self.db.query(func.sum(Sale.total_amount))\
-            .filter(Sale.date >= session.start_time)\
-            .scalar() or 0.0
+        # Query sales since session start
+        sales = self.db.query(Sale).filter(Sale.date >= session.start_time).all()
+        
+        sales_by_method = {}
+        sales_total_usd = 0.0
+        
+        cash_sales_usd = 0.0
+        cash_sales_bs = 0.0
+        
+        for sale in sales:
+            method = sale.payment_method
+            sales_total_usd += sale.total_amount
             
-        # Sum Movements
-        movements_out = self.db.query(func.sum(CashMovement.amount))\
-            .filter(CashMovement.session_id == session.id, CashMovement.type.in_(["EXPENSE", "WITHDRAWAL"]))\
-            .scalar() or 0.0
+            if method not in sales_by_method:
+                sales_by_method[method] = 0.0
+            sales_by_method[method] += sale.total_amount
             
-        movements_in = self.db.query(func.sum(CashMovement.amount))\
-            .filter(CashMovement.session_id == session.id, CashMovement.type == "DEPOSIT")\
-            .scalar() or 0.0
+            # Calculate Cash Sales
+            if method == "Efectivo USD":
+                cash_sales_usd += sale.total_amount
+            elif method == "Efectivo Bs":
+                # For Bs sales, we use the stored Bs amount
+                # If total_amount_bs is None (legacy), convert using rate used
+                amount_bs = sale.total_amount_bs if sale.total_amount_bs is not None else (sale.total_amount * sale.exchange_rate_used)
+                cash_sales_bs += amount_bs
+
+        # 2. Movements (Expenses/Deposits)
+        movements = self.db.query(CashMovement).filter(CashMovement.session_id == session.id).all()
+        
+        expenses_usd = 0.0
+        expenses_bs = 0.0
+        deposits_usd = 0.0
+        deposits_bs = 0.0
+        
+        for mov in movements:
+            if mov.type in ["EXPENSE", "WITHDRAWAL"]:
+                if mov.currency == "Bs":
+                    expenses_bs += mov.amount
+                else:
+                    expenses_usd += mov.amount
+            elif mov.type == "DEPOSIT":
+                if mov.currency == "Bs":
+                    deposits_bs += mov.amount
+                else:
+                    deposits_usd += mov.amount
             
-        expected = session.initial_cash + sales_total + movements_in - movements_out
+        # 3. Calculate Expected Cash
+        expected_usd = session.initial_cash + cash_sales_usd + deposits_usd - expenses_usd
+        expected_bs = session.initial_cash_bs + cash_sales_bs + deposits_bs - expenses_bs
         
         return {
-            "initial": session.initial_cash,
-            "sales": sales_total,
-            "expenses": movements_out,
-            "deposits": movements_in,
-            "expected": expected
+            "initial_usd": session.initial_cash,
+            "initial_bs": session.initial_cash_bs,
+            "sales_total": sales_total_usd,
+            "sales_by_method": sales_by_method,
+            "expenses_usd": expenses_usd,
+            "expenses_bs": expenses_bs,
+            "deposits_usd": deposits_usd,
+            "deposits_bs": deposits_bs,
+            "expected_usd": expected_usd,
+            "expected_bs": expected_bs
         }
 
-    def close_session(self, reported_amount: float):
+    def close_session(self, reported_usd: float, reported_bs: float):
         session = self.get_current_session()
         if not session:
             raise ValueError("No hay caja abierta.")
             
         balance = self.get_session_balance()
-        expected = balance["expected"]
-        difference = reported_amount - expected
+        expected_usd = balance["expected_usd"]
+        expected_bs = balance["expected_bs"]
         
-        session.final_cash_reported = reported_amount
-        session.final_cash_expected = expected
-        session.difference = difference
+        diff_usd = reported_usd - expected_usd
+        diff_bs = reported_bs - expected_bs
+        
+        session.final_cash_reported = reported_usd
+        session.final_cash_reported_bs = reported_bs
+        session.final_cash_expected = expected_usd
+        session.final_cash_expected_bs = expected_bs
+        session.difference = diff_usd
+        session.difference_bs = diff_bs
+        
         session.end_time = datetime.datetime.utcnow()
         session.status = "CLOSED"
         
         self.db.commit()
         
         return {
-            "expected": expected,
-            "reported": reported_amount,
-            "difference": difference,
+            "expected_usd": expected_usd,
+            "expected_bs": expected_bs,
+            "reported_usd": reported_usd,
+            "reported_bs": reported_bs,
+            "diff_usd": diff_usd,
+            "diff_bs": diff_bs,
             "details": balance
         }

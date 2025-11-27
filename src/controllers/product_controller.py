@@ -6,7 +6,7 @@ class ProductController:
     def __init__(self, db: Session):
         self.db = db
 
-    def create_product(self, name, sku, price, cost_price, stock, is_box, conversion_factor, unit_type, category_id=None, supplier_id=None):
+    def create_product(self, name, sku, price, cost_price, stock, min_stock, is_box, conversion_factor, unit_type, category_id=None, supplier_id=None):
         """Create a new product"""
         # Check if SKU exists and is active
         if sku:
@@ -20,6 +20,7 @@ class ProductController:
             price=price,
             cost_price=cost_price,
             stock=stock,
+            min_stock=min_stock,
             is_box=is_box,
             conversion_factor=conversion_factor,
             unit_type=unit_type,
@@ -31,7 +32,7 @@ class ProductController:
         self.db.commit()
         return new_product
 
-    def update_product(self, product_id, name, sku, price, cost_price, stock, is_box, conversion_factor, unit_type, category_id=None, supplier_id=None):
+    def update_product(self, product_id, name, sku, price, cost_price, stock, min_stock, is_box, conversion_factor, unit_type, category_id=None, supplier_id=None):
         """Update an existing product"""
         product = self.db.query(Product).get(product_id)
         if not product:
@@ -63,6 +64,7 @@ class ProductController:
         product.price = price
         product.cost_price = cost_price
         product.stock = stock
+        product.min_stock = min_stock
         product.is_box = is_box
         product.conversion_factor = conversion_factor
         product.unit_type = unit_type

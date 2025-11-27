@@ -38,3 +38,12 @@ class ConfigController:
         self.set_config("BUSINESS_RIF", rif)
         self.set_config("BUSINESS_ADDRESS", address)
         self.set_config("BUSINESS_PHONE", phone)
+    
+    def get_exchange_rate(self) -> float:
+        """Get current exchange rate (USD to Bs)"""
+        rate_str = self.get_config("exchange_rate", "1.0")
+        try:
+            return float(rate_str)
+        except ValueError:
+            return 1.0
+

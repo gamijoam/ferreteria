@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 from src.database.db import SessionLocal
 from src.controllers.customer_controller import CustomerController
+from src.controllers.config_controller import ConfigController
 
 class CustomerWindow(QWidget):
     def __init__(self):
@@ -16,6 +17,10 @@ class CustomerWindow(QWidget):
         
         self.db = SessionLocal()
         self.controller = CustomerController(self.db)
+        self.config_controller = ConfigController(self.db)
+        
+        # Get exchange rate
+        self.exchange_rate = self.config_controller.get_exchange_rate()
         
         self.layout = QVBoxLayout()
         self.setLayout(self.layout)
@@ -88,9 +93,14 @@ class CustomerWindow(QWidget):
         layout.addLayout(selector_layout)
         
         # Debt display
-        self.lbl_debt = QLabel("Deuda Actual: $0")
-        self.lbl_debt.setStyleSheet("font-size: 20px; font-weight: bold; color: red;")
+        self.lbl_debt = QLabel("Deuda Actual: $0 / Bs 0")
+        self.lbl_debt.setStyleSheet("font-size: 18px; font-weight: bold; color: red;")
         layout.addWidget(self.lbl_debt)
+        
+        # Exchange rate info
+        self.lbl_rate = QLabel(f"Tasa: 1 USD = {self.exchange_rate:.2f} Bs")
+        self.lbl_rate.setStyleSheet("font-size: 12px; color: #666;")
+        layout.addWidget(self.lbl_rate)
         
         # Payment
         btn_pay = QPushButton("Registrar Pago")
@@ -177,7 +187,8 @@ class CustomerWindow(QWidget):
             return
             
         debt = self.controller.get_customer_debt(self.selected_customer_id)
-        self.lbl_debt.setText(f"Deuda Actual: ${debt:,.2f}")
+        debt_bs = debt * self.exchange_rate
+        self.lbl_debt.setText(f"Deuda Actual: ${debt:,.2f} / Bs {debt_bs:,.2f}")
 
     def record_payment(self):
         if not self.selected_customer_id:
@@ -195,10 +206,25 @@ class CustomerWindow(QWidget):
         layout = QVBoxLayout()
         dialog.setLayout(layout)
         
-        # Show current debt
-        debt_label = QLabel(f"Deuda Actual: ${current_debt:,.2f}")
+        # Show current debt in both currencies
+        debt_bs = current_debt * self.exchange_rate
+        debt_label = QLabel(f"Deuda Actual:\n${current_debt:,.2f} / Bs {debt_bs:,.2f}")
         debt_label.setStyleSheet("font-size: 16px; font-weight: bold; color: red; padding: 10px;")
         layout.addWidget(debt_label)
+        
+        # Currency selector
+        from PyQt6.QtWidgets import QRadioButton, QButtonGroup
+        currency_group = QButtonGroup(dialog)
+        
+        radio_usd = QRadioButton("Pagar en USD")
+        radio_bs = QRadioButton("Pagar en Bs")
+        radio_usd.setChecked(True)
+        
+        currency_group.addButton(radio_usd, 0)
+        currency_group.addButton(radio_bs, 1)
+        
+        layout.addWidget(radio_usd)
+        layout.addWidget(radio_bs)
         
         # Payment input with QDoubleSpinBox
         form_layout = QFormLayout()
@@ -241,28 +267,56 @@ class CustomerWindow(QWidget):
         # Show dialog
         if dialog.exec() == QDialog.DialogCode.Accepted:
             amount = amount_spin.value()
-            if amount > 0:
-                try:
-                    self.controller.record_payment(self.selected_customer_id, amount)
-                    new_debt = self.controller.get_customer_debt(self.selected_customer_id)
-                    
-                    if new_debt < 0:
-                        QMessageBox.information(
-                            self, 
-                            "Éxito", 
-                            f"Pago de ${amount:,.2f} registrado.\n\n"
-                            f"El cliente tiene un CRÉDITO A FAVOR de ${abs(new_debt):,.2f}"
-                        )
-                    else:
-                        QMessageBox.information(
-                            self, 
-                            "Éxito", 
-                            f"Pago de ${amount:,.2f} registrado.\n\n"
-                            f"Deuda restante: ${new_debt:,.2f}"
-                        )
-                    self.check_debt()  # Refresh
-                except Exception as e:
-                    QMessageBox.critical(self, "Error", str(e))
+            
+            # Get selected currency
+            currency = "USD" if radio_usd.isChecked() else "Bs"
+            
+            # Convert to USD if paying in Bs
+            amount_usd = amount
+            if currency == "Bs":
+                amount_usd = amount / self.exchange_rate
+            
+            if amount_usd <= 0:
+                QMessageBox.warning(self, "Error", "El monto debe ser mayor a 0")
+                return
+            
+            try:
+                # Record payment in USD (always store in USD)
+                self.controller.add_payment(
+                    self.selected_customer_id, 
+                    amount_usd,
+                    f"Pago en {currency}: {amount:,.2f}"
+                )
+                
+                # Calculate remaining debt
+                remaining_debt = self.controller.get_customer_debt(self.selected_customer_id)
+                remaining_bs = remaining_debt * self.exchange_rate
+                
+                if remaining_debt < 0:
+                    QMessageBox.information(
+                        self, 
+                        "Pago Registrado", 
+                        f"Pago registrado exitosamente.\n\n"
+                        f"CRÉDITO A FAVOR: ${abs(remaining_debt):,.2f} / Bs {abs(remaining_bs):,.2f}"
+                    )
+                elif remaining_debt == 0:
+                    QMessageBox.information(
+                        self, 
+                        "Pago Registrado", 
+                        "Pago registrado exitosamente.\n\nDeuda saldada completamente."
+                    )
+                else:
+                    QMessageBox.information(
+                        self, 
+                        "Pago Registrado", 
+                        f"Pago registrado exitosamente.\n\n"
+                        f"Deuda Restante: ${remaining_debt:,.2f} / Bs {remaining_bs:,.2f}"
+                    )
+                
+                self.check_debt()
+                
+            except Exception as e:
+                QMessageBox.critical(self, "Error", str(e))
 
     def closeEvent(self, event):
         self.db.close()

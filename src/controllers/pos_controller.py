@@ -118,7 +118,7 @@ class POSController:
     def get_total(self):
         return sum(item["subtotal"] for item in self.cart)
 
-    def finalize_sale(self, payment_method="Efectivo", customer_id=None, is_credit=False):
+    def finalize_sale(self, payment_method="Efectivo USD", customer_id=None, is_credit=False, currency="USD", exchange_rate=1.0):
         if not self.cart:
             return False, "El carrito está vacío", ""
 
@@ -131,12 +131,21 @@ class POSController:
 
         try:
             total = self.get_total()
+            
+            # Calculate total in Bs if currency is Bs
+            total_bs = None
+            if currency == "Bs":
+                total_bs = total * exchange_rate
+            
             new_sale = Sale(
                 total_amount=total, 
                 payment_method=payment_method,
                 customer_id=customer_id,
                 is_credit=is_credit,
-                paid=not is_credit  # If credit, not paid yet
+                paid=not is_credit,  # If credit, not paid yet
+                currency=currency,
+                exchange_rate_used=exchange_rate,
+                total_amount_bs=total_bs
             )
             self.db.add(new_sale)
             self.db.flush() # Get ID
@@ -181,12 +190,12 @@ class POSController:
                 # Ticket Line
                 qty_display = f"{item['quantity']} {'CAJA' if item['is_box'] else 'UNID'}"
                 ticket_lines.append(f"{item['name'][:15]} x {qty_display}")
-                ticket_lines.append(f"   ${item['subtotal']:,.0f}")
+                ticket_lines.append(f"   ${item['subtotal']:,.2f}")
 
             self.db.commit()
             
             ticket_lines.append("-" * 20)
-            ticket_lines.append(f"TOTAL: ${total:,.0f}")
+            ticket_lines.append(f"TOTAL: ${total:,.2f}")
             ticket_lines.append("Gracias por su compra!")
             
             self.cart.clear()

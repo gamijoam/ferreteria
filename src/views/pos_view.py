@@ -1,7 +1,8 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, 
     QCheckBox, QPushButton, QTableWidget, QTableWidgetItem, 
-    QHeaderView, QMessageBox, QFrame, QComboBox, QCompleter, QDoubleSpinBox
+    QHeaderView, QMessageBox, QFrame, QComboBox, QCompleter, QDoubleSpinBox,
+    QGroupBox, QFormLayout
 )
 from PyQt6.QtGui import QKeySequence, QFont, QShortcut
 from PyQt6.QtCore import Qt
@@ -9,6 +10,7 @@ from src.database.db import SessionLocal
 from src.controllers.pos_controller import POSController
 from src.controllers.customer_controller import CustomerController
 from src.controllers.quote_controller import QuoteController
+from src.controllers.config_controller import ConfigController
 
 class POSWindow(QWidget):
     def __init__(self):
@@ -20,6 +22,10 @@ class POSWindow(QWidget):
         self.controller = POSController(self.db)
         self.customer_controller = CustomerController(self.db)
         self.quote_controller = QuoteController(self.db)
+        self.config_controller = ConfigController(self.db)
+        
+        # Get exchange rate
+        self.exchange_rate = self.config_controller.get_exchange_rate()
         
         self.layout = QVBoxLayout()
         self.setLayout(self.layout)
@@ -28,43 +34,105 @@ class POSWindow(QWidget):
         self.setup_shortcuts()
 
     def setup_ui(self):
-        # Top Bar: Input
-        top_frame = QFrame()
-        top_layout = QHBoxLayout()
-        top_frame.setLayout(top_layout)
+        # Main horizontal layout: Left (search + table) | Right (controls)
+        main_layout = QHBoxLayout()
         
-        lbl_scan = QLabel("Escanear / Código (F1):")
-        lbl_scan.setFont(QFont("Arial", 14))
+        # LEFT PANEL: Search and Table
+        left_panel = QVBoxLayout()
+        
+        # Search Bar (now with more space)
+        search_frame = QFrame()
+        search_layout = QVBoxLayout()
+        search_frame.setLayout(search_layout)
+        search_frame.setStyleSheet("background-color: #f5f5f5; padding: 10px; border-radius: 5px;")
+        
+        lbl_scan = QLabel("🔍 Buscar Producto (F1):")
+        lbl_scan.setFont(QFont("Arial", 14, QFont.Weight.Bold))
+        search_layout.addWidget(lbl_scan)
         
         self.input_scan = QLineEdit()
         self.input_scan.setFont(QFont("Arial", 16))
-        self.input_scan.setPlaceholderText("Ingrese SKU o Nombre y presione ENTER")
+        self.input_scan.setPlaceholderText("Ingrese SKU o Nombre del Producto...")
         self.input_scan.returnPressed.connect(self.handle_add_item)
+        self.input_scan.setMinimumHeight(45)
+        search_layout.addWidget(self.input_scan)
         
         # Setup autocomplete
         self.setup_autocomplete()
         
-        self.check_box_mode = QCheckBox("Vender por Caja (F2)")
-        self.check_box_mode.setFont(QFont("Arial", 12))
+        left_panel.addWidget(search_frame)
         
-        # Credit Sale
-        self.check_credit = QCheckBox("Venta a Crédito (F3)")
-        self.check_credit.setFont(QFont("Arial", 12))
-        self.check_credit.toggled.connect(self.toggle_credit_mode)
+        # RIGHT PANEL: Controls
+        right_panel = QVBoxLayout()
+        right_panel.setSpacing(10)
+        
+        # Control Group 1: Sale Mode
+        mode_group = QGroupBox("Modo de Venta")
+        mode_layout = QVBoxLayout()
+        
+        self.check_box_mode = QCheckBox("Vender por Caja (F2)")
+        self.check_box_mode.setFont(QFont("Arial", 11))
+        mode_layout.addWidget(self.check_box_mode)
+        
+        mode_group.setLayout(mode_layout)
+        right_panel.addWidget(mode_group)
+        
+        # Control Group 2: Currency
+        currency_group = QGroupBox("Moneda")
+        currency_layout = QFormLayout()
+        
+        self.currency_combo = QComboBox()
+        self.currency_combo.setFont(QFont("Arial", 11))
+        self.currency_combo.addItems(["USD", "Bs"])
+        self.currency_combo.currentTextChanged.connect(self.on_currency_changed)
+        
+        currency_layout.addRow("Venta en:", self.currency_combo)
+        currency_group.setLayout(currency_layout)
+        right_panel.addWidget(currency_group)
+        
+        # Control Group 3: Payment Method
+        payment_group = QGroupBox("Método de Pago")
+        payment_layout = QVBoxLayout()
+        
+        self.payment_method_combo = QComboBox()
+        self.payment_method_combo.setFont(QFont("Arial", 11))
+        self.payment_method_combo.addItems([
+            "Efectivo Bs",
+            "Efectivo USD",
+            "Transferencia Bs / Pago Móvil",
+            "Transferencia USD",
+            "Tarjeta Débito/Crédito",
+            "Crédito (Fiado)"
+        ])
+        self.payment_method_combo.currentTextChanged.connect(self.on_payment_method_changed)
+        payment_layout.addWidget(self.payment_method_combo)
+        
+        payment_group.setLayout(payment_layout)
+        right_panel.addWidget(payment_group)
+        
+        # Control Group 4: Customer
+        customer_group = QGroupBox("Cliente (Opcional)")
+        customer_layout = QVBoxLayout()
         
         self.customer_combo = QComboBox()
-        self.customer_combo.setVisible(False)
+        self.customer_combo.setFont(QFont("Arial", 10))
+        self.customer_combo.setVisible(True)
         self.load_customers()
+        customer_layout.addWidget(self.customer_combo)
         
-        top_layout.addWidget(lbl_scan)
-        top_layout.addWidget(self.input_scan, 3)
-        top_layout.addWidget(self.check_box_mode)
-        top_layout.addWidget(self.check_credit)
-        top_layout.addWidget(self.customer_combo)
+        customer_group.setLayout(customer_layout)
+        right_panel.addWidget(customer_group)
         
-        self.layout.addWidget(top_frame)
+        # Exchange Rate Info
+        self.lbl_rate = QLabel(f"Tasa: 1 USD = {self.exchange_rate:.2f} Bs")
+        self.lbl_rate.setFont(QFont("Arial", 10))
+        self.lbl_rate.setStyleSheet("color: #666; padding: 5px; background-color: #fff3cd; border-radius: 3px;")
+        self.lbl_rate.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        right_panel.addWidget(self.lbl_rate)
         
-        # Center: Table
+        right_panel.addStretch()
+        
+        # Table (in left panel)
         self.table = QTableWidget()
         self.table.setColumnCount(6)
         self.table.setHorizontalHeaderLabels([
@@ -76,25 +144,25 @@ class POSWindow(QWidget):
         # Connect cell change signal
         self.table.cellChanged.connect(self.on_cell_changed)
         
-        self.layout.addWidget(self.table)
+        left_panel.addWidget(self.table)
         
-        # Bottom: Total & Actions
+        # Bottom: Total & Actions (in left panel)
         bottom_frame = QFrame()
         bottom_layout = QHBoxLayout()
         bottom_frame.setLayout(bottom_layout)
         
-        self.lbl_total = QLabel("Total: $0")
-        self.lbl_total.setFont(QFont("Arial", 24, QFont.Weight.Bold))
+        self.lbl_total = QLabel(f"Total: $0 / Bs 0")
+        self.lbl_total.setFont(QFont("Arial", 20, QFont.Weight.Bold))
         self.lbl_total.setStyleSheet("color: green;")
         
         btn_pay = QPushButton("COBRAR (F12)")
         btn_pay.setFont(QFont("Arial", 16, QFont.Weight.Bold))
-        btn_pay.setStyleSheet("background-color: #007bff; color: white; padding: 10px;")
+        btn_pay.setStyleSheet("background-color: #28a745; color: white; padding: 15px; border-radius: 5px;")
         btn_pay.clicked.connect(self.handle_payment)
         
         btn_quote = QPushButton("GUARDAR COTIZACIÓN (F4)")
         btn_quote.setFont(QFont("Arial", 14, QFont.Weight.Bold))
-        btn_quote.setStyleSheet("background-color: #ff9800; color: white; padding: 10px;")
+        btn_quote.setStyleSheet("background-color: #ff9800; color: white; padding: 15px; border-radius: 5px;")
         btn_quote.clicked.connect(self.save_as_quote)
         
         bottom_layout.addWidget(self.lbl_total)
@@ -102,7 +170,13 @@ class POSWindow(QWidget):
         bottom_layout.addWidget(btn_quote)
         bottom_layout.addWidget(btn_pay)
         
-        self.layout.addWidget(bottom_frame)
+        left_panel.addWidget(bottom_frame)
+        
+        # Add panels to main layout
+        main_layout.addLayout(left_panel, 3)  # 75% width
+        main_layout.addLayout(right_panel, 1)  # 25% width
+        
+        self.layout.addLayout(main_layout)
         
         # Focus input initially
         self.input_scan.setFocus()
@@ -243,9 +317,17 @@ class POSWindow(QWidget):
             
             total += item["subtotal"]
             
-        self.lbl_total.setText(f"Total: ${total:,.2f}")
+        # Calculate total in Bs
+        total_bs = total * self.exchange_rate
+        
+        self.lbl_total.setText(f"Total: ${total:,.2f} / Bs {total_bs:,.2f}")
         
         self.table.blockSignals(False)
+    
+    def on_currency_changed(self, currency):
+        """Handle currency selection change"""
+        # Refresh display to show prices in selected currency
+        self.refresh_table()
 
     def on_cell_changed(self, row, column):
         # Column 1 is Quantity
@@ -289,11 +371,12 @@ class POSWindow(QWidget):
         if not self.controller.cart:
             return
         
-        is_credit = self.check_credit.isChecked()
-        customer_id = None
+        payment_method = self.payment_method_combo.currentText()
+        is_credit = payment_method == "Crédito (Fiado)"
+        # Optional: Save customer for all sales if selected
+        customer_id = self.customer_combo.currentData()
         
         if is_credit:
-            customer_id = self.customer_combo.currentData()
             if not customer_id:
                 QMessageBox.warning(self, "Error", "Debe seleccionar un cliente para venta a crédito")
                 return
@@ -305,10 +388,15 @@ class POSWindow(QWidget):
         )
         
         if reply == QMessageBox.StandardButton.Yes:
+            # Get currency and exchange rate
+            currency = self.currency_combo.currentText()
+            
             success, msg, ticket = self.controller.finalize_sale(
-                payment_method="Credito" if is_credit else "Efectivo",
+                payment_method=payment_method,
                 customer_id=customer_id,
-                is_credit=is_credit
+                is_credit=is_credit,
+                currency=currency,
+                exchange_rate=self.exchange_rate
             )
             if success:
                 if is_credit:
@@ -317,11 +405,15 @@ class POSWindow(QWidget):
                 else:
                     QMessageBox.information(self, "Venta Exitosa", f"Ticket generado:\\n\\n{ticket}")
                 self.refresh_table()
-                self.check_credit.setChecked(False)  # Reset
+                self.payment_method_combo.setCurrentIndex(0)  # Reset to Efectivo
             else:
                 QMessageBox.critical(self, "Error", msg)
         
         self.focus_input()
+
+    def on_payment_method_changed(self, text):
+        # Customer combo is now always visible, but we can reload or highlight if needed
+        pass
 
     def save_as_quote(self):
         """Save current cart as a quote (F4)"""

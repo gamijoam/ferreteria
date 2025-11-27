@@ -58,11 +58,11 @@ def migrate_suppliers_table():
             print("✓ Columna antigua 'contact_info' eliminada")
         
         conn.commit()
-        print("\n✅ Migración completada exitosamente!")
+        print("\nMigracion completada exitosamente!")
         
     except Exception as e:
         conn.rollback()
-        print(f"\n❌ Error en migración: {e}")
+        print(f"\nError en migracion: {e}")
         raise
     finally:
         cursor.close()
@@ -80,7 +80,7 @@ def add_cost_price_to_products():
             ADD COLUMN IF NOT EXISTS cost_price FLOAT DEFAULT 0.0
         """)
         conn.commit()
-        print("✓ Columna 'cost_price' agregada a products")
+        print("Columna 'cost_price' agregada a products")
     except Exception as e:
         conn.rollback()
         print(f"  cost_price ya existe o error: {e}")
@@ -88,15 +88,36 @@ def add_cost_price_to_products():
         cursor.close()
         conn.close()
 
+def add_min_stock_to_products():
+    """Add min_stock column to products table"""
+    conn = engine.raw_connection()
+    cursor = conn.cursor()
+    
+    try:
+        print("\nAgregando min_stock a productos...")
+        cursor.execute("""
+            ALTER TABLE products 
+            ADD COLUMN IF NOT EXISTS min_stock FLOAT DEFAULT 5.0
+        """)
+        conn.commit()
+        print("Columna 'min_stock' agregada a products")
+    except Exception as e:
+        conn.rollback()
+        print(f"  min_stock ya existe o error: {e}")
+    finally:
+        cursor.close()
+        conn.close()
+
 if __name__ == "__main__":
     print("=" * 60)
-    print("MIGRACIÓN DE BASE DE DATOS - MÓDULOS 14, 15, 16")
+    print("MIGRACION DE BASE DE DATOS - MODULOS 14, 15, 16, ALERTAS")
     print("=" * 60)
     
     migrate_suppliers_table()
     add_cost_price_to_products()
+    add_min_stock_to_products()
     
     print("\n" + "=" * 60)
-    print("✅ TODAS LAS MIGRACIONES COMPLETADAS")
+    print("TODAS LAS MIGRACIONES COMPLETADAS")
     print("=" * 60)
     print("\nAhora puedes ejecutar: python run.py")

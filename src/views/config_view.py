@@ -47,6 +47,22 @@ class ConfigDialog(QDialog):
         form_group.setLayout(form_layout)
         layout.addWidget(form_group)
         
+        # Exchange Rate Section
+        exchange_group = QGroupBox("Tasa de Cambio (USD → Bs)")
+        exchange_layout = QFormLayout()
+        
+        self.exchange_rate_input = QLineEdit()
+        self.exchange_rate_input.setPlaceholderText("Ej: 36.50")
+        
+        self.exchange_rate_updated_label = QLabel("Nunca actualizada")
+        self.exchange_rate_updated_label.setStyleSheet("color: #666; font-size: 10pt;")
+        
+        exchange_layout.addRow("Tasa Actual (1 USD = X Bs):", self.exchange_rate_input)
+        exchange_layout.addRow("Última Actualización:", self.exchange_rate_updated_label)
+        
+        exchange_group.setLayout(exchange_layout)
+        layout.addWidget(exchange_group)
+        
         # Buttons
         btn_save = QPushButton("Guardar Cambios")
         btn_save.setStyleSheet("""
@@ -78,6 +94,22 @@ class ConfigDialog(QDialog):
         index = self.business_type_combo.findText(business_type)
         if index >= 0:
             self.business_type_combo.setCurrentIndex(index)
+        
+        # Load exchange rate
+        exchange_rate = self.controller.get_config("exchange_rate", "1.0")
+        self.exchange_rate_input.setText(exchange_rate)
+        
+        # Load last updated
+        updated_at = self.controller.get_config("exchange_rate_updated_at", "")
+        if updated_at:
+            from datetime import datetime
+            try:
+                dt = datetime.fromisoformat(updated_at)
+                self.exchange_rate_updated_label.setText(dt.strftime("%Y-%m-%d %H:%M"))
+            except:
+                self.exchange_rate_updated_label.setText("Fecha inválida")
+        else:
+            self.exchange_rate_updated_label.setText("Nunca actualizada")
 
     def save_config(self):
         try:
@@ -95,6 +127,22 @@ class ConfigDialog(QDialog):
             # Save business type
             business_type = self.business_type_combo.currentText()
             self.controller.set_config("BUSINESS_TYPE", business_type)
+            
+            # Save exchange rate
+            exchange_rate_text = self.exchange_rate_input.text().strip()
+            if exchange_rate_text:
+                try:
+                    exchange_rate = float(exchange_rate_text)
+                    if exchange_rate <= 0:
+                        QMessageBox.warning(self, "Error", "La tasa de cambio debe ser mayor a 0")
+                        return
+                    
+                    from datetime import datetime
+                    self.controller.set_config("exchange_rate", str(exchange_rate))
+                    self.controller.set_config("exchange_rate_updated_at", datetime.now().isoformat())
+                except ValueError:
+                    QMessageBox.warning(self, "Error", "La tasa de cambio debe ser un número válido")
+                    return
             
             QMessageBox.information(self, "Éxito", "Configuración guardada correctamente.\nReinicie la aplicación para ver algunos cambios.")
             self.accept()

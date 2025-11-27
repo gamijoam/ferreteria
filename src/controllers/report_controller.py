@@ -46,6 +46,13 @@ class ReportController:
         ).all()
         
         total_revenue = sum(s.total_amount for s in sales)
+        # Calculate total revenue in Bs (using stored amount or converting with stored rate)
+        total_revenue_bs = sum(
+            s.total_amount_bs if s.total_amount_bs is not None 
+            else (s.total_amount * (s.exchange_rate_used or 1.0)) 
+            for s in sales
+        )
+        
         total_transactions = len(sales)
         
         # Count by payment method
@@ -60,6 +67,7 @@ class ReportController:
         
         return {
             "total_revenue": total_revenue,
+            "total_revenue_bs": total_revenue_bs,
             "total_transactions": total_transactions,
             "cash_sales": cash_sales,
             "credit_sales": credit_sales,
@@ -188,14 +196,15 @@ class ReportController:
         """Products with stock <= threshold"""
         return self.db.query(Product).filter(Product.stock <= threshold).all()
 
-    def get_inventory_valuation(self):
+    def get_inventory_valuation(self, exchange_rate=1.0):
         """Total inventory value (stock * price)"""
         products = self.db.query(Product).all()
         total_value = sum(p.stock * p.price for p in products)
         return {
             "total_products": len(products),
             "total_stock_units": sum(p.stock for p in products),
-            "total_value": total_value
+            "total_value": total_value,
+            "total_value_bs": total_value * exchange_rate
         }
 
     # ===== EXPORT FUNCTIONS =====

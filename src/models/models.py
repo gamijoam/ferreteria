@@ -52,6 +52,7 @@ class Product(Base):
     price = Column(Float, nullable=False, default=0.0)
     cost_price = Column(Float, default=0.0)  # NEW: Cost for profit margin calculation
     stock = Column(Float, default=0.0) # Base units
+    min_stock = Column(Float, default=5.0) # Low stock alert threshold
     is_active = Column(Boolean, default=True) # Logical delete
 
     # Core Logic for Hardware Store
@@ -92,6 +93,11 @@ class Sale(Base):
     total_amount = Column(Float, nullable=False)
     payment_method = Column(String, default="Efectivo") # Efectivo, Tarjeta, Credito
     
+    # Dual Currency Support
+    currency = Column(String, default="USD") # USD or BS
+    exchange_rate_used = Column(Float, default=1.0) # Rate at time of sale
+    total_amount_bs = Column(Float, nullable=True) # Amount in Bs if applicable
+    
     # Credit Sales
     customer_id = Column(Integer, ForeignKey("customers.id"), nullable=True)
     is_credit = Column(Boolean, default=False)
@@ -127,9 +133,13 @@ class CashSession(Base):
     start_time = Column(DateTime, default=datetime.datetime.now)
     end_time = Column(DateTime, nullable=True)
     initial_cash = Column(Float, default=0.0)
-    final_cash_reported = Column(Float, nullable=True) # What user counted
-    final_cash_expected = Column(Float, nullable=True) # Calculated
-    difference = Column(Float, nullable=True)
+    initial_cash_bs = Column(Float, default=0.0) # Initial amount in Bs
+    final_cash_reported = Column(Float, nullable=True) # What user counted (USD)
+    final_cash_reported_bs = Column(Float, nullable=True) # What user counted (Bs)
+    final_cash_expected = Column(Float, nullable=True) # Calculated (USD)
+    final_cash_expected_bs = Column(Float, nullable=True) # Calculated (Bs)
+    difference = Column(Float, nullable=True) # USD difference
+    difference_bs = Column(Float, nullable=True) # Bs difference
     status = Column(String, default="OPEN") # OPEN, CLOSED
 
     movements = relationship("CashMovement", back_populates="session")
@@ -144,6 +154,8 @@ class CashMovement(Base):
     session_id = Column(Integer, ForeignKey("cash_sessions.id"), nullable=False)
     type = Column(String, nullable=False) # EXPENSE, WITHDRAWAL, DEPOSIT
     amount = Column(Float, nullable=False)
+    currency = Column(String, default="USD") # USD or BS
+    exchange_rate = Column(Float, default=1.0)
     description = Column(Text, nullable=True)
     date = Column(DateTime, default=datetime.datetime.now)
 
@@ -220,6 +232,11 @@ class Payment(Base):
     amount = Column(Float, nullable=False)
     date = Column(DateTime, default=datetime.datetime.now)
     description = Column(Text, nullable=True)
+    
+    # Dual Currency Support
+    currency = Column(String, default="USD") # USD or BS
+    exchange_rate_used = Column(Float, default=1.0) # Rate at time of payment
+    amount_bs = Column(Float, nullable=True) # Amount in Bs if applicable
 
     customer = relationship("Customer", back_populates="payments")
 
@@ -312,6 +329,10 @@ class BusinessConfig(Base):
 
     key = Column(String, primary_key=True, index=True)
     value = Column(Text, nullable=True)
+    
+    # Dual Currency Support (stored as special keys)
+    # exchange_rate: Current USD to Bs rate
+    # exchange_rate_updated_at: Last update timestamp
 
     def __repr__(self):
         return f"<BusinessConfig(key='{self.key}', value='{self.value}')>"

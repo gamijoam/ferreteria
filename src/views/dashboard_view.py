@@ -165,9 +165,14 @@ class DashboardWindow(QWidget):
         today_start = datetime.datetime.combine(datetime.date.today(), datetime.time.min)
         today_end = datetime.datetime.combine(datetime.date.today(), datetime.time.max)
         
+        # Get current exchange rate
+        from src.controllers.config_controller import ConfigController
+        config_ctrl = ConfigController(self.db)
+        rate = config_ctrl.get_exchange_rate()
+        
         # 1. Today's Sales
         summary = self.controller.get_sales_summary(today_start, today_end)
-        self.sales_widget.value_label.setText(f"${summary['total_revenue']:,.0f}")
+        self.sales_widget.value_label.setText(f"${summary['total_revenue']:,.2f}\nBs {summary['total_revenue_bs']:,.2f}")
         self.sales_widget.subtitle_label.setText(f"{summary['total_transactions']} transacciones")
         
         # 2. Stock Alerts
@@ -187,31 +192,33 @@ class DashboardWindow(QWidget):
         # 4. Customer Debt
         debt_report = self.controller.get_customer_debt_report()
         total_debt = sum(item['debt'] for item in debt_report)
-        self.debt_widget.value_label.setText(f"${total_debt:,.0f}")
+        total_debt_bs = total_debt * rate
+        self.debt_widget.value_label.setText(f"${total_debt:,.2f}\nBs {total_debt_bs:,.2f}")
         self.debt_widget.subtitle_label.setText(f"{len(debt_report)} clientes")
         
         # 5. Inventory Value
-        valuation = self.controller.get_inventory_valuation()
-        self.inventory_widget.value_label.setText(f"${valuation['total_value']:,.0f}")
+        valuation = self.controller.get_inventory_valuation(exchange_rate=rate)
+        self.inventory_widget.value_label.setText(f"${valuation['total_value']:,.2f}\nBs {valuation['total_value_bs']:,.2f}")
         self.inventory_widget.subtitle_label.setText(f"{valuation['total_products']} productos")
         
         # 6. Average Ticket (last 7 days)
         week_start = datetime.datetime.now() - datetime.timedelta(days=7)
         week_summary = self.controller.get_sales_summary(week_start, today_end)
-        self.ticket_widget.value_label.setText(f"${week_summary['average_ticket']:,.0f}")
+        self.ticket_widget.value_label.setText(f"${week_summary['average_ticket']:,.2f}")
         self.ticket_widget.subtitle_label.setText("últimos 7 días")
         
         # 7. Month Profitability (NEW)
         try:
             month_profit = self.profit_controller.get_month_profitability()
-            self.profit_widget.value_label.setText(f"${month_profit['total_profit']:,.0f}")
+            profit_bs = month_profit['total_profit'] * rate
+            self.profit_widget.value_label.setText(f"${month_profit['total_profit']:,.2f}\nBs {profit_bs:,.2f}")
             self.profit_widget.subtitle_label.setText(f"Margen: {month_profit['avg_margin']:.1f}%")
             if month_profit['total_profit'] < 0:
                 self.profit_widget.value_label.setStyleSheet("color: red;")
             else:
                 self.profit_widget.value_label.setStyleSheet("color: green;")
         except:
-            self.profit_widget.value_label.setText("$0")
+            self.profit_widget.value_label.setText("$0.00")
             self.profit_widget.subtitle_label.setText("sin datos")
 
     def closeEvent(self, event):
