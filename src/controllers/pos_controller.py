@@ -198,6 +198,24 @@ class POSController:
             ticket_lines.append(f"TOTAL: ${total:,.2f}")
             ticket_lines.append("Gracias por su compra!")
             
+            # Auto-print if enabled
+            try:
+                from src.controllers.printer_controller import PrinterController
+                from src.controllers.config_controller import ConfigController
+                
+                config_ctrl = ConfigController(self.db)
+                auto_print = config_ctrl.get_config("auto_print_tickets", "false")
+                
+                if auto_print == "true":
+                    printer_ctrl = PrinterController(self.db)
+                    try:
+                        printer_ctrl.print_ticket(new_sale)
+                    except Exception as print_error:
+                        print(f"Auto-print error: {print_error}")
+                        # Don't fail the sale if print fails
+            except Exception as e:
+                print(f"Printer module error: {e}")
+            
             self.cart.clear()
             return True, "Venta Exitosa", "\n".join(ticket_lines)
 

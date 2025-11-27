@@ -1,9 +1,12 @@
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QLineEdit, QPushButton, 
-    QMessageBox, QLabel, QGroupBox, QComboBox
+    QMessageBox, QLabel, QGroupBox, QComboBox, QFileDialog, QHBoxLayout
 )
+from PyQt6.QtGui import QPixmap
+from PyQt6.QtCore import Qt
 from src.database.db import SessionLocal
 from src.controllers.config_controller import ConfigController
+import os
 
 class ConfigDialog(QDialog):
     def __init__(self, parent=None):
@@ -63,6 +66,40 @@ class ConfigDialog(QDialog):
         exchange_group.setLayout(exchange_layout)
         layout.addWidget(exchange_group)
         
+        # Logo Section
+        logo_group = QGroupBox("Logo de la Empresa")
+        logo_layout = QVBoxLayout()
+        
+        self.logo_preview = QLabel("Sin logo")
+        self.logo_preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.logo_preview.setMinimumHeight(100)
+        self.logo_preview.setStyleSheet("border: 1px solid #ccc; background-color: #f5f5f5;")
+        logo_layout.addWidget(self.logo_preview)
+        
+        btn_upload_logo = QPushButton("Cargar Logo")
+        btn_upload_logo.clicked.connect(self.upload_logo)
+        logo_layout.addWidget(btn_upload_logo)
+        
+        logo_group.setLayout(logo_layout)
+        layout.addWidget(logo_group)
+        
+        # Printer Configuration Button
+        btn_printer = QPushButton("⚙️ Configurar Impresora Térmica")
+        btn_printer.setStyleSheet("""
+            QPushButton {
+                background-color: #ff9800;
+                color: white;
+                padding: 10px;
+                border-radius: 5px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #f57c00;
+            }
+        """)
+        btn_printer.clicked.connect(self.open_printer_config)
+        layout.addWidget(btn_printer)
+        
         # Buttons
         btn_save = QPushButton("Guardar Cambios")
         btn_save.setStyleSheet("""
@@ -110,6 +147,16 @@ class ConfigDialog(QDialog):
                 self.exchange_rate_updated_label.setText("Fecha inválida")
         else:
             self.exchange_rate_updated_label.setText("Nunca actualizada")
+        
+        # Load logo
+        logo_path = self.controller.get_config("business_logo_path", "")
+        if logo_path and os.path.exists(logo_path):
+            pixmap = QPixmap(logo_path)
+            scaled_pixmap = pixmap.scaled(200, 100, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            self.logo_preview.setPixmap(scaled_pixmap)
+            self.logo_path = logo_path
+        else:
+            self.logo_path = ""
 
     def save_config(self):
         try:
@@ -147,8 +194,42 @@ class ConfigDialog(QDialog):
             QMessageBox.information(self, "Éxito", "Configuración guardada correctamente.\nReinicie la aplicación para ver algunos cambios.")
             self.accept()
             
+            # Save logo path if changed
+            if hasattr(self, 'logo_path') and self.logo_path:
+                self.controller.set_config("business_logo_path", self.logo_path)
+            
         except Exception as e:
             QMessageBox.critical(self, "Error", str(e))
+    
+    def upload_logo(self):
+        """Upload business logo"""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Seleccionar Logo",
+            "",
+            "Imágenes (*.png *.jpg *.jpeg *.bmp)"
+        )
+        
+        if file_path:
+            try:
+                pixmap = QPixmap(file_path)
+                if pixmap.isNull():
+                    QMessageBox.warning(self, "Error", "No se pudo cargar la imagen")
+                    return
+                
+                scaled_pixmap = pixmap.scaled(200, 100, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+                self.logo_preview.setPixmap(scaled_pixmap)
+                self.logo_path = file_path
+                
+                QMessageBox.information(self, "Éxito", "Logo cargado. Haga clic en 'Guardar Cambios' para aplicar.")
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Error al cargar logo: {str(e)}")
+    
+    def open_printer_config(self):
+        """Open printer configuration dialog"""
+        from src.views.printer_view import PrinterConfigDialog
+        dialog = PrinterConfigDialog(self)
+        dialog.exec()
 
     def closeEvent(self, event):
         self.db.close()

@@ -2,10 +2,11 @@ from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QMessageBox, QFrame
 )
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont, QColor, QPalette
+from PyQt6.QtGui import QFont, QColor, QPalette, QPixmap
 from src.database.db import SessionLocal
 from src.controllers.auth_controller import AuthController
 from src.controllers.config_controller import ConfigController
+import os
 
 class LoginDialog(QDialog):
     def __init__(self):
@@ -32,6 +33,16 @@ class LoginDialog(QDialog):
         
         # Get business info
         info = self.config_controller.get_business_info()
+        
+        # Logo
+        logo_path = self.config_controller.get_config("business_logo_path", "")
+        if logo_path and os.path.exists(logo_path):
+            lbl_logo = QLabel()
+            pixmap = QPixmap(logo_path)
+            scaled_pixmap = pixmap.scaled(200, 100, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            lbl_logo.setPixmap(scaled_pixmap)
+            lbl_logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            layout.addWidget(lbl_logo)
         
         # Business Name
         lbl_title = QLabel(info["name"])

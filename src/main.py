@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
     QGridLayout,
 )
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QPixmap
 from src.database.db import engine, Base
 from src.controllers.excel_import_controller import ExcelImportController
 from src.views.product_view import ProductWindow
@@ -33,6 +34,7 @@ from src.views.config_view import ConfigDialog
 from src.models.models import UserRole
 from src.controllers.config_controller import ConfigController
 from src.database.db import SessionLocal
+import os
 
 class MainWindow(QMainWindow):
     def __init__(self, user):
@@ -66,6 +68,16 @@ class MainWindow(QMainWindow):
         header.setStyleSheet("background-color: #1976D2; border-radius: 10px; padding: 20px;")
         header_layout = QVBoxLayout()
         header.setLayout(header_layout)
+
+        # Logo in header
+        logo_path = self.config_controller.get_config("business_logo_path", "")
+        if logo_path and os.path.exists(logo_path):
+            lbl_logo = QLabel()
+            pixmap = QPixmap(logo_path)
+            scaled_pixmap = pixmap.scaled(150, 60, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            lbl_logo.setPixmap(scaled_pixmap)
+            lbl_logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            header_layout.addWidget(lbl_logo)
 
         title = QLabel(f"🏪 {self.business_info['name'].upper()}")
         title.setStyleSheet("color: white; font-size: 28pt; font-weight: bold;")
