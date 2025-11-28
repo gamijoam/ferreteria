@@ -21,7 +21,8 @@ a = Analysis(
         'sqlite3',
         'PyQt6',
         'pandas',
-        'openpyxl'
+        'openpyxl',
+        'reporlab',
     ],
     hookspath=[],
     hooksconfig={},

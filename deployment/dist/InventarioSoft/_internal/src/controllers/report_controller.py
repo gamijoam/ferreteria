@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_
-from src.models.models import Product, Sale, SaleDetail, CashSession, CashMovement, Customer, Payment, Kardex
+from src.models.models import Product, Sale, SaleDetail, CashSession, CashMovement, Customer, Payment, Kardex, Return
 import datetime
 import csv
 
@@ -64,6 +64,26 @@ class ReportController:
             Sale.date >= start_date,
             Sale.date <= end_date
         ).scalar() or 0
+        
+        # Subtract returns
+        returns = self.db.query(Return).filter(
+            Return.date >= start_date,
+            Return.date <= end_date
+        ).all()
+        
+        total_refunded = sum(r.total_refunded for r in returns)
+        # For Bs, we need to get the exchange rate from the original sale
+        total_refunded_bs = 0.0
+        for ret in returns:
+            # Get the sale to find the exchange rate used
+            sale = self.db.query(Sale).filter(Sale.id == ret.sale_id).first()
+            if sale:
+                refund_bs = ret.total_refunded * (sale.exchange_rate_used or 1.0)
+                total_refunded_bs += refund_bs
+        
+        # Adjust totals
+        total_revenue -= total_refunded
+        total_revenue_bs -= total_refunded_bs
         
         return {
             "total_revenue": total_revenue,

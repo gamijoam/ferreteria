@@ -93,7 +93,7 @@ class CashController:
                     deposits_bs += mov.amount
                 else:
                     deposits_usd += mov.amount
-            
+        
         # 3. Calculate Expected Cash
         expected_usd = session.initial_cash + cash_sales_usd + deposits_usd - expenses_usd
         expected_bs = session.initial_cash_bs + cash_sales_bs + deposits_bs - expenses_bs
