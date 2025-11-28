@@ -1,4 +1,4 @@
-('C:\\Users\\Equipo\\Documents\\ferreteria\\deployment\\build\\build\\FerreteriaERP.pkg',
+('C:\\Users\\Equipo\\Documents\\ferreteria\\deployment\\build\\build\\InventarioSoft.pkg',
  {'BINARY': True,
   'DATA': True,
   'EXECUTABLE': True,

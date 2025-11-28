@@ -39,7 +39,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='FerreteriaERP',
+    name='InventarioSoft',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -50,7 +50,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=None # You can add an icon here later: icon='../assets/icon.ico'
+    icon='assets/icon.ico'
 )
 coll = COLLECT(
     exe,
@@ -60,5 +60,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='FerreteriaERP',
+    name='InventarioSoft',
 )

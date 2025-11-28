@@ -31,12 +31,12 @@ python deployment/build_exe.py
 
 Una vez finalizado el proceso, encontrarás dos carpetas nuevas en `deployment/dist`:
 
-- `deployment/dist/FerreteriaERP/`: Contiene el ejecutable y todos los archivos necesarios.
+- `deployment/dist/InventarioSoft/`: Contiene el ejecutable y todos los archivos necesarios.
 
 ## Instalación en el Cliente
 
 1. **Copiar Archivos:**
-   Copia la carpeta completa `FerreteriaERP` (ubicada en `deployment/dist/`) a la computadora del cliente (ej. en `C:\FerreteriaERP`).
+   Copia la carpeta completa `InventarioSoft` (ubicada en `deployment/dist/`) a la computadora del cliente (ej. en `C:\InventarioSoft`).
 
 2. **Base de Datos:**
    - El sistema buscará automáticamente un archivo `ferreteria.db` dentro de la carpeta del programa.
@@ -48,9 +48,9 @@ Una vez finalizado el proceso, encontrarás dos carpetas nuevas en `deployment/d
    - Sin embargo, si necesitas configuraciones especiales, puedes crear un archivo `.env` en la misma carpeta del ejecutable.
 
 4. **Crear Acceso Directo:**
-   - Haz clic derecho en `FerreteriaERP.exe` -> "Enviar a" -> "Escritorio (crear acceso directo)".
+   - Haz clic derecho en `InventarioSoft.exe` -> "Enviar a" -> "Escritorio (crear acceso directo)".
 
 ## Solución de Problemas
 
 - **Error de "No module named..."**: Si al abrir el exe falta alguna librería, agrégala a la lista `hiddenimports` en `deployment/build.spec` y vuelve a generar el exe.
-- **Imágenes/Logos no cargan**: Asegúrate de que las rutas de las imágenes sean accesibles o estén configuradas correctamente en el sistema.
+- **Imágenes/Logos no cargan**: Asegúrate de que las rutas de las imágenes sean accesibles. El icono del ejecutable está en `deployment/assets/icon.ico`.

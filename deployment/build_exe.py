@@ -17,4 +17,4 @@ PyInstaller.__main__.run([
 ])
 
 print("\nConstrucción finalizada.")
-print(f"El ejecutable se encuentra en: {os.path.join(base_dir, 'dist', 'FerreteriaERP')}")
+print(f"El ejecutable se encuentra en: {os.path.join(base_dir, 'dist', 'InventarioSoft')}")
