@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 from src.models.models import Product, Sale, SaleDetail, Kardex, MovementType, PriceRule
+from src.utils.event_bus import event_bus
 import datetime
 
 class POSController:
@@ -198,6 +199,11 @@ class POSController:
                 ticket_lines.append(f"   ${item['subtotal']:,.2f}")
 
             self.db.commit()
+            
+            # Emit signals
+            event_bus.sales_updated.emit()
+            event_bus.inventory_updated.emit()
+            event_bus.products_updated.emit()
             
             ticket_lines.append("-" * 20)
             ticket_lines.append(f"TOTAL: ${total:,.2f}")

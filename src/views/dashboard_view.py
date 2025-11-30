@@ -8,6 +8,7 @@ from src.database.db import SessionLocal
 from src.controllers.report_controller import ReportController
 from src.controllers.profit_controller import ProfitController
 from src.models.models import Quote, Sale
+from src.utils.event_bus import event_bus
 import datetime
 
 class DashboardWindow(QWidget):
@@ -118,6 +119,22 @@ class DashboardWindow(QWidget):
         
         # Initial load
         self.refresh_dashboard()
+        
+        # Debounce timer for updates
+        from PyQt6.QtCore import QTimer
+        self.update_timer = QTimer()
+        self.update_timer.setSingleShot(True)
+        self.update_timer.setInterval(1000) # Wait 1 second before refreshing
+        self.update_timer.timeout.connect(self.refresh_dashboard)
+        
+        # Connect signals to scheduler
+        event_bus.sales_updated.connect(self.schedule_refresh)
+        event_bus.inventory_updated.connect(self.schedule_refresh)
+        event_bus.customers_updated.connect(self.schedule_refresh)
+
+    def schedule_refresh(self):
+        """Reset timer to delay update"""
+        self.update_timer.start()
 
     def create_metric_widget(self, title, value, subtitle):
         """Create a metric display widget"""

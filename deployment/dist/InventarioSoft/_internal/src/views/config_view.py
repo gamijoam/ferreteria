@@ -47,7 +47,18 @@ class ConfigDialog(QDialog):
         self.phone_input = QLineEdit()
         
         self.business_type_combo = QComboBox()
-        self.business_type_combo.addItems(["Ferretería", "Pescadería/Frutería", "Otro"])
+        self.business_type_combo.setEditable(True)
+        self.business_type_combo.addItems([
+            "Ferretería", 
+            "Farmacia", 
+            "Supermercado", 
+            "Tienda de Ropa", 
+            "Restaurante", 
+            "Repuestos", 
+            "Electrónica",
+            "Pescadería/Frutería", 
+            "Otro"
+        ])
         
         form_layout.addRow("Nombre del Negocio:", self.name_input)
         form_layout.addRow("RIF / NIT:", self.rif_input)

@@ -8,6 +8,7 @@ from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtCore import Qt, QLocale
 from src.database.db import SessionLocal
 from src.controllers.product_controller import ProductController
+from src.utils.event_bus import event_bus
 
 class ProductFormDialog(QDialog):
     """Dialog for creating/editing products"""
@@ -149,7 +150,8 @@ class ProductWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Gestión de Productos")
-        self.resize(1200, 750)
+        # self.resize(1200, 750)
+        self.showMaximized()
         
         self.db = SessionLocal()
         self.controller = ProductController(self.db)
@@ -159,6 +161,20 @@ class ProductWindow(QWidget):
         
         self.setup_ui()
         self.load_products()
+        
+        # Debounce timer
+        from PyQt6.QtCore import QTimer
+        self.update_timer = QTimer()
+        self.update_timer.setSingleShot(True)
+        self.update_timer.setInterval(500) # 500ms delay
+        self.update_timer.timeout.connect(self.load_products)
+        
+        # Connect signals
+        event_bus.products_updated.connect(self.schedule_refresh)
+        event_bus.inventory_updated.connect(self.schedule_refresh)
+
+    def schedule_refresh(self):
+        self.update_timer.start()
 
     def setup_ui(self):
         # Header with title and new button
@@ -209,7 +225,11 @@ class ProductWindow(QWidget):
         self.table.setHorizontalHeaderLabels([
             "ID", "Nombre", "SKU", "Costo", "Precio", "Margen%", "Stock", "Min.", "Es Caja?", "Factor", "Editar", "Eliminar"
         ])
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch) # Name column stretches
+        self.table.setWordWrap(True)
+        self.table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        
         self.table.setFont(QFont("Arial", 10))
         self.table.setAlternatingRowColors(True)
         self.table.setStyleSheet("""

@@ -11,6 +11,7 @@ from src.controllers.pos_controller import POSController
 from src.controllers.customer_controller import CustomerController
 from src.controllers.quote_controller import QuoteController
 from src.controllers.config_controller import ConfigController
+from src.utils.event_bus import event_bus
 
 class POSWindow(QWidget):
     def __init__(self):
@@ -32,6 +33,10 @@ class POSWindow(QWidget):
         
         self.setup_ui()
         self.setup_shortcuts()
+        
+        # Connect signals
+        event_bus.products_updated.connect(self.setup_autocomplete)
+        event_bus.customers_updated.connect(self.load_customers)
 
     def setup_ui(self):
         # Main horizontal layout: Left (search + table) | Right (controls)
@@ -261,9 +266,13 @@ class POSWindow(QWidget):
         
         if success:
             self.refresh_table()
-            self.input_scan.clear()
         else:
             QMessageBox.warning(self, "Alerta", msg)
+        
+        self.input_scan.clear()
+        # Force clear again just in case completer interferes
+        from PyQt6.QtCore import QTimer
+        QTimer.singleShot(10, self.input_scan.clear)
         
         self.focus_input()
 

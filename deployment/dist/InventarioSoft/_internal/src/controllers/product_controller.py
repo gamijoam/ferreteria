@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 from src.models.models import Product, Kardex, MovementType
+from src.utils.event_bus import event_bus
 import datetime
 
 class ProductController:
@@ -30,6 +31,8 @@ class ProductController:
         )
         self.db.add(new_product)
         self.db.commit()
+        event_bus.products_updated.emit()
+        event_bus.inventory_updated.emit()
         return new_product
 
     def update_product(self, product_id, name, sku, price, cost_price, stock, min_stock, is_box, conversion_factor, unit_type, category_id=None, supplier_id=None):
@@ -74,6 +77,9 @@ class ProductController:
             product.supplier_id = supplier_id
         
         self.db.commit()
+        event_bus.products_updated.emit()
+        if stock != product.stock:
+            event_bus.inventory_updated.emit()
         return product
 
     def delete_product(self, product_id):
@@ -84,6 +90,8 @@ class ProductController:
         
         product.is_active = False
         self.db.commit()
+        event_bus.products_updated.emit()
+        event_bus.inventory_updated.emit()
         return True
 
     def get_active_products(self):

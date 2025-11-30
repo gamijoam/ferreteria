@@ -8,6 +8,7 @@ from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtCore import Qt, QLocale
 from src.database.db import SessionLocal
 from src.controllers.product_controller import ProductController
+from src.utils.event_bus import event_bus
 
 class ProductFormDialog(QDialog):
     """Dialog for creating/editing products"""
@@ -160,6 +161,20 @@ class ProductWindow(QWidget):
         
         self.setup_ui()
         self.load_products()
+        
+        # Debounce timer
+        from PyQt6.QtCore import QTimer
+        self.update_timer = QTimer()
+        self.update_timer.setSingleShot(True)
+        self.update_timer.setInterval(500) # 500ms delay
+        self.update_timer.timeout.connect(self.load_products)
+        
+        # Connect signals
+        event_bus.products_updated.connect(self.schedule_refresh)
+        event_bus.inventory_updated.connect(self.schedule_refresh)
+
+    def schedule_refresh(self):
+        self.update_timer.start()
 
     def setup_ui(self):
         # Header with title and new button

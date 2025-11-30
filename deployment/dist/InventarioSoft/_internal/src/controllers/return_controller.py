@@ -9,6 +9,23 @@ class ReturnController:
     def find_sale(self, sale_id: int):
         return self.db.query(Sale).filter(Sale.id == sale_id).first()
 
+    def get_recent_sales(self, limit=50):
+        return self.db.query(Sale).order_by(Sale.date.desc()).limit(limit).all()
+
+    def search_sales(self, query: str):
+        if not query:
+            return self.get_recent_sales()
+            
+        # Try to parse as ID
+        if query.isdigit():
+            return self.db.query(Sale).filter(Sale.id == int(query)).all()
+        
+        # Search by customer name
+        from src.models.models import Customer
+        return self.db.query(Sale).join(Customer, isouter=True).filter(
+            Customer.name.ilike(f"%{query}%")
+        ).order_by(Sale.date.desc()).limit(50).all()
+
     def process_return(self, sale_id: int, items_to_return: list, reason: str, refund_currency: str = "USD", exchange_rate: float = 1.0):
         """
         items_to_return: List of dicts {product_id, quantity}

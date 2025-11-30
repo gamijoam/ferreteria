@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from src.models.models import Customer, Sale, Payment, CashSession, CashMovement
+from src.utils.event_bus import event_bus
 
 class CustomerController:
     def __init__(self, db: Session):
@@ -13,6 +14,7 @@ class CustomerController:
         customer = Customer(name=name, phone=phone, address=address)
         self.db.add(customer)
         self.db.commit()
+        event_bus.customers_updated.emit()
         return customer
 
     def get_all_customers(self):
@@ -61,6 +63,7 @@ class CustomerController:
         self.db.add(cash_movement)
         
         self.db.commit()
+        event_bus.sales_updated.emit() # Updates cash/debt
         return payment
 
     def add_payment(self, customer_id: int, amount: float, description: str = "Abono a cuenta"):

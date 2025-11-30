@@ -7,6 +7,7 @@ from PyQt6.QtCore import Qt, QLocale
 from src.database.db import SessionLocal
 from src.models.models import Product
 from src.controllers.inventory_controller import InventoryController
+from src.utils.event_bus import event_bus
 
 class InventoryWindow(QWidget):
     def __init__(self):
@@ -21,6 +22,29 @@ class InventoryWindow(QWidget):
         self.setLayout(self.layout)
         
         self.setup_ui()
+        
+        # Debounce timer
+        from PyQt6.QtCore import QTimer
+        self.update_timer = QTimer()
+        self.update_timer.setSingleShot(True)
+        self.update_timer.setInterval(500)
+        self.update_timer.timeout.connect(self.refresh_current_stock)
+        
+        # Connect signals
+        event_bus.products_updated.connect(self.setup_product_autocomplete)
+        event_bus.products_updated.connect(self.setup_stock_out_product_autocomplete)
+        event_bus.inventory_updated.connect(self.schedule_refresh)
+
+    def schedule_refresh(self):
+        self.update_timer.start()
+
+    def refresh_current_stock(self):
+        if self.selected_product_id:
+            self.on_product_selected()
+        if self.selected_out_product_id:
+            self.on_stock_out_product_selected()
+        if self.selected_history_product_id:
+            self.load_kardex()
 
     def setup_ui(self):
         # Tabs for Entry and History

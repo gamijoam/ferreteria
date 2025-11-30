@@ -1,8 +1,9 @@
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, 
     QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox, QInputDialog,
-    QComboBox
+    QComboBox, QWidget
 )
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 from src.database.db import SessionLocal
 from src.controllers.return_controller import ReturnController
@@ -11,43 +12,58 @@ class ReturnDialog(QDialog):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Procesar Devolución - Módulo 6")
-        self.resize(1200, 750)
+        self.resize(1300, 800)
         
         self.db = SessionLocal()
         self.controller = ReturnController(self.db)
         self.current_sale = None
         
-        self.layout = QVBoxLayout()
+        self.layout = QHBoxLayout()
         self.setLayout(self.layout)
         
         self.setup_ui()
+        self.load_initial_sales()
 
     def setup_ui(self):
-        # Search
-        search_layout = QHBoxLayout()
-        self.input_sale_id = QLineEdit()
-        self.input_sale_id.setPlaceholderText("Número de Ticket / Venta ID")
+        # --- LEFT PANEL: Sales List ---
+        left_panel = QVBoxLayout()
         
-        btn_search = QPushButton("Buscar Venta")
-        btn_search.clicked.connect(self.search_sale)
+        left_panel.addWidget(QLabel("<b>Buscar Venta:</b>"))
         
-        search_layout.addWidget(QLabel("Ticket #:"))
-        search_layout.addWidget(self.input_sale_id)
-        search_layout.addWidget(btn_search)
-        self.layout.addLayout(search_layout)
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Buscar por ID o Cliente...")
+        self.search_input.textChanged.connect(self.filter_sales)
+        left_panel.addWidget(self.search_input)
         
-        # Info
-        self.lbl_info = QLabel("")
-        self.layout.addWidget(self.lbl_info)
+        self.sales_table = QTableWidget()
+        self.sales_table.setColumnCount(4)
+        self.sales_table.setHorizontalHeaderLabels(["ID", "Fecha", "Cliente", "Total"])
+        self.sales_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        self.sales_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        self.sales_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.sales_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+        self.sales_table.itemSelectionChanged.connect(self.on_sale_selected)
+        left_panel.addWidget(self.sales_table)
         
-        # Table
-        self.table = QTableWidget()
-        self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels([
+        # Wrap left panel in a widget/frame if needed, or just add layout
+        left_widget = QWidget()
+        left_widget.setLayout(left_panel)
+        self.layout.addWidget(left_widget, 35) # 35% width
+        
+        # --- RIGHT PANEL: Sale Details ---
+        right_panel = QVBoxLayout()
+        
+        self.lbl_info = QLabel("Seleccione una venta para ver detalles")
+        self.lbl_info.setStyleSheet("font-size: 14pt; font-weight: bold; color: #1976D2;")
+        right_panel.addWidget(self.lbl_info)
+        
+        self.details_table = QTableWidget()
+        self.details_table.setColumnCount(5)
+        self.details_table.setHorizontalHeaderLabels([
             "ID Prod", "Producto", "Cant. Comprada", "Precio Unit.", "Devolver (Cant)"
         ])
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.layout.addWidget(self.table)
+        self.details_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        right_panel.addWidget(self.details_table)
         
         # Action Layout
         action_layout = QHBoxLayout()
@@ -74,42 +90,74 @@ class ReturnDialog(QDialog):
         btn_process.clicked.connect(self.process_return)
         action_layout.addWidget(btn_process)
         
-        self.layout.addLayout(action_layout)
+        right_panel.addLayout(action_layout)
+        
+        right_widget = QWidget()
+        right_widget.setLayout(right_panel)
+        self.layout.addWidget(right_widget, 65) # 65% width
 
-    def search_sale(self):
-        sale_id_text = self.input_sale_id.text()
-        if not sale_id_text.isdigit():
-            QMessageBox.warning(self, "Error", "ID inválido")
+    def load_initial_sales(self):
+        sales = self.controller.get_recent_sales()
+        self.populate_sales_table(sales)
+
+    def filter_sales(self):
+        query = self.search_input.text().strip()
+        if not query:
+            self.load_initial_sales()
             return
             
-        sale_id = int(sale_id_text)
-        sale = self.controller.find_sale(sale_id)
+        sales = self.controller.search_sales(query)
+        self.populate_sales_table(sales)
+
+    def populate_sales_table(self, sales):
+        self.sales_table.blockSignals(True)
+        self.sales_table.setRowCount(0)
+        for i, sale in enumerate(sales):
+            self.sales_table.insertRow(i)
+            self.sales_table.setItem(i, 0, QTableWidgetItem(str(sale.id)))
+            self.sales_table.setItem(i, 1, QTableWidgetItem(sale.date.strftime("%Y-%m-%d %H:%M")))
+            customer_name = sale.customer.name if sale.customer else "Cliente General"
+            self.sales_table.setItem(i, 2, QTableWidgetItem(customer_name))
+            self.sales_table.setItem(i, 3, QTableWidgetItem(f"${sale.total_amount:,.2f}"))
+            
+            # Store sale object in first item
+            self.sales_table.item(i, 0).setData(Qt.ItemDataRole.UserRole, sale.id)
+        self.sales_table.blockSignals(False)
+
+    def on_sale_selected(self):
+        selected_items = self.sales_table.selectedItems()
+        if not selected_items:
+            return
+            
+        row = selected_items[0].row()
+        sale_id = self.sales_table.item(row, 0).data(Qt.ItemDataRole.UserRole)
         
+        self.load_sale_details(sale_id)
+
+    def load_sale_details(self, sale_id):
+        sale = self.controller.find_sale(sale_id)
         if not sale:
-            QMessageBox.warning(self, "Error", "Venta no encontrada")
-            self.current_sale = None
-            self.table.setRowCount(0)
-            self.lbl_info.setText("")
             return
             
         self.current_sale = sale
-        self.lbl_info.setText(f"Venta del {sale.date} - Total: ${sale.total_amount:,.2f}")
+        self.lbl_info.setText(f"Venta #{sale.id} - {sale.date.strftime('%d/%m/%Y')} - Total: ${sale.total_amount:,.2f}")
         
-        self.table.setRowCount(0)
+        self.details_table.setRowCount(0)
         for i, detail in enumerate(sale.details):
-            self.table.insertRow(i)
-            self.table.setItem(i, 0, QTableWidgetItem(str(detail.product_id)))
-            self.table.setItem(i, 1, QTableWidgetItem(detail.product.name))
-            self.table.setItem(i, 2, QTableWidgetItem(str(detail.quantity)))
-            self.table.setItem(i, 3, QTableWidgetItem(f"${detail.unit_price:,.2f}"))
+            self.details_table.insertRow(i)
+            self.details_table.setItem(i, 0, QTableWidgetItem(str(detail.product_id)))
+            self.details_table.setItem(i, 1, QTableWidgetItem(detail.product.name))
+            self.details_table.setItem(i, 2, QTableWidgetItem(str(detail.quantity)))
+            self.details_table.setItem(i, 3, QTableWidgetItem(f"${detail.unit_price:,.2f}"))
             
             # Editable Return Qty (Default 0)
             qty_item = QTableWidgetItem("0")
-            self.table.setItem(i, 4, qty_item)
+            self.details_table.setItem(i, 4, qty_item)
 
     def void_sale(self):
         """Set all return quantities to max and auto-process"""
         if not self.current_sale:
+            QMessageBox.warning(self, "Alerta", "Seleccione una venta primero")
             return
         
         # Detect original payment method to determine refund currency
@@ -124,28 +172,28 @@ class ReturnDialog(QDialog):
             # For other methods (Tarjeta, Crédito), ask user
             refund_currency = self.currency_combo.currentText()
             
-        for i in range(self.table.rowCount()):
+        for i in range(self.details_table.rowCount()):
             # Get max qty from column 2 (Cant. Comprada)
-            max_qty = self.table.item(i, 2).text()
-            self.table.item(i, 4).setText(max_qty)
+            max_qty = self.details_table.item(i, 2).text()
+            self.details_table.item(i, 4).setText(max_qty)
         
         # Auto-trigger process with void message
         reason, ok = QInputDialog.getText(self, "Anular Venta", f"Razón de la anulación:\\n(Reembolso en {refund_currency})")
         if not ok or not reason:
             # Reset quantities if cancelled
-            for i in range(self.table.rowCount()):
-                self.table.item(i, 4).setText("0")
+            for i in range(self.details_table.rowCount()):
+                self.details_table.item(i, 4).setText("0")
             return
         
         # Process immediately with detected currency
         try:
             items_to_return = []
             
-            for i in range(self.table.rowCount()):
+            for i in range(self.details_table.rowCount()):
                 try:
-                    qty_return = float(self.table.item(i, 4).text())
+                    qty_return = float(self.details_table.item(i, 4).text())
                     if qty_return > 0:
-                        product_id = int(self.table.item(i, 0).text())
+                        product_id = int(self.details_table.item(i, 0).text())
                         items_to_return.append({
                             "product_id": product_id,
                             "quantity": qty_return
@@ -174,15 +222,16 @@ class ReturnDialog(QDialog):
 
     def process_return(self):
         if not self.current_sale:
+            QMessageBox.warning(self, "Alerta", "Seleccione una venta primero")
             return
 
         items_to_return = []
         
-        for i in range(self.table.rowCount()):
+        for i in range(self.details_table.rowCount()):
             try:
-                qty_return = float(self.table.item(i, 4).text())
+                qty_return = float(self.details_table.item(i, 4).text())
                 if qty_return > 0:
-                    product_id = int(self.table.item(i, 0).text())
+                    product_id = int(self.details_table.item(i, 0).text())
                     items_to_return.append({
                         "product_id": product_id,
                         "quantity": qty_return

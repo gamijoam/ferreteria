@@ -6,14 +6,14 @@ from src.database.db import SessionLocal
 from src.controllers.quote_controller import QuoteController
 
 class QuoteWindow(QWidget):
-    def __init__(self, pos_window=None):
+    def __init__(self, main_window=None):
         super().__init__()
         self.setWindowTitle("Cotizaciones - Módulo 9")
         self.resize(1200, 750)
         
         self.db = SessionLocal()
         self.controller = QuoteController(self.db)
-        self.pos_window = pos_window  # Reference to POS for loading quotes
+        self.main_window = main_window
         
         self.layout = QVBoxLayout()
         self.setLayout(self.layout)
@@ -109,8 +109,8 @@ class QuoteWindow(QWidget):
         QMessageBox.information(self, f"Cotización #{quote.id}", text)
 
     def convert_to_sale(self, quote):
-        if not self.pos_window:
-            QMessageBox.warning(self, "Error", "No se puede cargar al POS. Abra el POS primero.")
+        if not self.main_window:
+            QMessageBox.warning(self, "Error", "Error interno: Referencia a ventana principal perdida.")
             return
         
         reply = QMessageBox.question(
@@ -121,9 +121,13 @@ class QuoteWindow(QWidget):
         
         if reply == QMessageBox.StandardButton.Yes:
             try:
+                # Open POS (or bring to front)
+                pos_window = self.main_window.open_pos()
+                
+                # Load cart
                 cart = self.controller.convert_to_cart(quote.id)
-                self.pos_window.controller.cart = cart
-                self.pos_window.refresh_table()
+                pos_window.controller.cart = cart
+                pos_window.refresh_table()
                 
                 # Mark as converted
                 self.controller.mark_as_converted(quote.id)

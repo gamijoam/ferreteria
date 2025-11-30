@@ -279,8 +279,13 @@ class MainWindow(QMainWindow):
         self.inventory_window.show()
 
     def open_pos(self):
-        self.pos_window = POSWindow()
-        self.pos_window.show()
+        if not hasattr(self, 'pos_window') or not self.pos_window.isVisible():
+            self.pos_window = POSWindow()
+            self.pos_window.show()
+        else:
+            self.pos_window.raise_()
+            self.pos_window.activateWindow()
+        return self.pos_window
 
     def open_cash(self):
         self.cash_window = CashWindow()
@@ -303,9 +308,7 @@ class MainWindow(QMainWindow):
         self.price_rule_window.show()
 
     def open_quotes(self):
-        # Pass POS reference if open
-        pos_ref = getattr(self, 'pos_window', None)
-        self.quote_window = QuoteWindow(pos_window=pos_ref)
+        self.quote_window = QuoteWindow(main_window=self)
         self.quote_window.show()
 
     def open_labels(self):
