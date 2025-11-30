@@ -125,11 +125,21 @@ class MainWindow(QMainWindow):
             grid.addWidget(btn, row, col)
             col += 1
 
-            if col >= 3:
+            if col >= 4:
                 row += 1
                 col = 0
 
         # POS & Cash & Purchases
+        if user.role in [UserRole.ADMIN, UserRole.WAREHOUSE]:
+            btn = self.create_module_button("🛍️", "Compras", "Órdenes de compra", "#FF9800")
+            btn.clicked.connect(self.open_purchases)
+            grid.addWidget(btn, row, col)
+            col += 1
+
+        if col >= 4:
+            row += 1
+            col = 0
+
         if user.role in [UserRole.ADMIN, UserRole.CASHIER]:
             btn = self.create_module_button("🛒", "Punto de Venta", "Ventas rápidas", "#FF9800")
             btn.clicked.connect(self.open_pos)
@@ -141,18 +151,6 @@ class MainWindow(QMainWindow):
             grid.addWidget(btn, row, col)
             col += 1
             
-        if user.role in [UserRole.ADMIN, UserRole.WAREHOUSE]:
-            btn = self.create_module_button("🛍️", "Compras", "Órdenes de compra", "#FF9800")
-            btn.clicked.connect(self.open_purchases)
-            grid.addWidget(btn, row, col)
-            col += 1
-
-        if col >= 3:
-            row += 1
-            col = 0
-
-        # Returns & Customers & Quotes
-        if user.role in [UserRole.ADMIN, UserRole.CASHIER]:
             btn = self.create_module_button("↩️", "Devoluciones", "Gestión de returns", "#F44336")
             btn.clicked.connect(self.open_returns)
             grid.addWidget(btn, row, col)
@@ -162,15 +160,15 @@ class MainWindow(QMainWindow):
             btn.clicked.connect(self.open_customers)
             grid.addWidget(btn, row, col)
             col += 1
+
+            if col >= 4:
+                row += 1
+                col = 0
             
             btn = self.create_module_button("📝", "Cotizaciones", "Presupuestos", "#9C27B0")
             btn.clicked.connect(self.open_quotes)
             grid.addWidget(btn, row, col)
             col += 1
-
-            if col >= 3:
-                row += 1
-                col = 0
 
         # Admin & Management Tools
         if user.role == UserRole.ADMIN:
@@ -191,7 +189,7 @@ class MainWindow(QMainWindow):
             grid.addWidget(btn, row, col)
             col += 1
             
-            if col >= 3:
+            if col >= 4:
                 row += 1
                 col = 0
 

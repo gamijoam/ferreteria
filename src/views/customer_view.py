@@ -240,6 +240,18 @@ class CustomerWindow(QWidget):
         from PyQt6.QtCore import QLocale
         amount_spin.setLocale(QLocale(QLocale.Language.English, QLocale.Country.UnitedStates))
         
+        # Function to update currency display
+        def update_currency_display():
+            if radio_usd.isChecked():
+                amount_spin.setPrefix("$ ")
+                amount_spin.setValue(current_debt if current_debt > 0 else 0.01)
+            else:
+                amount_spin.setPrefix("Bs ")
+                amount_spin.setValue(debt_bs if debt_bs > 0 else 0.01)
+                
+        radio_usd.toggled.connect(update_currency_display)
+        radio_bs.toggled.connect(update_currency_display)
+        
         amount_spin.selectAll()
         
         form_layout.addRow("Monto del Pago:", amount_spin)

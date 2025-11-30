@@ -22,7 +22,7 @@ a = Analysis(
         'PyQt6',
         'pandas',
         'openpyxl',
-        'reporlab',
+        'reportlab',
     ],
     hookspath=[],
     hooksconfig={},

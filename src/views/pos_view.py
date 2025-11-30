@@ -262,6 +262,9 @@ class POSWindow(QWidget):
         if success:
             self.refresh_table()
             self.input_scan.clear()
+            # Force clear again just in case completer interferes
+            from PyQt6.QtCore import QTimer
+            QTimer.singleShot(10, self.input_scan.clear)
         else:
             QMessageBox.warning(self, "Alerta", msg)
         

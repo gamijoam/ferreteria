@@ -12,7 +12,7 @@ class ConfigDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Configuración del Negocio")
-        self.resize(400, 300)
+        self.resize(800, 600)
         
         self.db = SessionLocal()
         self.controller = ConfigController(self.db)
@@ -21,13 +21,21 @@ class ConfigDialog(QDialog):
         self.load_data()
 
     def setup_ui(self):
-        layout = QVBoxLayout()
-        self.setLayout(layout)
+        main_layout = QVBoxLayout()
+        self.setLayout(main_layout)
         
         # Header
         header = QLabel("Datos de la Empresa")
         header.setStyleSheet("font-size: 18px; font-weight: bold; margin-bottom: 10px;")
-        layout.addWidget(header)
+        main_layout.addWidget(header)
+        
+        # Create horizontal layout for two columns
+        content_layout = QHBoxLayout()
+        main_layout.addLayout(content_layout)
+        
+        # LEFT COLUMN
+        left_column = QVBoxLayout()
+        content_layout.addLayout(left_column)
         
         # Form
         form_group = QGroupBox("Información General")
@@ -39,7 +47,18 @@ class ConfigDialog(QDialog):
         self.phone_input = QLineEdit()
         
         self.business_type_combo = QComboBox()
-        self.business_type_combo.addItems(["Ferretería", "Pescadería/Frutería", "Otro"])
+        self.business_type_combo.setEditable(True)
+        self.business_type_combo.addItems([
+            "Ferretería", 
+            "Farmacia", 
+            "Supermercado", 
+            "Tienda de Ropa", 
+            "Restaurante", 
+            "Repuestos", 
+            "Electrónica",
+            "Pescadería/Frutería", 
+            "Otro"
+        ])
         
         form_layout.addRow("Nombre del Negocio:", self.name_input)
         form_layout.addRow("RIF / NIT:", self.rif_input)
@@ -48,7 +67,7 @@ class ConfigDialog(QDialog):
         form_layout.addRow("Teléfono:", self.phone_input)
         
         form_group.setLayout(form_layout)
-        layout.addWidget(form_group)
+        left_column.addWidget(form_group)
         
         # Exchange Rate Section
         exchange_group = QGroupBox("Tasa de Cambio (USD → Bs)")
@@ -64,7 +83,13 @@ class ConfigDialog(QDialog):
         exchange_layout.addRow("Última Actualización:", self.exchange_rate_updated_label)
         
         exchange_group.setLayout(exchange_layout)
-        layout.addWidget(exchange_group)
+        left_column.addWidget(exchange_group)
+        
+        left_column.addStretch()
+        
+        # RIGHT COLUMN
+        right_column = QVBoxLayout()
+        content_layout.addLayout(right_column)
         
         # Logo Section
         logo_group = QGroupBox("Logo de la Empresa")
@@ -72,7 +97,7 @@ class ConfigDialog(QDialog):
         
         self.logo_preview = QLabel("Sin logo")
         self.logo_preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.logo_preview.setMinimumHeight(100)
+        self.logo_preview.setMinimumHeight(150)
         self.logo_preview.setStyleSheet("border: 1px solid #ccc; background-color: #f5f5f5;")
         logo_layout.addWidget(self.logo_preview)
         
@@ -81,7 +106,7 @@ class ConfigDialog(QDialog):
         logo_layout.addWidget(btn_upload_logo)
         
         logo_group.setLayout(logo_layout)
-        layout.addWidget(logo_group)
+        right_column.addWidget(logo_group)
         
         # Printer Configuration Button
         btn_printer = QPushButton("⚙️ Configurar Impresora Térmica")
@@ -98,9 +123,11 @@ class ConfigDialog(QDialog):
             }
         """)
         btn_printer.clicked.connect(self.open_printer_config)
-        layout.addWidget(btn_printer)
+        right_column.addWidget(btn_printer)
         
-        # Buttons
+        right_column.addStretch()
+        
+        # BOTTOM: Save button (full width)
         btn_save = QPushButton("Guardar Cambios")
         btn_save.setStyleSheet("""
             QPushButton {
@@ -115,9 +142,7 @@ class ConfigDialog(QDialog):
             }
         """)
         btn_save.clicked.connect(self.save_config)
-        layout.addWidget(btn_save)
-        
-        layout.addStretch()
+        main_layout.addWidget(btn_save)
 
     def load_data(self):
         info = self.controller.get_business_info()

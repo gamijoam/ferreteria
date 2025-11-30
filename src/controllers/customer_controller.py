@@ -62,3 +62,7 @@ class CustomerController:
         
         self.db.commit()
         return payment
+
+    def add_payment(self, customer_id: int, amount: float, description: str = "Abono a cuenta"):
+        """Alias for record_payment to maintain compatibility"""
+        return self.record_payment(customer_id, amount, description)
