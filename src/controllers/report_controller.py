@@ -35,6 +35,8 @@ class ReportController:
             sales = [s for s in sales if any(d.product_id == product_id for d in s.details)]
         
         return sales
+        
+        return sales
 
     def get_sales_summary(self, start_date, end_date):
         """Summary statistics for sales period"""

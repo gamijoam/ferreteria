@@ -116,10 +116,78 @@ class POSController:
         if 0 <= index < len(self.cart):
             self.cart.pop(index)
 
+    def apply_discount(self, index: int, discount_value: float, discount_type: str):
+        """
+        Apply discount to a specific cart item.
+        discount_type: 'PERCENT' or 'FIXED'
+        """
+        if not (0 <= index < len(self.cart)):
+            return False, "Item no válido"
+        
+        item = self.cart[index]
+        
+        if discount_type == "PERCENT":
+            if discount_value < 0 or discount_value > 100:
+                return False, "El descuento debe estar entre 0 y 100%"
+            discount_amount = (item["unit_price"] * item["quantity"]) * (discount_value / 100)
+        elif discount_type == "FIXED":
+            if discount_value < 0:
+                return False, "El descuento no puede ser negativo"
+            discount_amount = discount_value
+        else:
+            return False, "Tipo de descuento inválido"
+        
+        # Store discount info
+        item["discount"] = discount_value
+        item["discount_type"] = discount_type
+        item["discount_amount"] = discount_amount
+        
+        # Recalculate subtotal
+        original_subtotal = item["unit_price"] * item["quantity"]
+        item["subtotal"] = max(0, original_subtotal - discount_amount)
+        
+        return True, f"Descuento aplicado: ${discount_amount:,.2f}"
+
+    def apply_global_discount(self, discount_value: float, discount_type: str):
+        """
+        Apply discount to all items in cart proportionally.
+        """
+        if not self.cart:
+            return False, "El carrito está vacío"
+        
+        total_before = self.get_total()
+        
+        if discount_type == "PERCENT":
+            if discount_value < 0 or discount_value > 100:
+                return False, "El descuento debe estar entre 0 y 100%"
+            total_discount = total_before * (discount_value / 100)
+        elif discount_type == "FIXED":
+            if discount_value < 0:
+                return False, "El descuento no puede ser negativo"
+            if discount_value > total_before:
+                return False, "El descuento no puede ser mayor al total"
+            total_discount = discount_value
+        else:
+            return False, "Tipo de descuento inválido"
+        
+        # Apply proportionally to each item
+        for item in self.cart:
+            item_proportion = item["subtotal"] / total_before
+            item_discount = total_discount * item_proportion
+            
+            item["discount"] = discount_value  # Store original value
+            item["discount_type"] = discount_type
+            item["discount_amount"] = item_discount
+            
+            original_subtotal = item["unit_price"] * item["quantity"]
+            item["subtotal"] = max(0, original_subtotal - item_discount)
+        
+        return True, f"Descuento global aplicado: ${total_discount:,.2f}"
+
     def get_total(self):
         return sum(item["subtotal"] for item in self.cart)
 
-    def finalize_sale(self, payment_method="Efectivo USD", customer_id=None, is_credit=False, currency="USD", exchange_rate=1.0):
+    def finalize_sale(self, payment_method="Efectivo USD", customer_id=None, is_credit=False, currency="USD", exchange_rate=1.0, notes=""):
         if not self.cart:
             return False, "El carrito está vacío", ""
 
@@ -146,7 +214,8 @@ class POSController:
                 paid=not is_credit,  # If credit, not paid yet
                 currency=currency,
                 exchange_rate_used=exchange_rate,
-                total_amount_bs=total_bs
+                total_amount_bs=total_bs,
+                notes=notes if notes else None
             )
             self.db.add(new_sale)
             self.db.flush() # Get ID
@@ -168,12 +237,10 @@ class POSController:
                 detail = SaleDetail(
                     sale_id=new_sale.id,
                     product_id=item["product_id"],
-                    quantity=item["units_deducted"], # Store base units sold? Or sold items?
-                    # Usually for stats we want base units, but for receipt we want what user bought.
-                    # Let's store base units in DB for consistency with stock, 
-                    # but we might want to add a column 'display_quantity' later.
-                    # For now, let's store 'quantity' as units_deducted (base units) to match Kardex logic easily.
+                    quantity=item["units_deducted"], # Store base units sold
                     unit_price=item["product_obj"].price, # Base unit price
+                    discount=item.get("discount", 0.0),
+                    discount_type=item.get("discount_type", "NONE"),
                     subtotal=item["subtotal"],
                     is_box_sale=item["is_box"]
                 )

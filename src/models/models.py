@@ -102,6 +102,9 @@ class Sale(Base):
     customer_id = Column(Integer, ForeignKey("customers.id"), nullable=True)
     is_credit = Column(Boolean, default=False)
     paid = Column(Boolean, default=True) # False for credit sales
+    
+    # Sale Notes
+    notes = Column(Text, nullable=True)  # Special observations or instructions
 
     details = relationship("SaleDetail", back_populates="sale")
     customer = relationship("Customer", back_populates="sales")
@@ -117,6 +120,11 @@ class SaleDetail(Base):
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
     quantity = Column(Float, nullable=False) # Units sold
     unit_price = Column(Float, nullable=False) # Price at moment of sale
+    
+    # Discount Support
+    discount = Column(Float, default=0.0)  # Discount amount or percentage
+    discount_type = Column(String, default="NONE")  # NONE, PERCENT, FIXED
+    
     subtotal = Column(Float, nullable=False)
     is_box_sale = Column(Boolean, default=False) # Was it sold as a box?
 
