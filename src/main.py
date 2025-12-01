@@ -211,7 +211,7 @@ class MainWindow(QMainWindow):
         main_layout.addStretch()
 
         # Footer
-        footer = QLabel("Sistema ERP v2.0 | Desarrollado con PyQt6")
+        footer = QLabel("Sistema ERP v2.0")
         footer.setStyleSheet("color: #666; font-size: 9pt; padding: 10px;")
         footer.setAlignment(Qt.AlignmentFlag.AlignCenter)
         main_layout.addWidget(footer)
@@ -378,6 +378,23 @@ def main():
     # Apply modern theme
     from src.theme import MODERN_THEME
     app.setStyleSheet(MODERN_THEME)
+
+    # --- LICENSE CHECK ---
+    from src.controllers.license_controller import LicenseController
+    from src.views.license_view import LicenseDialog
+    
+    license_ctrl = LicenseController()
+    status, msg = license_ctrl.check_status()
+    
+    if status in ['EXPIRED', 'INVALID']:
+        # Show activation dialog
+        dialog = LicenseDialog(license_ctrl, status, msg)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            sys.exit(0)
+    elif status == 'DEMO':
+        # Optional: Show demo reminder toast or just log it
+        print(f"Modo Demo Activo: {msg}")
+    # ---------------------
 
     # Show Login First
     login = LoginDialog()

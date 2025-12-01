@@ -211,7 +211,7 @@ class MainWindow(QMainWindow):
         main_layout.addStretch()
 
         # Footer
-        footer = QLabel("Sistema ERP v2.0 | Desarrollado con PyQt6")
+        footer = QLabel("Sistema ERP v2.0")
         footer.setStyleSheet("color: #666; font-size: 9pt; padding: 10px;")
         footer.setAlignment(Qt.AlignmentFlag.AlignCenter)
         main_layout.addWidget(footer)

@@ -17,7 +17,7 @@ class POSWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Punto de Venta (POS) - Módulo 3")
-        self.resize(1200, 750)
+        self.showMaximized()  # Maximize window instead of fixed size
         
         self.db = SessionLocal()
         self.controller = POSController(self.db)
@@ -143,7 +143,45 @@ class POSWindow(QWidget):
         self.lbl_rate.setAlignment(Qt.AlignmentFlag.AlignCenter)
         right_panel.addWidget(self.lbl_rate)
         
+        # Notes Field
+        notes_group = QGroupBox("Notas de Venta")
+        notes_layout = QVBoxLayout()
+        self.notes_input = QLineEdit()
+        self.notes_input.setPlaceholderText("Observaciones especiales...")
+        self.notes_input.setMaxLength(200)
+        notes_layout.addWidget(self.notes_input)
+        notes_group.setLayout(notes_layout)
+        right_panel.addWidget(notes_group)
+        
+        # Discount Buttons
+        discount_group = QGroupBox("Descuentos")
+        discount_layout = QVBoxLayout()
+        
+        btn_item_discount = QPushButton("Descuento por Item")
+        btn_item_discount.setStyleSheet("background-color: #9C27B0; color: white; padding: 8px;")
+        btn_item_discount.clicked.connect(self.apply_item_discount)
+        discount_layout.addWidget(btn_item_discount)
+        
+        btn_global_discount = QPushButton("Descuento Global")
+        btn_global_discount.setStyleSheet("background-color: #673AB7; color: white; padding: 8px;")
+        btn_global_discount.clicked.connect(self.apply_global_discount_dialog)
+        discount_layout.addWidget(btn_global_discount)
+        
+        discount_group.setLayout(discount_layout)
+        right_panel.addWidget(discount_group)
+        
         right_panel.addStretch()
+        
+        # Wrap right panel in scroll area
+        from PyQt6.QtWidgets import QScrollArea
+        right_widget = QWidget()
+        right_widget.setLayout(right_panel)
+        
+        scroll_area = QScrollArea()
+        scroll_area.setWidget(right_widget)
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll_area.setMaximumWidth(400)  # Limit width
         
         # Table (in left panel)
         self.table = QTableWidget()
@@ -187,7 +225,7 @@ class POSWindow(QWidget):
         
         # Add panels to main layout
         main_layout.addLayout(left_panel, 3)  # 75% width
-        main_layout.addLayout(right_panel, 1)  # 25% width
+        main_layout.addWidget(scroll_area, 1)  # 25% width with scroll
         
         self.layout.addLayout(main_layout)
         
@@ -409,13 +447,15 @@ class POSWindow(QWidget):
         if reply == QMessageBox.StandardButton.Yes:
             # Get currency and exchange rate
             currency = self.currency_combo.currentText()
+            notes = self.notes_input.text().strip()
             
             success, msg, ticket = self.controller.finalize_sale(
                 payment_method=payment_method,
                 customer_id=customer_id,
                 is_credit=is_credit,
                 currency=currency,
-                exchange_rate=self.exchange_rate
+                exchange_rate=self.exchange_rate,
+                notes=notes
             )
             if success:
                 if is_credit:
@@ -503,6 +543,121 @@ class POSWindow(QWidget):
             self.refresh_table()
         except Exception as e:
             QMessageBox.critical(self, "Error", str(e))
+
+    def apply_item_discount(self):
+        """Apply discount to selected item"""
+        row = self.table.currentRow()
+        if row < 0:
+            QMessageBox.warning(self, "Alerta", "Seleccione un producto de la tabla")
+            return
+        
+        from PyQt6.QtWidgets import QInputDialog, QDialog, QVBoxLayout, QRadioButton, QButtonGroup
+        
+        # Create custom dialog
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Aplicar Descuento")
+        dialog.resize(300, 150)
+        
+        layout = QVBoxLayout()
+        
+        # Radio buttons for discount type
+        layout.addWidget(QLabel("Tipo de descuento:"))
+        btn_group = QButtonGroup(dialog)
+        rb_percent = QRadioButton("Porcentaje (%)")
+        rb_fixed = QRadioButton("Monto Fijo ($)")
+        rb_percent.setChecked(True)
+        btn_group.addButton(rb_percent)
+        btn_group.addButton(rb_fixed)
+        layout.addWidget(rb_percent)
+        layout.addWidget(rb_fixed)
+        
+        # Input
+        layout.addWidget(QLabel("Valor:"))
+        input_value = QDoubleSpinBox()
+        input_value.setMinimum(0)
+        input_value.setMaximum(100)
+        input_value.setValue(10)
+        layout.addWidget(input_value)
+        
+        # Buttons
+        btn_layout = QHBoxLayout()
+        btn_ok = QPushButton("Aplicar")
+        btn_cancel = QPushButton("Cancelar")
+        btn_ok.clicked.connect(dialog.accept)
+        btn_cancel.clicked.connect(dialog.reject)
+        btn_layout.addWidget(btn_ok)
+        btn_layout.addWidget(btn_cancel)
+        layout.addLayout(btn_layout)
+        
+        dialog.setLayout(layout)
+        
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            discount_value = input_value.value()
+            discount_type = "PERCENT" if rb_percent.isChecked() else "FIXED"
+            
+            success, msg = self.controller.apply_discount(row, discount_value, discount_type)
+            if success:
+                self.refresh_table()
+                QMessageBox.information(self, "Éxito", msg)
+            else:
+                QMessageBox.warning(self, "Error", msg)
+
+    def apply_global_discount_dialog(self):
+        """Apply discount to entire sale"""
+        if not self.controller.cart:
+            QMessageBox.warning(self, "Alerta", "El carrito está vacío")
+            return
+        
+        from PyQt6.QtWidgets import QInputDialog, QDialog, QVBoxLayout, QRadioButton, QButtonGroup
+        
+        # Create custom dialog
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Descuento Global")
+        dialog.resize(300, 150)
+        
+        layout = QVBoxLayout()
+        
+        # Radio buttons for discount type
+        layout.addWidget(QLabel("Tipo de descuento:"))
+        btn_group = QButtonGroup(dialog)
+        rb_percent = QRadioButton("Porcentaje (%)")
+        rb_fixed = QRadioButton("Monto Fijo ($)")
+        rb_percent.setChecked(True)
+        btn_group.addButton(rb_percent)
+        btn_group.addButton(rb_fixed)
+        layout.addWidget(rb_percent)
+        layout.addWidget(rb_fixed)
+        
+        # Input
+        layout.addWidget(QLabel("Valor:"))
+        input_value = QDoubleSpinBox()
+        input_value.setMinimum(0)
+        input_value.setMaximum(1000)
+        input_value.setValue(5)
+        layout.addWidget(input_value)
+        
+        # Buttons
+        btn_layout = QHBoxLayout()
+        btn_ok = QPushButton("Aplicar")
+        btn_cancel = QPushButton("Cancelar")
+        btn_ok.clicked.connect(dialog.accept)
+        btn_cancel.clicked.connect(dialog.reject)
+        btn_layout.addWidget(btn_ok)
+        btn_layout.addWidget(btn_cancel)
+        layout.addLayout(btn_layout)
+        
+        dialog.setLayout(layout)
+        
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            discount_value = input_value.value()
+            discount_type = "PERCENT" if rb_percent.isChecked() else "FIXED"
+            
+            success, msg = self.controller.apply_global_discount(discount_value, discount_type)
+            if success:
+                self.refresh_table()
+                QMessageBox.information(self, "Éxito", msg)
+            else:
+                QMessageBox.warning(self, "Error", msg)
 
     def closeEvent(self, event):
         self.db.close()
