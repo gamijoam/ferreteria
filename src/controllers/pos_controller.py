@@ -328,6 +328,32 @@ class POSController:
                     description=f"Venta Ticket #{new_sale.id} ({sale_type})"
                 )
                 self.db.add(kardex)
+                
+                # Register shrinkage if discount was applied
+                if item.get("discount", 0) > 0:
+                    # Calculate equivalent units of shrinkage
+                    discount_amount = item["discount"]
+                    unit_price = item["product_obj"].price
+                    
+                    if item["discount_type"] == "PERCENT":
+                        # Percentage discount
+                        shrinkage_value = item["subtotal"] * (discount_amount / 100)
+                    else:
+                        # Fixed discount
+                        shrinkage_value = discount_amount
+                    
+                    # Convert to equivalent units
+                    shrinkage_units = shrinkage_value / unit_price if unit_price > 0 else 0
+                    
+                    if shrinkage_units > 0:
+                        shrinkage_kardex = Kardex(
+                            product_id=product.id,
+                            movement_type=MovementType.ADJUSTMENT,
+                            quantity=-shrinkage_units,
+                            balance_after=product.stock,
+                            description=f"Merma por descuento en Venta #{new_sale.id} - ${shrinkage_value:.2f}"
+                        )
+                        self.db.add(shrinkage_kardex)
 
                 # Ticket Line
                 qty_display = f"{item['quantity']} {'CAJA' if item['is_box'] else 'UNID'}"

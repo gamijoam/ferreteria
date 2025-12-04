@@ -82,19 +82,7 @@ class POSWindow(QWidget):
         mode_group.setLayout(mode_layout)
         right_panel.addWidget(mode_group)
         
-        # Control Group 2: Currency
-        currency_group = QGroupBox("Moneda")
-        currency_layout = QFormLayout()
-        
-        self.currency_combo = QComboBox()
-        self.currency_combo.setFont(QFont("Arial", 11))
-        self.currency_combo.addItems(["USD", "Bs"])
-        self.currency_combo.setCurrentIndex(1)  # Default to Bs
-        self.currency_combo.currentTextChanged.connect(self.on_currency_changed)
-        
-        currency_layout.addRow("Venta en:", self.currency_combo)
-        currency_group.setLayout(currency_layout)
-        right_panel.addWidget(currency_group)
+
         
         # Payment Method - Removed (now handled in payment dialog)
         # Keeping only credit checkbox for quick access
@@ -139,15 +127,7 @@ class POSWindow(QWidget):
         self.lbl_rate.setAlignment(Qt.AlignmentFlag.AlignCenter)
         right_panel.addWidget(self.lbl_rate)
         
-        # Notes Field
-        notes_group = QGroupBox("Notas de Venta")
-        notes_layout = QVBoxLayout()
-        self.notes_input = QLineEdit()
-        self.notes_input.setPlaceholderText("Observaciones especiales...")
-        self.notes_input.setMaxLength(200)
-        notes_layout.addWidget(self.notes_input)
-        notes_group.setLayout(notes_layout)
-        right_panel.addWidget(notes_group)
+
         
         # Discount Buttons
         discount_group = QGroupBox("Descuentos")
@@ -678,16 +658,14 @@ class POSWindow(QWidget):
     
     def process_sale(self, payments, is_credit, customer_id):
         """Process the sale with given payments"""
-        currency = self.currency_combo.currentText()
-        notes = self.notes_input.text().strip()
         
         success, msg, ticket = self.controller.finalize_sale(
             payments=payments,
             customer_id=customer_id,
             is_credit=is_credit,
-            currency=currency,
+            currency="USD",  # Default, actual currency is in each payment
             exchange_rate=self.exchange_rate,
-            notes=notes
+            notes=""  # Notes field removed from UI
         )
         if success:
             if is_credit:
@@ -748,6 +726,13 @@ class POSWindow(QWidget):
             QMessageBox.warning(self, "Alerta", "Seleccione un producto de la tabla")
             return
         
+        # Request PIN authorization
+        from src.views.pin_auth_dialog import PINAuthDialog
+        authorized, auth_user = PINAuthDialog.request_authorization(self, "aplicar descuento por ítem")
+        
+        if not authorized:
+            return
+        
         from PyQt6.QtWidgets import QInputDialog, QDialog, QVBoxLayout, QRadioButton, QButtonGroup
         
         # Create custom dialog
@@ -805,6 +790,13 @@ class POSWindow(QWidget):
             QMessageBox.warning(self, "Alerta", "El carrito está vacío")
             return
         
+        # Request PIN authorization
+        from src.views.pin_auth_dialog import PINAuthDialog
+        authorized, auth_user = PINAuthDialog.request_authorization(self, "aplicar descuento global")
+        
+        if not authorized:
+            return
+        
         from PyQt6.QtWidgets import QInputDialog, QDialog, QVBoxLayout, QRadioButton, QButtonGroup
         
         # Create custom dialog
@@ -860,6 +852,13 @@ class POSWindow(QWidget):
         """Quick discount - adjust total to a specific amount"""
         if not self.controller.cart:
             QMessageBox.warning(self, "Alerta", "El carrito está vacío")
+            return
+        
+        # Request PIN authorization
+        from src.views.pin_auth_dialog import PINAuthDialog
+        authorized, auth_user = PINAuthDialog.request_authorization(self, "ajustar total (descuento rápido)")
+        
+        if not authorized:
             return
         
         from PyQt6.QtWidgets import QInputDialog, QDialog, QVBoxLayout, QHBoxLayout, QRadioButton, QButtonGroup, QLabel, QPushButton
