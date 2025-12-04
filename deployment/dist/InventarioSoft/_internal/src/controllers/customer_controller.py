@@ -7,11 +7,11 @@ class CustomerController:
     def __init__(self, db: Session):
         self.db = db
 
-    def create_customer(self, name: str, phone: str = "", address: str = ""):
+    def create_customer(self, name: str, id_number: str = None, phone: str = "", address: str = ""):
         if not name:
             raise ValueError("El nombre es obligatorio")
             
-        customer = Customer(name=name, phone=phone, address=address)
+        customer = Customer(name=name, id_number=id_number, phone=phone, address=address)
         self.db.add(customer)
         self.db.commit()
         event_bus.customers_updated.emit()

@@ -187,7 +187,19 @@ class POSController:
     def get_total(self):
         return sum(item["subtotal"] for item in self.cart)
 
-    def finalize_sale(self, payment_method="Efectivo USD", customer_id=None, is_credit=False, currency="USD", exchange_rate=1.0, notes=""):
+    def finalize_sale(self, payments=None, customer_id=None, is_credit=False, currency="USD", exchange_rate=1.0, notes=""):
+        """
+        Finalize sale with support for mixed payments.
+        
+        Args:
+            payments: List of dicts [{"method": "Efectivo Bs", "amount": 50, "currency": "Bs"}, ...]
+                     If None, defaults to single payment with all methods combined
+            customer_id: Optional customer ID
+            is_credit: If True, sale is on credit (no payment required)
+            currency: Currency of the sale (USD or Bs)
+            exchange_rate: Exchange rate used
+            notes: Optional notes
+        """
         if not self.cart:
             return False, "El carrito está vacío", ""
 
@@ -206,6 +218,29 @@ class POSController:
             if currency == "Bs":
                 total_bs = total * exchange_rate
             
+            # Validate payments if provided
+            if not is_credit and payments:
+                # Calculate total paid in USD (convert Bs payments to USD)
+                total_paid_usd = 0
+                for p in payments:
+                    if p.get("currency") == "USD":
+                        total_paid_usd += p["amount"]
+                    else:  # Bs
+                        total_paid_usd += p["amount"] / exchange_rate
+                
+                # Allow small rounding differences (0.01 USD)
+                if abs(total_paid_usd - total) > 0.01:
+                    return False, f"El total de pagos (${total_paid_usd:.2f}) no coincide con el total de la venta (${total:.2f})", ""
+            
+            # Determine payment_method string for backward compatibility
+            if payments and len(payments) > 0:
+                if len(payments) == 1:
+                    payment_method = payments[0]["method"]
+                else:
+                    payment_method = "Pago Mixto"
+            else:
+                payment_method = "Efectivo USD"  # Default
+            
             new_sale = Sale(
                 total_amount=total, 
                 payment_method=payment_method,
@@ -219,6 +254,39 @@ class POSController:
             )
             self.db.add(new_sale)
             self.db.flush() # Get ID
+            
+            # Create SalePayment records if payments provided
+            if payments and not is_credit:
+                from src.models.models import SalePayment, CashMovement, CashSession
+                
+                # Get open cash session
+                session = self.db.query(CashSession).filter(CashSession.status == "OPEN").first()
+                if not session:
+                    return False, "Debe abrir una sesión de caja antes de realizar ventas al contado", ""
+                
+                for payment in payments:
+                    # Create SalePayment record
+                    sale_payment = SalePayment(
+                        sale_id=new_sale.id,
+                        payment_method=payment["method"],
+                        amount=payment["amount"],
+                        currency=payment.get("currency", "Bs")
+                    )
+                    self.db.add(sale_payment)
+                    
+                    # Create CashMovement for each payment
+                    payment_currency = payment.get("currency", "Bs")
+                    payment_amount = payment["amount"]
+                    
+                    cash_movement = CashMovement(
+                        session_id=session.id,
+                        type="DEPOSIT",
+                        amount=payment_amount,  # Store original amount
+                        currency=payment_currency,  # Original currency
+                        exchange_rate=exchange_rate,
+                        description=f"Venta #{new_sale.id} - {payment['method']}"
+                    )
+                    self.db.add(cash_movement)
 
             # Get business name
             from src.controllers.config_controller import ConfigController
@@ -251,12 +319,13 @@ class POSController:
                 product.stock -= item["units_deducted"]
                 
                 # Kardex
+                sale_type = "Crédito" if is_credit else "Contado"
                 kardex = Kardex(
                     product_id=product.id,
                     movement_type=MovementType.SALE,
                     quantity=-item["units_deducted"],
                     balance_after=product.stock,
-                    description=f"Venta Ticket #{new_sale.id}"
+                    description=f"Venta Ticket #{new_sale.id} ({sale_type})"
                 )
                 self.db.add(kardex)
 
@@ -274,6 +343,14 @@ class POSController:
             
             ticket_lines.append("-" * 20)
             ticket_lines.append(f"TOTAL: ${total:,.2f}")
+            
+            # Add payment breakdown if mixed payments
+            if payments and len(payments) > 1:
+                ticket_lines.append("")
+                ticket_lines.append("FORMA DE PAGO:")
+                for p in payments:
+                    ticket_lines.append(f"  {p['method']}: {p['amount']:.2f} {p.get('currency', 'Bs')}")
+            
             ticket_lines.append("Gracias por su compra!")
             
             # Auto-print if enabled

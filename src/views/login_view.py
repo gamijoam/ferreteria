@@ -12,7 +12,7 @@ class LoginDialog(QDialog):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("InventarioSoft - Inicio de Sesión")
-        self.setFixedSize(900, 600)
+        self.setFixedSize(1200, 600)
         
         self.db = SessionLocal()
         self.auth_controller = AuthController(self.db)
@@ -61,7 +61,8 @@ class LoginDialog(QDialog):
             left_layout.addWidget(lbl_logo)
         
         # Brand name
-        brand_title = QLabel("InventarioSoft")
+        business_info = config_ctrl.get_business_info()
+        brand_title = QLabel(business_info['name'])
         brand_title.setStyleSheet("""
             color: white;
             font-size: 32pt;

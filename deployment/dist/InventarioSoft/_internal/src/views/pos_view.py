@@ -127,11 +127,17 @@ class POSWindow(QWidget):
         customer_group = QGroupBox("Cliente (Opcional)")
         customer_layout = QVBoxLayout()
         
-        self.customer_combo = QComboBox()
-        self.customer_combo.setFont(QFont("Arial", 10))
-        self.customer_combo.setVisible(True)
-        self.load_customers()
-        customer_layout.addWidget(self.customer_combo)
+        self.customer_input = QLineEdit()
+        self.customer_input.setPlaceholderText("Buscar cliente por nombre o cédula...")
+        self.customer_input.setFont(QFont("Arial", 10))
+        self.setup_customer_autocomplete()
+        self.customer_input.returnPressed.connect(self.on_customer_selected)
+        customer_layout.addWidget(self.customer_input)
+        
+        self.selected_customer_id = None
+        self.lbl_selected_customer = QLabel("Ninguno seleccionado")
+        self.lbl_selected_customer.setStyleSheet("color: #666; font-style: italic;")
+        customer_layout.addWidget(self.lbl_selected_customer)
         
         customer_group.setLayout(customer_layout)
         right_panel.addWidget(customer_group)
@@ -253,16 +259,59 @@ class POSWindow(QWidget):
         self.focus_input()
 
     def toggle_credit_mode(self, checked):
-        self.customer_combo.setVisible(checked)
+        self.customer_input.setVisible(checked)
+        self.lbl_selected_customer.setVisible(checked)
         if checked:
             self.load_customers()
 
     def load_customers(self):
-        self.customer_combo.clear()
-        self.customer_combo.addItem("Seleccione Cliente...", None)
+        # Refresh autocomplete data
+        self.setup_customer_autocomplete()
+        
+    def setup_customer_autocomplete(self):
+        """Setup autocomplete for customer search"""
         customers = self.customer_controller.get_all_customers()
+        
+        self.customer_map = {}
+        suggestions = []
         for c in customers:
-            self.customer_combo.addItem(c.name, c.id)
+            # Add both name and id_number as searchable
+            suggestion = c.name
+            suggestions.append(suggestion)
+            self.customer_map[suggestion] = c
+            
+            if c.id_number:
+                suggestions.append(c.id_number)
+                self.customer_map[c.id_number] = c
+            
+        completer = QCompleter(suggestions)
+        completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        completer.setFilterMode(Qt.MatchFlag.MatchContains)
+        self.customer_input.setCompleter(completer)
+
+    def on_customer_selected(self):
+        text = self.customer_input.text().strip()
+        if not text:
+            self.selected_customer_id = None
+            self.lbl_selected_customer.setText("Ninguno seleccionado")
+            return
+            
+        customer = self.customer_map.get(text)
+        if not customer:
+            # Try finding by name match
+            for name, c in self.customer_map.items():
+                if text.lower() in name.lower():
+                    customer = c
+                    break
+        
+        if customer:
+            self.selected_customer_id = customer.id
+            self.lbl_selected_customer.setText(f"Seleccionado: {customer.name}")
+            self.lbl_selected_customer.setStyleSheet("color: green; font-weight: bold;")
+        else:
+            self.selected_customer_id = None
+            self.lbl_selected_customer.setText("Cliente no encontrado")
+            self.lbl_selected_customer.setStyleSheet("color: red;")
     
     def setup_autocomplete(self):
         """Setup autocomplete for product search"""
@@ -431,7 +480,7 @@ class POSWindow(QWidget):
         payment_method = self.payment_method_combo.currentText()
         is_credit = self.credit_check.isChecked() # Use checkbox as truth
         # Optional: Save customer for all sales if selected
-        customer_id = self.customer_combo.currentData()
+        customer_id = self.selected_customer_id
         
         if is_credit:
             if not customer_id:
@@ -479,9 +528,9 @@ class POSWindow(QWidget):
         
         # Show/Hide customer requirement
         if is_credit:
-            self.customer_combo.setStyleSheet("background-color: #ffebee; border: 1px solid red;")
+            self.customer_input.setStyleSheet("background-color: #ffebee; border: 1px solid red;")
         else:
-            self.customer_combo.setStyleSheet("")
+            self.customer_input.setStyleSheet("")
 
     def on_credit_check_toggled(self, checked):
         # Sync combo with checkbox
@@ -508,18 +557,11 @@ class POSWindow(QWidget):
         from PyQt6.QtWidgets import QInputDialog
         
         # Ask for customer (optional)
-        customer_id = None
-        if self.customer_combo.count() > 1:  # Has customers
-            customer_name, ok = QInputDialog.getItem(
-                self, "Cliente", 
-                "Seleccione cliente (opcional):",
-                [self.customer_combo.itemText(i) for i in range(self.customer_combo.count())],
-                0, False
-            )
-            if ok and customer_name != "Seleccione Cliente...":
-                customer_id = self.customer_combo.findText(customer_name)
-                if customer_id > 0:
-                    customer_id = self.customer_combo.itemData(customer_id)
+        customer_id = self.selected_customer_id
+        if not customer_id:
+            # Try to get from input if not confirmed
+            self.on_customer_selected()
+            customer_id = self.selected_customer_id
         
         # Ask for notes
         notes, ok = QInputDialog.getText(

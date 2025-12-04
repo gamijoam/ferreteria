@@ -83,11 +83,17 @@ class ProductController:
         return product
 
     def delete_product(self, product_id):
-        """Logically delete a product (set is_active=False)"""
+        """Logically delete a product (set is_active=False) and free up SKU"""
         product = self.db.query(Product).get(product_id)
         if not product:
             raise ValueError("Producto no encontrado")
         
+        # Rename SKU to allow reuse
+        if product.sku:
+            import time
+            timestamp = int(time.time())
+            product.sku = f"{product.sku}_DEL_{timestamp}"
+
         product.is_active = False
         self.db.commit()
         event_bus.products_updated.emit()
@@ -104,3 +110,21 @@ class ProductController:
 
     def get_product_by_id(self, product_id):
         return self.db.query(Product).get(product_id)
+
+    def get_products_paginated(self, page=1, page_size=50, search_query=None):
+        """Get products with pagination and search"""
+        query = self.db.query(Product).filter(Product.is_active == True)
+        
+        if search_query:
+            search = f"%{search_query}%"
+            # Search by name or SKU
+            from sqlalchemy import or_
+            query = query.filter(or_(Product.name.ilike(search), Product.sku.ilike(search)))
+            
+        total_items = query.count()
+        
+        # Apply pagination
+        offset = (page - 1) * page_size
+        products = query.offset(offset).limit(page_size).all()
+        
+        return products, total_items

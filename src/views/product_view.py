@@ -160,6 +160,12 @@ class ProductWindow(QWidget):
         self.setLayout(self.layout)
         
         self.setup_ui()
+        
+        # Pagination state
+        self.current_page = 1
+        self.page_size = 50
+        self.total_pages = 1
+        
         self.load_products()
         
         # Debounce timer
@@ -253,6 +259,28 @@ class ProductWindow(QWidget):
         """)
         
         self.layout.addWidget(self.table)
+        
+        # Pagination Controls
+        pagination_layout = QHBoxLayout()
+        
+        self.btn_prev = QPushButton("◀ Anterior")
+        self.btn_prev.clicked.connect(self.prev_page)
+        self.btn_prev.setEnabled(False)
+        
+        self.lbl_page = QLabel("Página 1 de 1")
+        self.lbl_page.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        self.btn_next = QPushButton("Siguiente ▶")
+        self.btn_next.clicked.connect(self.next_page)
+        self.btn_next.setEnabled(False)
+        
+        pagination_layout.addStretch()
+        pagination_layout.addWidget(self.btn_prev)
+        pagination_layout.addWidget(self.lbl_page)
+        pagination_layout.addWidget(self.btn_next)
+        pagination_layout.addStretch()
+        
+        self.layout.addLayout(pagination_layout)
 
     def open_new_product_dialog(self):
         """Open dialog to create new product"""
@@ -290,9 +318,33 @@ class ProductWindow(QWidget):
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Error al actualizar: {str(e)}")
 
+    def prev_page(self):
+        if self.current_page > 1:
+            self.current_page -= 1
+            self.load_products()
+
+    def next_page(self):
+        if self.current_page < self.total_pages:
+            self.current_page += 1
+            self.load_products()
+
     def load_products(self):
         self.table.setRowCount(0)
-        products = self.controller.get_active_products()
+        
+        search_text = self.search_input.text().strip()
+        products, total_items = self.controller.get_products_paginated(
+            page=self.current_page, 
+            page_size=self.page_size, 
+            search_query=search_text
+        )
+        
+        # Update pagination labels
+        import math
+        self.total_pages = math.ceil(total_items / self.page_size) if total_items > 0 else 1
+        self.lbl_page.setText(f"Página {self.current_page} de {self.total_pages} (Total: {total_items})")
+        
+        self.btn_prev.setEnabled(self.current_page > 1)
+        self.btn_next.setEnabled(self.current_page < self.total_pages)
         
         for row, prod in enumerate(products):
             self.table.insertRow(row)
@@ -340,17 +392,10 @@ class ProductWindow(QWidget):
             self.table.setCellWidget(row, 11, btn_delete)
 
     def filter_products(self):
-        """Filter products based on search text"""
-        search_text = self.search_input.text().lower()
-        
-        for row in range(self.table.rowCount()):
-            name = self.table.item(row, 1).text().lower()
-            sku = self.table.item(row, 2).text().lower()
-            
-            if search_text in name or search_text in sku:
-                self.table.setRowHidden(row, False)
-            else:
-                self.table.setRowHidden(row, True)
+        """Filter products based on search text (Debounced)"""
+        # Reset to page 1 for new search
+        self.current_page = 1
+        self.update_timer.start() # This calls load_products after delay
 
     def delete_product(self, product_id):
         reply = QMessageBox.question(

@@ -41,6 +41,8 @@ class CustomerWindow(QWidget):
         form_layout = QFormLayout()
         
         self.name_input = QLineEdit()
+        self.id_number_input = QLineEdit()
+        self.id_number_input.setPlaceholderText("Cédula o RIF")
         self.phone_input = QLineEdit()
         self.address_input = QLineEdit()
         
@@ -48,6 +50,7 @@ class CustomerWindow(QWidget):
         btn_add.clicked.connect(self.add_customer)
         
         form_layout.addRow("Nombre:", self.name_input)
+        form_layout.addRow("Cédula/RIF:", self.id_number_input)
         form_layout.addRow("Teléfono:", self.phone_input)
         form_layout.addRow("Dirección:", self.address_input)
         form_layout.addRow(btn_add)
@@ -57,8 +60,8 @@ class CustomerWindow(QWidget):
         
         # Table
         self.customer_table = QTableWidget()
-        self.customer_table.setColumnCount(4)
-        self.customer_table.setHorizontalHeaderLabels(["ID", "Nombre", "Teléfono", "Dirección"])
+        self.customer_table.setColumnCount(5)
+        self.customer_table.setHorizontalHeaderLabels(["ID", "Nombre", "Cédula/RIF", "Teléfono", "Dirección"])
         self.customer_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         layout.addWidget(self.customer_table)
         
@@ -78,7 +81,7 @@ class CustomerWindow(QWidget):
         selector_layout = QHBoxLayout()
         
         self.customer_search = QLineEdit()
-        self.customer_search.setPlaceholderText("Buscar cliente por nombre...")
+        self.customer_search.setPlaceholderText("Buscar cliente por nombre o cédula...")
         self.setup_customer_autocomplete()
         self.customer_search.returnPressed.connect(self.on_customer_selected)
         
@@ -115,15 +118,17 @@ class CustomerWindow(QWidget):
     def add_customer(self):
         try:
             name = self.name_input.text()
+            id_number = self.id_number_input.text()
             phone = self.phone_input.text()
             address = self.address_input.text()
             
-            self.controller.create_customer(name, phone, address)
+            self.controller.create_customer(name, id_number, phone, address)
             QMessageBox.information(self, "Éxito", "Cliente agregado")
             self.load_customers()
             self.load_customers_combo()
             
             self.name_input.clear()
+            self.id_number_input.clear()
             self.phone_input.clear()
             self.address_input.clear()
             
@@ -138,8 +143,9 @@ class CustomerWindow(QWidget):
             self.customer_table.insertRow(i)
             self.customer_table.setItem(i, 0, QTableWidgetItem(str(c.id)))
             self.customer_table.setItem(i, 1, QTableWidgetItem(c.name))
-            self.customer_table.setItem(i, 2, QTableWidgetItem(c.phone or ""))
-            self.customer_table.setItem(i, 3, QTableWidgetItem(c.address or ""))
+            self.customer_table.setItem(i, 2, QTableWidgetItem(c.id_number or ""))
+            self.customer_table.setItem(i, 3, QTableWidgetItem(c.phone or ""))
+            self.customer_table.setItem(i, 4, QTableWidgetItem(c.address or ""))
 
     def load_customers_combo(self):
         # Kept for compatibility
@@ -152,9 +158,14 @@ class CustomerWindow(QWidget):
         self.customer_map = {}
         suggestions = []
         for c in customers:
+            # Add both name and id_number as searchable
             suggestion = c.name
             suggestions.append(suggestion)
             self.customer_map[suggestion] = c
+            
+            if c.id_number:
+                suggestions.append(c.id_number)
+                self.customer_map[c.id_number] = c
             
         completer = QCompleter(suggestions)
         completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)

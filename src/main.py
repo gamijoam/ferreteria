@@ -373,6 +373,20 @@ def main():
     Base.metadata.create_all(bind=engine)
     print("Tablas creadas exitosamente.")
 
+    # Initialize Admin User if needed
+    from src.controllers.auth_controller import AuthController
+    from src.database.db import SessionLocal
+    
+    db = SessionLocal()
+    try:
+        auth = AuthController(db)
+        if auth.init_admin():
+            print("Usuario admin creado por defecto (admin/admin123)")
+    except Exception as e:
+        print(f"Error inicializando admin: {e}")
+    finally:
+        db.close()
+
     app = QApplication(sys.argv)
 
     # Apply modern theme

@@ -373,11 +373,42 @@ def main():
     Base.metadata.create_all(bind=engine)
     print("Tablas creadas exitosamente.")
 
+    # Initialize Admin User if needed
+    from src.controllers.auth_controller import AuthController
+    from src.database.db import SessionLocal
+    
+    db = SessionLocal()
+    try:
+        auth = AuthController(db)
+        if auth.init_admin():
+            print("Usuario admin creado por defecto (admin/admin123)")
+    except Exception as e:
+        print(f"Error inicializando admin: {e}")
+    finally:
+        db.close()
+
     app = QApplication(sys.argv)
 
     # Apply modern theme
     from src.theme import MODERN_THEME
     app.setStyleSheet(MODERN_THEME)
+
+    # --- LICENSE CHECK ---
+    from src.controllers.license_controller import LicenseController
+    from src.views.license_view import LicenseDialog
+    
+    license_ctrl = LicenseController()
+    status, msg = license_ctrl.check_status()
+    
+    if status in ['EXPIRED', 'INVALID']:
+        # Show activation dialog
+        dialog = LicenseDialog(license_ctrl, status, msg)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            sys.exit(0)
+    elif status == 'DEMO':
+        # Optional: Show demo reminder toast or just log it
+        print(f"Modo Demo Activo: {msg}")
+    # ---------------------
 
     # Show Login First
     login = LoginDialog()
