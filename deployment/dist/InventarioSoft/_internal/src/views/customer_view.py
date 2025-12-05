@@ -2,12 +2,62 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, 
     QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, 
     QMessageBox, QFormLayout, QTabWidget, QCompleter, QDialog, QDoubleSpinBox,
-    QGroupBox
+    QGroupBox, QComboBox
 )
 from PyQt6.QtCore import Qt
 from src.database.db import SessionLocal
 from src.controllers.customer_controller import CustomerController
 from src.controllers.config_controller import ConfigController
+
+class CustomerFormDialog(QDialog):
+    def __init__(self, parent=None, customer=None):
+        super().__init__(parent)
+        self.customer = customer
+        self.setWindowTitle("Editar Cliente" if customer else "Nuevo Cliente")
+        self.resize(400, 300)
+        
+        self.layout = QVBoxLayout()
+        self.setLayout(self.layout)
+        
+        form_layout = QFormLayout()
+        
+        self.name_input = QLineEdit()
+        self.id_number_input = QLineEdit()
+        self.phone_input = QLineEdit()
+        self.address_input = QLineEdit()
+        
+        if customer:
+            self.name_input.setText(customer.name)
+            self.id_number_input.setText(customer.id_number or "")
+            self.phone_input.setText(customer.phone or "")
+            self.address_input.setText(customer.address or "")
+            
+        form_layout.addRow("Nombre:*", self.name_input)
+        form_layout.addRow("Cédula/RIF:", self.id_number_input)
+        form_layout.addRow("Teléfono:", self.phone_input)
+        form_layout.addRow("Dirección:", self.address_input)
+        
+        self.layout.addLayout(form_layout)
+        
+        btn_layout = QHBoxLayout()
+        btn_save = QPushButton("Guardar")
+        btn_save.clicked.connect(self.accept)
+        btn_save.setStyleSheet("background-color: #4CAF50; color: white; padding: 8px;")
+        
+        btn_cancel = QPushButton("Cancelar")
+        btn_cancel.clicked.connect(self.reject)
+        
+        btn_layout.addWidget(btn_save)
+        btn_layout.addWidget(btn_cancel)
+        self.layout.addLayout(btn_layout)
+        
+    def get_data(self):
+        return {
+            "name": self.name_input.text().strip(),
+            "id_number": self.id_number_input.text().strip(),
+            "phone": self.phone_input.text().strip(),
+            "address": self.address_input.text().strip()
+        }
 
 class CustomerWindow(QWidget):
     def __init__(self):
@@ -60,9 +110,12 @@ class CustomerWindow(QWidget):
         
         # Table
         self.customer_table = QTableWidget()
-        self.customer_table.setColumnCount(5)
-        self.customer_table.setHorizontalHeaderLabels(["ID", "Nombre", "Cédula/RIF", "Teléfono", "Dirección"])
+        self.customer_table.setColumnCount(7)
+        self.customer_table.setHorizontalHeaderLabels(["ID", "Nombre", "Cédula/RIF", "Teléfono", "Dirección", "Editar", "Eliminar"])
         self.customer_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.customer_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        self.customer_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
+        self.customer_table.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)
         layout.addWidget(self.customer_table)
         
         btn_refresh = QPushButton("Actualizar Lista")
@@ -146,6 +199,48 @@ class CustomerWindow(QWidget):
             self.customer_table.setItem(i, 2, QTableWidgetItem(c.id_number or ""))
             self.customer_table.setItem(i, 3, QTableWidgetItem(c.phone or ""))
             self.customer_table.setItem(i, 4, QTableWidgetItem(c.address or ""))
+            
+            # Edit Button
+            btn_edit = QPushButton("✏")
+            btn_edit.setToolTip("Editar Cliente")
+            btn_edit.setStyleSheet("background-color: #2196F3; color: white; border: none; padding: 4px;")
+            btn_edit.clicked.connect(lambda checked, cust=c: self.edit_customer(cust))
+            self.customer_table.setCellWidget(i, 5, btn_edit)
+            
+            # Delete Button
+            btn_delete = QPushButton("🗑")
+            btn_delete.setToolTip("Eliminar Cliente")
+            btn_delete.setStyleSheet("background-color: #F44336; color: white; border: none; padding: 4px;")
+            btn_delete.clicked.connect(lambda checked, cust=c: self.delete_customer(cust))
+            self.customer_table.setCellWidget(i, 6, btn_delete)
+
+    def edit_customer(self, customer):
+        dialog = CustomerFormDialog(self, customer)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            try:
+                data = dialog.get_data()
+                self.controller.update_customer(customer.id, **data)
+                QMessageBox.information(self, "Éxito", "Cliente actualizado")
+                self.load_customers()
+                self.load_customers_combo()
+            except Exception as e:
+                QMessageBox.critical(self, "Error", str(e))
+
+    def delete_customer(self, customer):
+        reply = QMessageBox.question(
+            self, "Confirmar Eliminación",
+            f"¿Está seguro de eliminar al cliente '{customer.name}'?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            try:
+                self.controller.delete_customer(customer.id)
+                QMessageBox.information(self, "Éxito", "Cliente eliminado")
+                self.load_customers()
+                self.load_customers_combo()
+            except Exception as e:
+                QMessageBox.critical(self, "Error", str(e))
 
     def load_customers_combo(self):
         # Kept for compatibility
@@ -273,6 +368,15 @@ class CustomerWindow(QWidget):
         instructions.setStyleSheet("color: #666; font-size: 10px; padding: 5px;")
         layout.addWidget(instructions)
         
+        # Payment Method Selector
+        method_layout = QHBoxLayout()
+        method_label = QLabel("Método de Pago:")
+        self.method_combo = QComboBox()
+        self.method_combo.addItems(["Efectivo", "Transferencia", "Tarjeta", "Pago Móvil", "Zelle"])
+        method_layout.addWidget(method_label)
+        method_layout.addWidget(self.method_combo)
+        layout.addLayout(method_layout)
+
         # Buttons
         btn_layout = QHBoxLayout()
         btn_ok = QPushButton("Registrar Pago")
@@ -290,6 +394,7 @@ class CustomerWindow(QWidget):
         # Show dialog
         if dialog.exec() == QDialog.DialogCode.Accepted:
             amount = amount_spin.value()
+            method = self.method_combo.currentText()
             
             # Get selected currency
             currency = "USD" if radio_usd.isChecked() else "Bs"
@@ -308,7 +413,8 @@ class CustomerWindow(QWidget):
                 self.controller.add_payment(
                     self.selected_customer_id, 
                     amount_usd,
-                    f"Pago en {currency}: {amount:,.2f}"
+                    f"Pago en {currency}: {amount:,.2f}",
+                    payment_method=method
                 )
                 
                 # Calculate remaining debt

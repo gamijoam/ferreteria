@@ -7,6 +7,7 @@ import enum
 class MovementType(enum.Enum):
     PURCHASE = "PURCHASE"
     SALE = "SALE"
+    ADJUSTMENT = "ADJUSTMENT"  # For shrinkage, discounts, damaged goods
     RETURN = "RETURN"
     ADJUSTMENT_IN = "ADJUSTMENT_IN"
     ADJUSTMENT_OUT = "ADJUSTMENT_OUT"
@@ -108,6 +109,7 @@ class Sale(Base):
 
     details = relationship("SaleDetail", back_populates="sale")
     customer = relationship("Customer", back_populates="sales")
+    payments = relationship("SalePayment", back_populates="sale", lazy="joined")
 
     def __repr__(self):
         return f"<Sale(id={self.id}, total={self.total_amount})>"
@@ -138,6 +140,7 @@ class CashSession(Base):
     __tablename__ = "cash_sessions"
 
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     start_time = Column(DateTime, default=datetime.datetime.now)
     end_time = Column(DateTime, nullable=True)
     initial_cash = Column(Float, default=0.0)
@@ -151,6 +154,7 @@ class CashSession(Base):
     status = Column(String, default="OPEN") # OPEN, CLOSED
 
     movements = relationship("CashMovement", back_populates="session")
+    user = relationship("User", foreign_keys=[user_id])
 
     def __repr__(self):
         return f"<CashSession(id={self.id}, status='{self.status}')>"
@@ -183,6 +187,7 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
+    pin = Column(String, nullable=True)  # 4-6 digit PIN for discount authorization
     role = Column(Enum(UserRole), default=UserRole.CASHIER)
     is_active = Column(Boolean, default=True)
 
@@ -246,11 +251,26 @@ class Payment(Base):
     currency = Column(String, default="USD") # USD or BS
     exchange_rate_used = Column(Float, default=1.0) # Rate at time of payment
     amount_bs = Column(Float, nullable=True) # Amount in Bs if applicable
+    payment_method = Column(String, default="Efectivo") # Efectivo, Transferencia, Tarjeta
 
     customer = relationship("Customer", back_populates="payments")
 
     def __repr__(self):
         return f"<Payment(customer={self.customer_id}, amount={self.amount})>"
+
+class SalePayment(Base):
+    __tablename__ = "sale_payments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    sale_id = Column(Integer, ForeignKey("sales.id"), nullable=False)
+    payment_method = Column(String, nullable=False)  # "Efectivo Bs", "Tarjeta", etc.
+    amount = Column(Float, nullable=False)
+    currency = Column(String, default="Bs")  # Bs or USD
+    
+    sale = relationship("Sale")
+
+    def __repr__(self):
+        return f"<SalePayment(sale={self.sale_id}, method='{self.payment_method}', amount={self.amount})>"
 
 class PriceRule(Base):
     __tablename__ = "price_rules"

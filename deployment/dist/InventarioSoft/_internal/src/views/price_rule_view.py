@@ -66,7 +66,7 @@ class PriceRuleWindow(QWidget):
     def load_products(self):
         self.product_combo.clear()
         self.product_combo.addItem("Seleccione un producto...", None)
-        products = self.db.query(Product).all()
+        products = self.db.query(Product).filter(Product.is_active == True).all()
         for p in products:
             self.product_combo.addItem(f"{p.name} (${p.price:,.2f})", p.id)
 

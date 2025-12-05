@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (
     QGroupBox, QFormLayout
 )
 from PyQt6.QtGui import QKeySequence, QFont, QShortcut
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QLocale
 from src.database.db import SessionLocal
 from src.controllers.pos_controller import POSController
 from src.controllers.customer_controller import CustomerController
@@ -82,46 +82,24 @@ class POSWindow(QWidget):
         mode_group.setLayout(mode_layout)
         right_panel.addWidget(mode_group)
         
-        # Control Group 2: Currency
-        currency_group = QGroupBox("Moneda")
-        currency_layout = QFormLayout()
+
         
-        self.currency_combo = QComboBox()
-        self.currency_combo.setFont(QFont("Arial", 11))
-        self.currency_combo.addItems(["USD", "Bs"])
-        self.currency_combo.setCurrentIndex(1)  # Default to Bs
-        self.currency_combo.currentTextChanged.connect(self.on_currency_changed)
+        # Payment Method - Removed (now handled in payment dialog)
+        # Keeping only credit checkbox for quick access
+        # Payment Method - Removed (now handled in payment dialog)
+        # Keeping only credit checkbox for quick access
         
-        currency_layout.addRow("Venta en:", self.currency_combo)
-        currency_group.setLayout(currency_layout)
-        right_panel.addWidget(currency_group)
+        # Credit Sale Checkbox
+        credit_group = QGroupBox("Tipo de Venta")
+        credit_layout = QVBoxLayout()
         
-        # Control Group 3: Payment Method
-        payment_group = QGroupBox("Método de Pago")
-        payment_layout = QVBoxLayout()
-        
-        self.payment_method_combo = QComboBox()
-        self.payment_method_combo.setFont(QFont("Arial", 11))
-        self.payment_method_combo.addItems([
-            "Efectivo Bs",
-            "Efectivo USD",
-            "Transferencia Bs / Pago Móvil",
-            "Transferencia USD",
-            "Tarjeta Débito/Crédito",
-            "Crédito (Fiado)"
-        ])
-        self.payment_method_combo.currentTextChanged.connect(self.on_payment_method_changed)
-        payment_layout.addWidget(self.payment_method_combo)
-        
-        # Credit Checkbox (Restored)
-        self.credit_check = QCheckBox("Venta a Crédito")
-        self.credit_check.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+        self.credit_check = QCheckBox("Venta a Crédito (Fiado)")
+        self.credit_check.setFont(QFont("Arial", 11, QFont.Weight.Bold))
         self.credit_check.setStyleSheet("color: #d32f2f;")
-        self.credit_check.toggled.connect(self.on_credit_check_toggled)
-        payment_layout.addWidget(self.credit_check)
+        credit_layout.addWidget(self.credit_check)
         
-        payment_group.setLayout(payment_layout)
-        right_panel.addWidget(payment_group)
+        credit_group.setLayout(credit_layout)
+        right_panel.addWidget(credit_group)
         
         # Control Group 4: Customer
         customer_group = QGroupBox("Cliente (Opcional)")
@@ -149,15 +127,7 @@ class POSWindow(QWidget):
         self.lbl_rate.setAlignment(Qt.AlignmentFlag.AlignCenter)
         right_panel.addWidget(self.lbl_rate)
         
-        # Notes Field
-        notes_group = QGroupBox("Notas de Venta")
-        notes_layout = QVBoxLayout()
-        self.notes_input = QLineEdit()
-        self.notes_input.setPlaceholderText("Observaciones especiales...")
-        self.notes_input.setMaxLength(200)
-        notes_layout.addWidget(self.notes_input)
-        notes_group.setLayout(notes_layout)
-        right_panel.addWidget(notes_group)
+
         
         # Discount Buttons
         discount_group = QGroupBox("Descuentos")
@@ -172,6 +142,11 @@ class POSWindow(QWidget):
         btn_global_discount.setStyleSheet("background-color: #673AB7; color: white; padding: 8px;")
         btn_global_discount.clicked.connect(self.apply_global_discount_dialog)
         discount_layout.addWidget(btn_global_discount)
+        
+        btn_quick_discount = QPushButton("⚡ Ajustar Total")
+        btn_quick_discount.setStyleSheet("background-color: #FF5722; color: white; padding: 8px; font-weight: bold;")
+        btn_quick_discount.clicked.connect(self.apply_quick_discount)
+        discount_layout.addWidget(btn_quick_discount)
         
         discount_group.setLayout(discount_layout)
         right_panel.addWidget(discount_group)
@@ -477,76 +452,234 @@ class POSWindow(QWidget):
         if not self.controller.cart:
             return
         
-        payment_method = self.payment_method_combo.currentText()
-        is_credit = self.credit_check.isChecked() # Use checkbox as truth
-        # Optional: Save customer for all sales if selected
+        is_credit = self.credit_check.isChecked()
         customer_id = self.selected_customer_id
         
         if is_credit:
             if not customer_id:
                 QMessageBox.warning(self, "Error", "Debe seleccionar un cliente para venta a crédito")
                 return
-            
-        reply = QMessageBox.question(
-            self, "Confirmar Venta", 
-            f"¿Procesar venta por {self.lbl_total.text()}?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
-        
-        if reply == QMessageBox.StandardButton.Yes:
-            # Get currency and exchange rate
-            currency = self.currency_combo.currentText()
-            notes = self.notes_input.text().strip()
-            
-            success, msg, ticket = self.controller.finalize_sale(
-                payment_method=payment_method,
-                customer_id=customer_id,
-                is_credit=is_credit,
-                currency=currency,
-                exchange_rate=self.exchange_rate,
-                notes=notes
-            )
-            if success:
-                if is_credit:
-                    QMessageBox.information(self, "Venta a Crédito Exitosa", 
-                                          f"Venta registrada a crédito.\\n\\n{ticket}")
-                else:
-                    QMessageBox.information(self, "Venta Exitosa", f"Ticket generado:\\n\\n{ticket}")
-                self.refresh_table()
-                self.payment_method_combo.setCurrentIndex(0)  # Reset to Efectivo
-            else:
-                QMessageBox.critical(self, "Error", msg)
+            # For credit sales, skip payment dialog
+            self.process_sale(payments=None, is_credit=True, customer_id=customer_id)
+        else:
+            # Show mixed payment dialog
+            self.show_mixed_payment_dialog()
         
         self.focus_input()
-
-    def on_payment_method_changed(self, text):
-        # Sync checkbox with combo
-        is_credit = (text == "Crédito (Fiado)")
-        self.credit_check.blockSignals(True)
-        self.credit_check.setChecked(is_credit)
-        self.credit_check.blockSignals(False)
+    
+    def show_mixed_payment_dialog(self):
+        """Show dialog for mixed payment entry"""
+        from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, QRadioButton, QButtonGroup
         
-        # Show/Hide customer requirement
-        if is_credit:
-            self.customer_input.setStyleSheet("background-color: #ffebee; border: 1px solid red;")
-        else:
-            self.customer_input.setStyleSheet("")
-
-    def on_credit_check_toggled(self, checked):
-        # Sync combo with checkbox
-        self.payment_method_combo.blockSignals(True)
-        if checked:
-            index = self.payment_method_combo.findText("Crédito (Fiado)")
-            if index >= 0:
-                self.payment_method_combo.setCurrentIndex(index)
-        else:
-            # Revert to default or first option if uncheck
-            if self.payment_method_combo.currentText() == "Crédito (Fiado)":
-                self.payment_method_combo.setCurrentIndex(0) # Efectivo Bs
-        self.payment_method_combo.blockSignals(False)
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Forma de Pago")
+        dialog.resize(600, 450)
         
-        # Trigger logic
-        self.on_payment_method_changed(self.payment_method_combo.currentText())
+        layout = QVBoxLayout()
+        
+        # Total display
+        total_usd = self.controller.get_total()
+        total_bs = total_usd * self.exchange_rate
+        
+        lbl_total = QLabel(f"TOTAL A PAGAR: ${total_usd:,.2f} USD / Bs {total_bs:,.2f}")
+        lbl_total.setFont(QFont("Arial", 14, QFont.Weight.Bold))
+        lbl_total.setStyleSheet("color: green; padding: 10px; background-color: #e8f5e9; border-radius: 5px;")
+        layout.addWidget(lbl_total)
+        
+        # Payments table
+        layout.addWidget(QLabel("Métodos de Pago:"))
+        payments_table = QTableWidget()
+        payments_table.setColumnCount(3)
+        payments_table.setHorizontalHeaderLabels(["Método", "Monto", "Eliminar"])
+        payments_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        layout.addWidget(payments_table)
+        
+        # Payment list storage
+        payment_list = []
+        
+        def refresh_payments_table():
+            payments_table.setRowCount(0)
+            total_paid_usd = 0
+            
+            for i, p in enumerate(payment_list):
+                payments_table.insertRow(i)
+                payments_table.setItem(i, 0, QTableWidgetItem(p["method"]))
+                
+                # Display amount in original currency
+                amount_display = f"{p['amount']:.2f} {p['currency']}"
+                payments_table.setItem(i, 1, QTableWidgetItem(amount_display))
+                
+                btn_del = QPushButton("X")
+                btn_del.setStyleSheet("background-color: #f44336; color: white;")
+                btn_del.clicked.connect(lambda checked, idx=i: remove_payment(idx))
+                payments_table.setCellWidget(i, 2, btn_del)
+                
+                # Convert to USD for total calculation
+                if p["currency"] == "USD":
+                    total_paid_usd += p["amount"]
+                else:  # Bs
+                    total_paid_usd += p["amount"] / self.exchange_rate
+            
+            remaining_usd = total_usd - total_paid_usd
+            remaining_bs = remaining_usd * self.exchange_rate
+            
+            lbl_remaining.setText(f"Restante: ${remaining_usd:,.2f} USD / Bs {remaining_bs:,.2f}")
+            if remaining_usd <= 0.01:  # Allow small rounding
+                lbl_remaining.setStyleSheet("color: green; font-weight: bold;")
+            else:
+                lbl_remaining.setStyleSheet("color: red; font-weight: bold;")
+        
+        def remove_payment(idx):
+            payment_list.pop(idx)
+            refresh_payments_table()
+        
+        # Remaining label
+        lbl_remaining = QLabel(f"Restante: ${total_usd:,.2f} USD / Bs {total_bs:,.2f}")
+        lbl_remaining.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+        layout.addWidget(lbl_remaining)
+        
+        # Add payment controls
+        add_layout = QVBoxLayout()
+        
+        # Method selector
+        method_layout = QHBoxLayout()
+        method_combo = QComboBox()
+        method_combo.addItems([
+            "Efectivo",
+            "Transferencia / Pago Móvil",
+            "Tarjeta Débito/Crédito",
+            "Zelle"
+        ])
+        method_layout.addWidget(QLabel("Método:"))
+        method_layout.addWidget(method_combo)
+        add_layout.addLayout(method_layout)
+        
+        # Currency selector
+        currency_layout = QHBoxLayout()
+        currency_layout.addWidget(QLabel("Moneda:"))
+        
+        btn_group = QButtonGroup(dialog)
+        rb_bs = QRadioButton("Bs")
+        rb_usd = QRadioButton("USD")
+        rb_bs.setChecked(True)
+        btn_group.addButton(rb_bs)
+        btn_group.addButton(rb_usd)
+        
+        currency_layout.addWidget(rb_bs)
+        currency_layout.addWidget(rb_usd)
+        add_layout.addLayout(currency_layout)
+        
+        # Amount input
+        amount_layout = QHBoxLayout()
+        amount_input = QDoubleSpinBox()
+        amount_input.setRange(0, 1000000)
+        amount_input.setDecimals(2)
+        amount_input.setLocale(QLocale(QLocale.Language.English, QLocale.Country.UnitedStates))
+        amount_input.setValue(total_bs)
+        amount_layout.addWidget(QLabel("Monto:"))
+        amount_layout.addWidget(amount_input)
+        add_layout.addLayout(amount_layout)
+        
+        # Update amount when currency changes
+        def on_currency_changed():
+            # Calculate current remaining
+            total_paid_usd = sum(
+                p["amount"] if p["currency"] == "USD" else p["amount"] / self.exchange_rate 
+                for p in payment_list
+            )
+            remaining_usd = total_usd - total_paid_usd
+            
+            if rb_bs.isChecked():
+                amount_input.setValue(remaining_usd * self.exchange_rate)
+            else:
+                amount_input.setValue(remaining_usd)
+        
+        rb_bs.toggled.connect(on_currency_changed)
+        rb_usd.toggled.connect(on_currency_changed)
+        
+        def add_payment():
+            method = method_combo.currentText()
+            amount = amount_input.value()
+            currency = "USD" if rb_usd.isChecked() else "Bs"
+            
+            if amount <= 0:
+                QMessageBox.warning(dialog, "Error", "El monto debe ser mayor a 0")
+                return
+            
+            payment_list.append({
+                "method": f"{method} {currency}",
+                "amount": amount,
+                "currency": currency
+            })
+            refresh_payments_table()
+            
+            # Calculate remaining and update amount input
+            on_currency_changed()
+        
+        btn_add = QPushButton("Agregar Pago")
+        btn_add.setStyleSheet("background-color: #4CAF50; color: white; padding: 8px; font-weight: bold;")
+        btn_add.clicked.connect(add_payment)
+        add_layout.addWidget(btn_add)
+        
+        layout.addLayout(add_layout)
+        
+        # Bottom buttons
+        btn_layout = QHBoxLayout()
+        
+        btn_cancel = QPushButton("Cancelar")
+        btn_cancel.clicked.connect(dialog.reject)
+        btn_layout.addWidget(btn_cancel)
+        
+        btn_ok = QPushButton("PROCESAR VENTA")
+        btn_ok.setStyleSheet("background-color: #28a745; color: white; padding: 10px; font-weight: bold;")
+        btn_ok.clicked.connect(dialog.accept)
+        btn_layout.addWidget(btn_ok)
+        
+        layout.addLayout(btn_layout)
+        dialog.setLayout(layout)
+        
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            if not payment_list:
+                QMessageBox.warning(self, "Error", "Debe agregar al menos un método de pago")
+                return
+            
+            # Calculate total paid in USD
+            total_paid_usd = sum(
+                p["amount"] if p["currency"] == "USD" else p["amount"] / self.exchange_rate 
+                for p in payment_list
+            )
+            
+            if abs(total_paid_usd - total_usd) > 0.01:
+                QMessageBox.warning(self, "Error", 
+                    f"El total pagado (${total_paid_usd:.2f}) no coincide con el total (${total_usd:.2f})")
+                return
+            
+            self.process_sale(payments=payment_list, is_credit=False, customer_id=self.selected_customer_id)
+    
+    def process_sale(self, payments, is_credit, customer_id):
+        """Process the sale with given payments"""
+        
+        success, msg, ticket = self.controller.finalize_sale(
+            payments=payments,
+            customer_id=customer_id,
+            is_credit=is_credit,
+            currency="USD",  # Default, actual currency is in each payment
+            exchange_rate=self.exchange_rate,
+            notes=""  # Notes field removed from UI
+        )
+        if success:
+            if is_credit:
+                QMessageBox.information(self, "Venta a Crédito Exitosa", 
+                                      f"Venta registrada a crédito.\\n\\n{ticket}")
+            else:
+                QMessageBox.information(self, "Venta Exitosa", f"Ticket generado:\\n\\n{ticket}")
+            self.refresh_table()
+            # payment_method_combo removed - no longer needed
+        else:
+            QMessageBox.critical(self, "Error", msg)
+
+    # on_payment_method_changed and on_credit_check_toggled removed
+    # Payment methods now handled in payment dialog
 
     def save_as_quote(self):
         """Save current cart as a quote (F4)"""
@@ -591,6 +724,13 @@ class POSWindow(QWidget):
         row = self.table.currentRow()
         if row < 0:
             QMessageBox.warning(self, "Alerta", "Seleccione un producto de la tabla")
+            return
+        
+        # Request PIN authorization
+        from src.views.pin_auth_dialog import PINAuthDialog
+        authorized, auth_user = PINAuthDialog.request_authorization(self, "aplicar descuento por ítem")
+        
+        if not authorized:
             return
         
         from PyQt6.QtWidgets import QInputDialog, QDialog, QVBoxLayout, QRadioButton, QButtonGroup
@@ -650,6 +790,13 @@ class POSWindow(QWidget):
             QMessageBox.warning(self, "Alerta", "El carrito está vacío")
             return
         
+        # Request PIN authorization
+        from src.views.pin_auth_dialog import PINAuthDialog
+        authorized, auth_user = PINAuthDialog.request_authorization(self, "aplicar descuento global")
+        
+        if not authorized:
+            return
+        
         from PyQt6.QtWidgets import QInputDialog, QDialog, QVBoxLayout, QRadioButton, QButtonGroup
         
         # Create custom dialog
@@ -698,6 +845,115 @@ class POSWindow(QWidget):
             if success:
                 self.refresh_table()
                 QMessageBox.information(self, "Éxito", msg)
+            else:
+                QMessageBox.warning(self, "Error", msg)
+
+    def apply_quick_discount(self):
+        """Quick discount - adjust total to a specific amount"""
+        if not self.controller.cart:
+            QMessageBox.warning(self, "Alerta", "El carrito está vacío")
+            return
+        
+        # Request PIN authorization
+        from src.views.pin_auth_dialog import PINAuthDialog
+        authorized, auth_user = PINAuthDialog.request_authorization(self, "ajustar total (descuento rápido)")
+        
+        if not authorized:
+            return
+        
+        from PyQt6.QtWidgets import QInputDialog, QDialog, QVBoxLayout, QHBoxLayout, QRadioButton, QButtonGroup, QLabel, QPushButton
+        
+        current_total_usd = self.controller.get_total()
+        current_total_bs = current_total_usd * self.exchange_rate
+        
+        # Create custom dialog
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Ajustar Total")
+        dialog.resize(350, 200)
+        
+        layout = QVBoxLayout()
+        
+        # Show current total
+        lbl_current = QLabel(f"Total actual:\n${current_total_usd:,.2f} USD / Bs {current_total_bs:,.2f}")
+        lbl_current.setFont(QFont("Arial", 11))
+        lbl_current.setStyleSheet("padding: 10px; background-color: #e3f2fd; border-radius: 5px;")
+        layout.addWidget(lbl_current)
+        
+        # Currency selector
+        currency_layout = QHBoxLayout()
+        currency_layout.addWidget(QLabel("Moneda:"))
+        
+        btn_group = QButtonGroup(dialog)
+        rb_bs = QRadioButton("Bs")
+        rb_usd = QRadioButton("USD")
+        rb_bs.setChecked(True)
+        btn_group.addButton(rb_bs)
+        btn_group.addButton(rb_usd)
+        
+        currency_layout.addWidget(rb_bs)
+        currency_layout.addWidget(rb_usd)
+        layout.addLayout(currency_layout)
+        
+        # Amount input
+        amount_layout = QHBoxLayout()
+        amount_layout.addWidget(QLabel("Nuevo total:"))
+        
+        amount_input = QDoubleSpinBox()
+        amount_input.setRange(0, 1000000)
+        amount_input.setDecimals(2)
+        amount_input.setLocale(QLocale(QLocale.Language.English, QLocale.Country.UnitedStates))
+        amount_input.setValue(current_total_bs)
+        amount_layout.addWidget(amount_input)
+        layout.addLayout(amount_layout)
+        
+        # Update amount when currency changes
+        def on_currency_changed():
+            if rb_bs.isChecked():
+                amount_input.setValue(current_total_bs)
+            else:
+                amount_input.setValue(current_total_usd)
+        
+        rb_bs.toggled.connect(on_currency_changed)
+        rb_usd.toggled.connect(on_currency_changed)
+        
+        # Buttons
+        btn_layout = QHBoxLayout()
+        btn_cancel = QPushButton("Cancelar")
+        btn_cancel.clicked.connect(dialog.reject)
+        btn_ok = QPushButton("Aplicar")
+        btn_ok.setStyleSheet("background-color: #4CAF50; color: white; padding: 5px;")
+        btn_ok.clicked.connect(dialog.accept)
+        btn_layout.addWidget(btn_cancel)
+        btn_layout.addWidget(btn_ok)
+        layout.addLayout(btn_layout)
+        
+        dialog.setLayout(layout)
+        
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            new_total = amount_input.value()
+            currency = "USD" if rb_usd.isChecked() else "Bs"
+            
+            # Convert to USD for calculation
+            if currency == "USD":
+                new_total_usd = new_total
+                if new_total_usd >= current_total_usd:
+                    QMessageBox.information(self, "Info", "El nuevo total debe ser menor al actual")
+                    return
+            else:  # Bs
+                new_total_usd = new_total / self.exchange_rate
+                if new_total >= current_total_bs:
+                    QMessageBox.information(self, "Info", "El nuevo total debe ser menor al actual")
+                    return
+            
+            # Calculate discount amount in USD
+            discount_amount_usd = current_total_usd - new_total_usd
+            
+            # Apply as fixed discount in USD
+            success, msg = self.controller.apply_global_discount(discount_amount_usd, "FIXED")
+            if success:
+                self.refresh_table()
+                QMessageBox.information(self, "Éxito", 
+                    f"Total ajustado a {new_total:,.2f} {currency}\nDescuento aplicado: ${discount_amount_usd:,.2f}")
             else:
                 QMessageBox.warning(self, "Error", msg)
 

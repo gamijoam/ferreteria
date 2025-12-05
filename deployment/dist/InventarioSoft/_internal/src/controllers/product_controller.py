@@ -83,11 +83,17 @@ class ProductController:
         return product
 
     def delete_product(self, product_id):
-        """Logically delete a product (set is_active=False)"""
+        """Logically delete a product (set is_active=False) and free up SKU"""
         product = self.db.query(Product).get(product_id)
         if not product:
             raise ValueError("Producto no encontrado")
         
+        # Rename SKU to allow reuse
+        if product.sku:
+            import time
+            timestamp = int(time.time())
+            product.sku = f"{product.sku}_DEL_{timestamp}"
+
         product.is_active = False
         self.db.commit()
         event_bus.products_updated.emit()

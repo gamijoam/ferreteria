@@ -63,6 +63,10 @@ class UserManagementWindow(QWidget):
         self.password_input = QLineEdit()
         self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
         
+        self.pin_input = QLineEdit()
+        self.pin_input.setPlaceholderText("4-6 dígitos (opcional)")
+        self.pin_input.setMaxLength(6)
+        
         self.role_combo = QComboBox()
         self.role_combo.addItem("Administrador", UserRole.ADMIN)
         self.role_combo.addItem("Cajero", UserRole.CASHIER)
@@ -80,6 +84,7 @@ class UserManagementWindow(QWidget):
         
         form_layout.addRow("Nombre de Usuario:", self.username_input)
         form_layout.addRow("Contraseña:", self.password_input)
+        form_layout.addRow("PIN (Autorización):", self.pin_input)
         form_layout.addRow("Rol:", self.role_combo)
         form_layout.addRow("", self.active_checkbox)
         form_layout.addRow(btn_save)
@@ -177,11 +182,16 @@ class UserManagementWindow(QWidget):
         try:
             username = self.username_input.text().strip()
             password = self.password_input.text()
+            pin = self.pin_input.text().strip()
             role = self.role_combo.currentData()
             is_active = self.active_checkbox.isChecked()
             
             if not username:
                 raise ValueError("El nombre de usuario es obligatorio")
+            
+            # Validate PIN if provided
+            if pin and (len(pin) < 4 or len(pin) > 6 or not pin.isdigit()):
+                raise ValueError("El PIN debe tener entre 4 y 6 dígitos")
             
             if self.current_user:
                 # Update existing user
@@ -189,7 +199,8 @@ class UserManagementWindow(QWidget):
                     self.current_user.id,
                     username=username,
                     role=role,
-                    is_active=is_active
+                    is_active=is_active,
+                    pin=pin if pin else None
                 )
                 
                 # Change password if provided
@@ -202,7 +213,7 @@ class UserManagementWindow(QWidget):
                 if not password:
                     raise ValueError("La contraseña es obligatoria para nuevos usuarios")
                 
-                self.controller.create_user(username, password, role)
+                self.controller.create_user(username, password, role, pin=pin if pin else None)
                 QMessageBox.information(self, "Éxito", "Usuario creado correctamente")
             
             self.clear_form()
@@ -216,6 +227,7 @@ class UserManagementWindow(QWidget):
         self.current_user = user
         self.username_input.setText(user.username)
         self.password_input.clear()
+        self.pin_input.setText(user.pin if user.pin else "")
         
         # Set role
         for i in range(self.role_combo.count()):
@@ -233,6 +245,7 @@ class UserManagementWindow(QWidget):
         self.current_user = None
         self.username_input.clear()
         self.password_input.clear()
+        self.pin_input.clear()
         self.role_combo.setCurrentIndex(0)
         self.active_checkbox.setChecked(True)
         self.lbl_form_mode.setText("Modo: Crear Nuevo Usuario")

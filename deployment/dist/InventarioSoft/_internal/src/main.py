@@ -34,6 +34,7 @@ from src.views.config_view import ConfigDialog
 from src.models.models import UserRole
 from src.controllers.config_controller import ConfigController
 from src.database.db import SessionLocal
+from src.views.cash_history_view import CashHistoryWindow
 import os
 
 class MainWindow(QMainWindow):
@@ -184,11 +185,12 @@ class MainWindow(QMainWindow):
             col += 1
 
         if user.role == UserRole.ADMIN:
-            btn = self.create_module_button("👥", "Usuarios", "Gestión de accesos", "#607D8B")
-            btn.clicked.connect(self.open_user_management)
+            # Add Historial Caja for admin only
+            btn = self.create_module_button("📋", "Historial Caja", "Cierres anteriores", "#607D8B")
+            btn.clicked.connect(self.open_cash_history)
             grid.addWidget(btn, row, col)
             col += 1
-            
+
             if col >= 4:
                 row += 1
                 col = 0
@@ -205,6 +207,11 @@ class MainWindow(QMainWindow):
 
             btn = self.create_module_button("📄", "Importar Excel", "Cargar productos", "#009688")
             btn.clicked.connect(self.open_excel_import)
+            grid.addWidget(btn, row, col)
+            col += 1
+            
+            btn = self.create_module_button("👥", "Usuarios", "Gestión de accesos", "#607D8B")
+            btn.clicked.connect(self.open_user_management)
             grid.addWidget(btn, row, col)
             col += 1
 
@@ -290,7 +297,9 @@ class MainWindow(QMainWindow):
     def open_cash(self):
         self.cash_window = CashWindow()
         self.cash_window.show()
-
+    def open_cash_history(self):
+        self.cash_history_window = CashHistoryWindow()
+        self.cash_history_window.show()
     def open_reports(self):
         self.report_window = AdvancedReportWindow()
         self.report_window.show()

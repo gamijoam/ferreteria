@@ -126,9 +126,33 @@ class AdvancedReportWindow(QWidget):
             self.sales_table.setItem(i, 0, QTableWidgetItem(str(sale.id)))
             self.sales_table.setItem(i, 1, QTableWidgetItem(sale.date.strftime('%Y-%m-%d %H:%M')))
             self.sales_table.setItem(i, 2, QTableWidgetItem(sale.customer.name if sale.customer else "N/A"))
-            self.sales_table.setItem(i, 3, QTableWidgetItem(f"${sale.total_amount:,.2f}"))
+            self.sales_table.setItem(i, 2, QTableWidgetItem(sale.customer.name if sale.customer else "N/A"))
+
+            
+
+            # Display total with correct currency
+
+            # Check payment_method field for currency indicator
+
+            if "Bs" in sale.payment_method or (hasattr(sale, "payments") and sale.payments and sale.payments[0].currency == "Bs"):
+                # Calculate Bs amount correctly
+                if sale.total_amount_bs and sale.total_amount_bs > 0:
+                    amount = sale.total_amount_bs
+                else:
+                    # Fallback: calculate from USD using exchange rate
+                    rate = sale.exchange_rate_used if sale.exchange_rate_used else 1.0
+                    amount = sale.total_amount * rate
+                self.sales_table.setItem(i, 3, QTableWidgetItem(f"Bs{amount:,.2f}"))
+
+            else:
+
+                self.sales_table.setItem(i, 3, QTableWidgetItem(f"${sale.total_amount:,.2f}"))
+
+            
+
             self.sales_table.setItem(i, 4, QTableWidgetItem(sale.payment_method))
             self.sales_table.setItem(i, 5, QTableWidgetItem("Pagado" if sale.paid else "Pendiente"))
+
 
     def export_sales_report(self):
         if self.sales_table.rowCount() == 0:
@@ -203,7 +227,10 @@ class AdvancedReportWindow(QWidget):
             self.cash_table.insertRow(i)
             self.cash_table.setItem(i, 0, QTableWidgetItem(mov['date'].strftime('%Y-%m-%d %H:%M')))
             self.cash_table.setItem(i, 1, QTableWidgetItem(mov['type']))
-            self.cash_table.setItem(i, 2, QTableWidgetItem(f"${mov['amount']:,.2f}"))
+            # Display amount with correct currency symbol
+            currency = mov.get('currency', 'USD')
+            symbol = '$' if currency == 'USD' else 'Bs'
+            self.cash_table.setItem(i, 2, QTableWidgetItem(f"{symbol}{mov['amount']:,.2f}"))
             self.cash_table.setItem(i, 3, QTableWidgetItem(mov['description']))
             self.cash_table.setItem(i, 4, QTableWidgetItem(str(mov['session_id']) if mov['session_id'] else "N/A"))
 

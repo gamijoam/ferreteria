@@ -32,14 +32,15 @@ class AuthController:
             return user
         return None
 
-    def create_user(self, username, password, role: UserRole):
+    def create_user(self, username, password, role: UserRole, pin=None):
         if self.db.query(User).filter(User.username == username).first():
             raise ValueError("Usuario ya existe")
             
         new_user = User(
             username=username,
             password_hash=self._hash_password(password),
-            role=role
+            role=role,
+            pin=pin
         )
         self.db.add(new_user)
         self.db.commit()
@@ -53,7 +54,7 @@ class AuthController:
         """Get user by ID"""
         return self.db.query(User).get(user_id)
 
-    def update_user(self, user_id: int, username: str = None, role: UserRole = None, is_active: bool = None):
+    def update_user(self, user_id: int, username: str = None, role: UserRole = None, is_active: bool = None, pin: str = None):
         """Update user details"""
         user = self.db.query(User).get(user_id)
         if not user:
@@ -71,6 +72,9 @@ class AuthController:
         
         if is_active is not None:
             user.is_active = is_active
+        
+        if pin is not None:
+            user.pin = pin
         
         self.db.commit()
         return user

@@ -117,6 +117,7 @@ class ReportController:
                     "session_id": session.id,
                     "type": mov.type,
                     "amount": mov.amount,
+                    "currency": mov.currency or "USD",
                     "description": mov.description
                 })
         
@@ -133,6 +134,7 @@ class ReportController:
                 "session_id": None,
                 "type": "SALE",
                 "amount": sale.total_amount,
+                "currency": "USD",  # Sales are stored in USD
                 "description": f"Venta #{sale.id}"
             })
         

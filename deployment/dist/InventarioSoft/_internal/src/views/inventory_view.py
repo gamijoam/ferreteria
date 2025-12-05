@@ -4,6 +4,7 @@ from PyQt6.QtWidgets import (
     QHeaderView, QMessageBox, QGroupBox, QFormLayout, QTabWidget, QCompleter, QDoubleSpinBox
 )
 from PyQt6.QtCore import Qt, QLocale
+from PyQt6.QtGui import QColor
 from src.database.db import SessionLocal
 from src.models.models import Product
 from src.controllers.inventory_controller import InventoryController
@@ -133,13 +134,25 @@ class InventoryWindow(QWidget):
         filter_layout.addWidget(btn_all)
         layout.addLayout(filter_layout)
         
-        # Table
+        # Table with improved layout
         self.kardex_table = QTableWidget()
         self.kardex_table.setColumnCount(6)
         self.kardex_table.setHorizontalHeaderLabels([
             "Fecha", "Producto", "Tipo", "Cantidad", "Saldo", "Descripción"
         ])
-        self.kardex_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        
+        # Set specific column widths for better visibility
+        self.kardex_table.setColumnWidth(0, 140)  # Fecha
+        self.kardex_table.setColumnWidth(1, 200)  # Producto
+        self.kardex_table.setColumnWidth(2, 110)  # Tipo
+        self.kardex_table.setColumnWidth(3, 90)   # Cantidad
+        self.kardex_table.setColumnWidth(4, 90)   # Saldo
+        # Description column will stretch to fill remaining space
+        self.kardex_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)
+        
+        # Enable word wrap for better text display
+        self.kardex_table.setWordWrap(True)
+        
         layout.addWidget(self.kardex_table)
 
     def setup_product_autocomplete(self):
@@ -392,23 +405,42 @@ class InventoryWindow(QWidget):
         
         for row, mov in enumerate(movements):
             self.kardex_table.insertRow(row)
-            self.kardex_table.setItem(row, 0, QTableWidgetItem(mov.date.strftime("%Y-%m-%d %H:%M")))
             
-            # Product Name (Need to fetch if not already available in mov object via relationship)
+            # Date
+            date_item = QTableWidgetItem(mov.date.strftime("%Y-%m-%d %H:%M"))
+            self.kardex_table.setItem(row, 0, date_item)
+            
+            # Product Name
             product_name = mov.product.name if mov.product else "Desconocido"
             self.kardex_table.setItem(row, 1, QTableWidgetItem(product_name))
             
-            self.kardex_table.setItem(row, 2, QTableWidgetItem(mov.movement_type.value))
+            # Type - with color coding
+            type_item = QTableWidgetItem(mov.movement_type.value)
+            if mov.movement_type.value == "PURCHASE":
+                type_item.setBackground(QColor("#c8e6c9"))  # Light green
+            elif mov.movement_type.value == "SALE":
+                type_item.setBackground(QColor("#ffcdd2"))  # Light red
+            elif mov.movement_type.value == "ADJUSTMENT":
+                type_item.setBackground(QColor("#fff9c4"))  # Light yellow
+            self.kardex_table.setItem(row, 2, type_item)
             
-            qty_item = QTableWidgetItem(str(mov.quantity))
+            # Quantity - with color and sign
+            qty_text = f"+{mov.quantity}" if mov.quantity > 0 else str(mov.quantity)
+            qty_item = QTableWidgetItem(qty_text)
             if mov.quantity > 0:
                 qty_item.setForeground(Qt.GlobalColor.green)
             else:
                 qty_item.setForeground(Qt.GlobalColor.red)
             self.kardex_table.setItem(row, 3, qty_item)
             
-            self.kardex_table.setItem(row, 4, QTableWidgetItem(str(mov.balance_after)))
+            # Balance
+            self.kardex_table.setItem(row, 4, QTableWidgetItem(f"{mov.balance_after:.2f}"))
+            
+            # Description
             self.kardex_table.setItem(row, 5, QTableWidgetItem(mov.description or ""))
+            
+            # Set row height for better readability
+            self.kardex_table.setRowHeight(row, 50)
 
     def closeEvent(self, event):
         self.db.close()

@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import (
     QFormLayout, QGroupBox, QComboBox, QSpinBox, QDoubleSpinBox, QTextEdit,
     QDateEdit
 )
-from PyQt6.QtCore import QDate
+from PyQt6.QtCore import QDate, QLocale
 from src.database.db import SessionLocal
 from src.controllers.purchase_controller import PurchaseController
 from src.controllers.supplier_controller import SupplierController
@@ -112,6 +112,7 @@ class PurchaseOrderWindow(QWidget):
         self.cost_spin.setMinimum(0.01)
         self.cost_spin.setMaximum(1000000)
         self.cost_spin.setDecimals(2)
+        self.cost_spin.setLocale(QLocale(QLocale.Language.English, QLocale.Country.UnitedStates))
         product_layout.addWidget(QLabel("Costo Unit.:"))
         product_layout.addWidget(self.cost_spin)
         
@@ -181,7 +182,7 @@ class PurchaseOrderWindow(QWidget):
     def load_products(self):
         self.product_combo.clear()
         self.product_combo.addItem("Seleccione producto...", None)
-        products = self.db.query(Product).all()
+        products = self.db.query(Product).filter(Product.is_active == True).all()
         for p in products:
             self.product_combo.addItem(f"{p.name} (Stock: {p.stock})", p.id)
 
