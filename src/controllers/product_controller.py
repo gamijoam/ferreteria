@@ -7,7 +7,7 @@ class ProductController:
     def __init__(self, db: Session):
         self.db = db
 
-    def create_product(self, name, sku, price, cost_price, stock, min_stock, is_box, conversion_factor, unit_type, category_id=None, supplier_id=None):
+    def create_product(self, name, sku, price, cost_price, stock, min_stock, is_box, conversion_factor, unit_type, category_id=None, supplier_id=None, location=None):
         """Create a new product"""
         # Check if SKU exists and is active
         if sku:
@@ -27,6 +27,7 @@ class ProductController:
             unit_type=unit_type,
             category_id=category_id,
             supplier_id=supplier_id,
+            location=location,
             is_active=True
         )
         self.db.add(new_product)
@@ -35,7 +36,7 @@ class ProductController:
         event_bus.inventory_updated.emit()
         return new_product
 
-    def update_product(self, product_id, name, sku, price, cost_price, stock, min_stock, is_box, conversion_factor, unit_type, category_id=None, supplier_id=None):
+    def update_product(self, product_id, name, sku, price, cost_price, stock, min_stock, is_box, conversion_factor, unit_type, category_id=None, supplier_id=None, location=None):
         """Update an existing product"""
         product = self.db.query(Product).get(product_id)
         if not product:
@@ -75,6 +76,7 @@ class ProductController:
             product.category_id = category_id
         if supplier_id is not None:
             product.supplier_id = supplier_id
+        product.location = location
         
         self.db.commit()
         event_bus.products_updated.emit()

@@ -58,6 +58,7 @@ class Product(Base):
 
     # Core Logic for Hardware Store
     is_box = Column(Boolean, default=False)
+    location = Column(String, nullable=True) # Shelf/Department location
     conversion_factor = Column(Integer, default=1) # How many units in the box?
     unit_type = Column(String, default="Unidad") # Unidad, Metro, Kilo, Litro
 
