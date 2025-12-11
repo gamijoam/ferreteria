@@ -1,7 +1,6 @@
 // AppTextField.qml - Modern Material Design Text Input
 import QtQuick
 import QtQuick.Controls
-import "../styles"
 
 Item {
     id: root
@@ -18,7 +17,7 @@ Item {
     property alias readOnly: textField.readOnly
     
     signal accepted()
-    signal textChanged()
+    // signal textChanged() - Removed to avoid conflict with alias
     
     implicitWidth: 300
     implicitHeight: 72
@@ -28,16 +27,16 @@ Item {
         id: labelText
         visible: root.label !== ""
         text: root.label
-        font.family: Theme.fontFamily
-        font.pixelSize: Theme.fontSizeSm
-        font.weight: Theme.fontWeightMedium
-        color: textField.activeFocus ? Theme.primary : Theme.textSecondary
+        font.family: "Segoe UI"
+        font.pixelSize: 12
+        font.weight: Font.Medium
+        color: textField.activeFocus ? "#2196F3" : "#666"
         anchors.bottom: inputContainer.top
-        anchors.bottomMargin: Theme.spacingSm
+        anchors.bottomMargin: 8
         anchors.left: parent.left
         
         Behavior on color {
-            ColorAnimation { duration: Theme.transitionFast }
+            ColorAnimation { duration: 150 }
         }
     }
     
@@ -47,35 +46,35 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: root.label !== "" ? labelText.bottom : parent.top
-        anchors.topMargin: root.label !== "" ? Theme.spacingSm : 0
+        anchors.topMargin: root.label !== "" ? 8 : 0
         height: 48
         
-        radius: Theme.radiusMd
-        color: Theme.surface
+        radius: 8
+        color: "white"
         border.width: 2
         border.color: {
-            if (root.hasError) return Theme.danger
-            if (textField.activeFocus) return Theme.primary
-            return Theme.border
+            if (root.hasError) return "#F44336"
+            if (textField.activeFocus) return "#2196F3"
+            return "#e0e0e0"
         }
         
         Behavior on border.color {
-            ColorAnimation { duration: Theme.transitionFast }
+            ColorAnimation { duration: 150 }
         }
         
         Row {
             anchors.fill: parent
-            anchors.leftMargin: Theme.spacingMd
-            anchors.rightMargin: Theme.spacingMd
-            spacing: Theme.spacingSm
+            anchors.leftMargin: 16
+            anchors.rightMargin: 16
+            spacing: 8
             
             // Left icon
             Text {
                 visible: root.iconLeft !== ""
                 text: root.iconLeft
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSizeLg
-                color: Theme.textSecondary
+                font.family: "Segoe UI"
+                font.pixelSize: 16
+                color: "#666"
                 verticalAlignment: Text.AlignVCenter
                 anchors.verticalCenter: parent.verticalCenter
             }
@@ -86,17 +85,18 @@ Item {
                 width: parent.width - (root.iconLeft !== "" ? 30 : 0) - (root.iconRight !== "" ? 30 : 0)
                 height: parent.height
                 
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSizeMd
-                color: Theme.textPrimary
-                selectionColor: Theme.primary
+                font.family: "Segoe UI"
+                font.pixelSize: 14
+                color: "black" 
+                selectionColor: "#2196F3"
                 selectedTextColor: "white"
                 verticalAlignment: TextInput.AlignVCenter
+                clip: true
                 
                 echoMode: root.isPassword ? TextInput.Password : TextInput.Normal
                 
                 onAccepted: root.accepted()
-                onTextChanged: root.textChanged()
+                // onTextChanged handling is automatic via alias
                 
                 // Placeholder
                 Text {
@@ -104,8 +104,9 @@ Item {
                     anchors.fill: parent
                     verticalAlignment: Text.AlignVCenter
                     font: textField.font
-                    color: Theme.textDisabled
+                    color: "#64748b"
                     visible: textField.text === "" && !textField.activeFocus
+                    elide: Text.ElideRight
                 }
             }
             
@@ -113,9 +114,9 @@ Item {
             Text {
                 visible: root.iconRight !== ""
                 text: root.iconRight
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSizeLg
-                color: Theme.textSecondary
+                font.family: "Segoe UI"
+                font.pixelSize: 16
+                color: "#666"
                 verticalAlignment: Text.AlignVCenter
                 anchors.verticalCenter: parent.verticalCenter
             }
@@ -127,14 +128,14 @@ Item {
             anchors.left: parent.left
             anchors.right: parent.right
             height: 2
-            color: Theme.primary
+            color: "#2196F3"
             
             scale: textField.activeFocus ? 1 : 0
             transformOrigin: Item.Center
             
             Behavior on scale {
                 NumberAnimation { 
-                    duration: Theme.transitionNormal
+                    duration: 250
                     easing.type: Easing.OutCubic
                 }
             }
@@ -146,11 +147,11 @@ Item {
         id: errorLabel
         visible: root.hasError && root.errorText !== ""
         text: root.errorText
-        font.family: Theme.fontFamily
-        font.pixelSize: Theme.fontSizeXs
-        color: Theme.danger
+        font.family: "Segoe UI"
+        font.pixelSize: 10
+        color: "#F44336"
         anchors.top: inputContainer.bottom
-        anchors.topMargin: Theme.spacingXs
+        anchors.topMargin: 4
         anchors.left: parent.left
     }
 }

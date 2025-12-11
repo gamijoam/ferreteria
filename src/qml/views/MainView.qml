@@ -186,6 +186,10 @@ Rectangle {
                     subtitle: "Control de stock"
                     cardColor: "#4CAF50"
                     visible: mainView.role === "ADMIN" || mainView.role === "WAREHOUSE"
+                    
+                    onClicked: {
+                        stackView.push("InventoryView.qml")
+                    }
                 }
                 
                 // Cash Module

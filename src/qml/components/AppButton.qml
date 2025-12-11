@@ -1,7 +1,7 @@
 // AppButton.qml - Modern Material Design Button Component
 import QtQuick
 import QtQuick.Controls
-import "../styles"
+// import "../styles"
 
 Button {
     id: control
@@ -14,56 +14,56 @@ Button {
     implicitWidth: Math.max(120, contentItem.implicitWidth + leftPadding + rightPadding)
     implicitHeight: 48
     
-    leftPadding: Theme.spacingLg
-    rightPadding: Theme.spacingLg
-    topPadding: Theme.spacingMd
-    bottomPadding: Theme.spacingMd
+    leftPadding: 24
+    rightPadding: 24
+    topPadding: 16
+    bottomPadding: 16
     
-    font.family: Theme.fontFamily
-    font.pixelSize: Theme.fontSizeMd
-    font.weight: Theme.fontWeightMedium
+    font.family: "Segoe UI"
+    font.pixelSize: 14
+    font.weight: Font.Medium
     
     // Background
     background: Rectangle {
-        radius: Theme.radiusMd
+        radius: 8
         
         gradient: Gradient {
             GradientStop { 
                 position: 0.0
                 color: {
-                    if (!control.enabled) return Theme.textDisabled
+                    if (!control.enabled) return "#64748b"
                     switch(control.variant) {
-                        case "primary": return Theme.primary
-                        case "secondary": return Theme.secondary
-                        case "success": return Theme.success
-                        case "danger": return Theme.danger
-                        case "warning": return Theme.warning
+                        case "primary": return "#2196F3"
+                        case "secondary": return "#8b5cf6"
+                        case "success": return "#4CAF50"
+                        case "danger": return "#F44336"
+                        case "warning": return "#FF9800"
                         case "outlined": return "transparent"
                         case "text": return "transparent"
-                        default: return Theme.primary
+                        default: return "#2196F3"
                     }
                 }
             }
             GradientStop { 
                 position: 1.0
                 color: {
-                    if (!control.enabled) return Theme.textDisabled
+                    if (!control.enabled) return "#64748b"
                     switch(control.variant) {
-                        case "primary": return Theme.primaryDark
-                        case "secondary": return Theme.secondaryDark
-                        case "success": return Theme.successDark
-                        case "danger": return Theme.dangerDark
-                        case "warning": return Theme.warningDark
+                        case "primary": return "#1976D2"
+                        case "secondary": return "#7c3aed"
+                        case "success": return "#388E3C"
+                        case "danger": return "#D32F2F"
+                        case "warning": return "#F57C00"
                         case "outlined": return "transparent"
                         case "text": return "transparent"
-                        default: return Theme.primaryDark
+                        default: return "#1976D2"
                     }
                 }
             }
         }
         
         border.width: control.variant === "outlined" ? 2 : 0
-        border.color: control.variant === "outlined" ? Theme.primary : "transparent"
+        border.color: control.variant === "outlined" ? "#2196F3" : "transparent"
         
         // Hover overlay
         Rectangle {
@@ -73,7 +73,7 @@ Button {
             opacity: control.hovered ? 0.1 : 0
             
             Behavior on opacity {
-                NumberAnimation { duration: Theme.transitionFast }
+                NumberAnimation { duration: 150 }
             }
         }
         
@@ -85,7 +85,7 @@ Button {
             opacity: control.pressed ? 0.2 : 0
             
             Behavior on opacity {
-                NumberAnimation { duration: Theme.transitionFast }
+                NumberAnimation { duration: 150 }
             }
         }
         
@@ -120,25 +120,14 @@ Button {
             }
         }
         
-        // Shadow
-        layer.enabled: control.variant !== "text" && control.variant !== "outlined"
-        layer.effect: ShaderEffect {
-            property color shadowColor: Qt.rgba(0, 0, 0, 0.3)
-            fragmentShader: "
-                varying highp vec2 qt_TexCoord0;
-                uniform lowp sampler2D source;
-                uniform lowp vec4 shadowColor;
-                void main() {
-                    lowp vec4 tex = texture2D(source, qt_TexCoord0);
-                    gl_FragColor = mix(shadowColor, tex, tex.a);
-                }
-            "
-        }
+        // Shadow - Removed ShaderEffect for compatibility
+        // layer.enabled: control.variant !== "text" && control.variant !== "outlined"
+        // layer.effect: ShaderEffect { ... }
     }
     
     // Content
     contentItem: Row {
-        spacing: Theme.spacingSm
+        spacing: 8
         
         // Loading spinner
         Rectangle {
@@ -149,7 +138,7 @@ Button {
             color: "transparent"
             border.width: 2
             border.color: control.variant === "outlined" || control.variant === "text" 
-                          ? Theme.primary : "white"
+                          ? "#2196F3" : "white"
             
             Rectangle {
                 width: 6
@@ -176,7 +165,7 @@ Button {
             text: control.iconName
             font: control.font
             color: control.variant === "outlined" || control.variant === "text" 
-                   ? Theme.primary : "white"
+                   ? "#2196F3" : "white"
             verticalAlignment: Text.AlignVCenter
         }
         
@@ -185,9 +174,9 @@ Button {
             text: control.text
             font: control.font
             color: {
-                if (!control.enabled) return Theme.textDisabled
+                if (!control.enabled) return "#64748b"
                 if (control.variant === "outlined" || control.variant === "text") 
-                    return Theme.primary
+                    return "#2196F3"
                 return "white"
             }
             verticalAlignment: Text.AlignVCenter
@@ -197,7 +186,7 @@ Button {
     
     // Animations
     Behavior on scale {
-        NumberAnimation { duration: Theme.transitionFast }
+        NumberAnimation { duration: 150 }
     }
     
     // Mouse handling for ripple
