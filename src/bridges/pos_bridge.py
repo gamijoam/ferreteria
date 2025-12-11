@@ -49,8 +49,8 @@ class POSBridge(QObject):
         """Get cart total in Bs"""
         return self.pos_controller.get_total() * self._exchange_rate
     
-    @Slot(str, float, bool)
-    def addToCart(self, sku_or_name: str, quantity: float, is_box: bool):
+    @Slot(str, float, bool, int)
+    def addToCart(self, sku_or_name: str, quantity: float, is_box: bool, product_id: int = 0):
         """
         Add product to cart
         
@@ -58,8 +58,10 @@ class POSBridge(QObject):
             sku_or_name: Product SKU or name
             quantity: Quantity to add
             is_box: True if selling by box
+            product_id: Product ID (optional)
         """
-        success, msg = self.pos_controller.add_to_cart(sku_or_name, quantity, is_box)
+        pid = product_id if product_id > 0 else None
+        success, msg = self.pos_controller.add_to_cart(sku_or_name, quantity, is_box, pid)
         
         if success:
             self.cartUpdated.emit()
@@ -270,7 +272,38 @@ class POSBridge(QObject):
             self.cartUpdated.emit()
         else:
             self.saleError.emit(msg)
-    
+
+    @Slot(int, result=list)
+    def getPickingItems(self, sale_id: int):
+        """Get items for picking list [name, quantity, location, is_box]"""
+        session = SessionLocal()
+        session = SessionLocal()
+        try:
+            # Use raw SQL to avoid metadata conflict with imports
+            sql = text("""
+                SELECT p.name, sd.quantity, sd.is_box_sale, p.location
+                FROM sale_details sd
+                JOIN products p ON sd.product_id = p.id
+                WHERE sd.sale_id = :sale_id
+            """)
+            
+            result = session.execute(sql, {"sale_id": sale_id})
+            
+            results = []
+            for row in result:
+                results.append({
+                    "name": row[0],
+                    "quantity": float(row[1]),
+                    "is_box": bool(row[2]),
+                    "location": row[3] or "-"
+                })
+            return results
+        except Exception as e:
+            print(f"Error getting picking items: {e}")
+            return []
+        finally:
+            session.close()
+
     def __del__(self):
         """Cleanup database connection"""
         if hasattr(self, 'db'):

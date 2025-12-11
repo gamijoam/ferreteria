@@ -68,6 +68,7 @@ def main():
     pin_auth_bridge = PINAuthBridge()
     from bridges.inventory_bridge import InventoryBridge
     inventory_bridge = InventoryBridge()
+    from bridges.cash_bridge import CashBridge
     
     # Expose bridges to QML
     qml_engine.rootContext().setContextProperty("authBridge", auth_bridge)
@@ -75,6 +76,9 @@ def main():
     qml_engine.rootContext().setContextProperty("productBridge", product_bridge)
     qml_engine.rootContext().setContextProperty("pinAuthBridge", pin_auth_bridge)
     qml_engine.rootContext().setContextProperty("inventoryBridge", inventory_bridge)
+
+    cash_bridge = CashBridge()
+    qml_engine.rootContext().setContextProperty("cashBridge", cash_bridge)
     
     # Set QML import paths
     qml_dir = Path(__file__).parent / "qml"

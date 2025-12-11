@@ -201,6 +201,11 @@ Rectangle {
                     subtitle: "Control de efectivo"
                     cardColor: "#FF9800"
                     visible: mainView.role === "ADMIN" || mainView.role === "CASHIER"
+                    
+                    onClicked: {
+                        console.log("Opening CashView...")
+                        stackView.push("CashView.qml")
+                    }
                 }
                 
                 // Customers Module

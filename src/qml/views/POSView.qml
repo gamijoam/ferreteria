@@ -6,7 +6,7 @@ import "../components"
 
 Rectangle {
     id: posView
-    anchors.fill: parent
+    // anchors.fill: parent
     color: "#f5f5f5"
     
     // State variables
@@ -14,6 +14,23 @@ Rectangle {
     property bool creditMode: false
     property int selectedCustomerId: 0
     property string selectedCustomerName: ""
+    
+    // -- CONNECTIONS --
+    Connections {
+        target: posBridge
+        
+        function onSaleCompleted(saleId, ticket) {
+             receiptDialog.saleId = saleId
+             receiptDialog.text = ticket
+             receiptDialog.open()
+             
+             // Reset UI state
+             selectedCustomerId = 0
+             selectedCustomerName = ""
+             boxMode = false
+             creditMode = false
+        }
+    }
     
     // Header
     Rectangle {
@@ -182,7 +199,7 @@ Rectangle {
                             model: ListModel { id: suggestionModel }
                             
                             delegate: Rectangle {
-                                width: parent.width
+                                width: suggestionList.width
                                 height: 70
                                 color: mouseArea.containsMouse ? "#E3F2FD" : "white"
                                 radius: 6
@@ -311,10 +328,11 @@ Rectangle {
                                     cursorShape: Qt.PointingHandCursor
                                     
                                     onClicked: {
-                                        searchField.text = model.name
-                                        suggestionsPopup.visible = false
-                                        posBridge.addToCart(model.name, 1.0, boxMode)
+                                        // Use model.id for precise selection
+                                        var productId = model.id || 0
+                                        posBridge.addToCart(model.sku || model.name, 1.0, boxMode, productId)
                                         searchField.text = ""
+                                        suggestionsPopup.visible = false
                                         searchField.forceActiveFocus()
                                     }
                                 }
@@ -931,6 +949,7 @@ Rectangle {
         title: "Error"
         modal: true
         anchors.centerIn: parent
+        width: 350
         
         property string errorText: ""
         
@@ -980,10 +999,7 @@ Rectangle {
             // Cart model updates automatically
         }
         
-        function onSaleCompleted(saleId, ticket) {
-            successDialog.ticketText = ticket
-            successDialog.open()
-        }
+
         
         function onSaleError(error) {
             errorDialog.errorText = error
@@ -1065,7 +1081,7 @@ Rectangle {
                         spacing: 4
                         
                         delegate: Rectangle {
-                            width: parent.width - 10
+                            width: paymentListView.width - 10
                             height: 40
                             color: "#f5f5f5"
                             radius: 4
@@ -1131,8 +1147,42 @@ Rectangle {
                     
                     Text { text: "Moneda:"; font.family: "Segoe UI"; font.pixelSize: 12 }
                     RowLayout {
-                        RadioButton { id: rbBs; text: "Bs"; checked: true }
-                        RadioButton { id: rbUsd; text: "USD" }
+                        RadioButton { 
+                            id: rbBs; 
+                            text: "Bs"; 
+                            checked: true 
+                            onCheckedChanged: {
+                                if (checked) {
+                                    // Switch to Bs: Convert current input or recalc remaining?
+                                    // Better to recalc remaining
+                                    var totalPaidUsd = 0
+                                    for (var i = 0; i < paymentListModel.count; i++) {
+                                        var p = paymentListModel.get(i)
+                                        if (p.currency === "USD") totalPaidUsd += p.amount
+                                        else totalPaidUsd += p.amount / posBridge.exchangeRate
+                                    }
+                                    var remainingUsd = posBridge.total - totalPaidUsd
+                                    amountInput.text = (remainingUsd * posBridge.exchangeRate).toFixed(2)
+                                }
+                            }
+                        }
+                        RadioButton { 
+                            id: rbUsd; 
+                            text: "USD" 
+                            onCheckedChanged: {
+                                if (checked) {
+                                    // Switch to USD
+                                    var totalPaidUsd = 0
+                                    for (var i = 0; i < paymentListModel.count; i++) {
+                                        var p = paymentListModel.get(i)
+                                        if (p.currency === "USD") totalPaidUsd += p.amount
+                                        else totalPaidUsd += p.amount / posBridge.exchangeRate
+                                    }
+                                    var remainingUsd = posBridge.total - totalPaidUsd
+                                    amountInput.text = remainingUsd.toFixed(2)
+                                }
+                            }
+                        }
                     }
                     
                     Text { text: "Monto:"; font.family: "Segoe UI"; font.pixelSize: 12 }
@@ -1141,8 +1191,8 @@ Rectangle {
                         Layout.fillWidth: true
                         text: posBridge.totalBs.toFixed(2)
                         font.family: "Segoe UI"
-                        font.pixelSize: 12
-                        validator: DoubleValidator { bottom: 0; decimals: 2 }
+                        font.pixelSize: 14
+                        validator: DoubleValidator { bottom: 0; decimals: 2; locale: "C" }
                     }
                 }
                 
@@ -1397,6 +1447,151 @@ Rectangle {
             var type = rbItemPercent.checked ? "PERCENT" : "FIXED"
             posBridge.applyItemDiscount(cartList.currentIndex, value, type)
             itemDiscountValue.text = "10"
+        }
+    }
+    
+    // --- POST SALE DIALOGS ---
+    
+    Dialog {
+        id: receiptDialog
+        title: "Comprobante de Venta"
+        modal: true
+        anchors.centerIn: parent
+        width: 450
+        height: 600
+        
+        property int saleId: 0
+        property alias text: ticketText.text
+        
+        contentItem: ColumnLayout {
+            spacing: 10
+            
+            ScrollView {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                TextArea {
+                    id: ticketText
+                    readOnly: true
+                    font.family: "Consolas"
+                    font.pixelSize: 12
+                    wrapMode: Text.WrapAnywhere
+                    background: Rectangle { color: "#FFF9C4" } // Receipt paper color
+                }
+            }
+            
+            Button {
+                text: "Cerrar / Ver Ubicaciones"
+                Layout.fillWidth: true
+                onClicked: receiptDialog.close()
+            }
+        }
+        
+        onClosed: {
+            var items = posBridge.getPickingItems(saleId)
+            console.log("Picking items for sale " + saleId + ":", JSON.stringify(items))
+            if (items && items.length > 0) {
+                pickingListModel.clear()
+                for (var i=0; i<items.length; i++) {
+                    pickingListModel.append(items[i])
+                }
+                pickingDialog.open()
+            }
+        }
+    }
+    
+    Dialog {
+        id: pickingDialog
+        title: "📦 Ubicación de Productos"
+        modal: true
+        anchors.centerIn: parent
+        width: 600
+        height: 500
+        
+        contentItem: ColumnLayout {
+            spacing: 15
+            
+            Text {
+                text: "Entregue estos productos al cliente:"
+                font.pixelSize: 18
+                font.bold: true
+                color: "#1976D2"
+                Layout.alignment: Qt.AlignHCenter
+            }
+            
+            ListView {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                model: ListModel { id: pickingListModel }
+                clip: true
+                spacing: 8
+                
+                delegate: Rectangle {
+                    width: ListView.view.width
+                    height: 80
+                    color: "#E3F2FD" // Light Blue
+                    radius: 8
+                    border.color: "#90CAF9"
+                    
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.margins: 15
+                        
+                        Text { 
+                            text: (index + 1) + "."
+                            font.bold: true
+                            color: "#666"
+                        }
+                        
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            Text { 
+                                text: model.name; 
+                                font.bold: true 
+                                font.pixelSize: 14
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                            }
+                            Text { 
+                                text: model.quantity + (model.is_box ? " CAJA(S)" : " UNID"); 
+                                font.pixelSize: 12 
+                                color: "#555"
+                            }
+                        }
+                        
+                        Rectangle {
+                            width: 100
+                            height: 50
+                            color: "#1565C0"
+                            radius: 6
+                            
+                            ColumnLayout {
+                                anchors.centerIn: parent
+                                spacing: 0
+                                Text {
+                                    text: "ESTANTE"
+                                    color: "#BBDEFB"
+                                    font.pixelSize: 10
+                                    Layout.alignment: Qt.AlignHCenter
+                                }
+                                Text {
+                                    text: model.location
+                                    color: "white"
+                                    font.bold: true
+                                    font.pixelSize: 18
+                                    Layout.alignment: Qt.AlignHCenter
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            Button {
+                text: "Listo / Cerrar"
+                Layout.fillWidth: true
+                highlighted: true
+                onClicked: pickingDialog.close()
+            }
         }
     }
     

@@ -8,13 +8,20 @@ class POSController:
         self.db = db
         self.cart = [] # List of dicts
 
-    def add_to_cart(self, sku_or_name: str, quantity: float, is_box: bool):
+    def add_to_cart(self, sku_or_name: str, quantity: float, is_box: bool, product_id: int = None):
         """
         Busca producto y agrega al carrito.
         Retorna (Success: bool, Message: str)
         """
-        # Try finding by SKU first, then Name
-        product = self.db.query(Product).filter(Product.sku == sku_or_name, Product.is_active == True).first()
+        product = None
+        
+        # Try finding by ID first if provided
+        if product_id:
+            product = self.db.query(Product).filter(Product.id == product_id, Product.is_active == True).first()
+            
+        # Try finding by SKU then Name if not found yet
+        if not product:
+            product = self.db.query(Product).filter(Product.sku == sku_or_name, Product.is_active == True).first()
         if not product:
             product = self.db.query(Product).filter(Product.name.ilike(f"%{sku_or_name}%"), Product.is_active == True).first()
         
