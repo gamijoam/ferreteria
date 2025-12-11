@@ -20,6 +20,17 @@ class CustomerController:
     def get_all_customers(self):
         return self.db.query(Customer).all()
 
+    def search_customers(self, query: str):
+        """Search customers by name or ID number"""
+        if not query:
+            return self.get_all_customers()
+            
+        search = f"%{query}%"
+        return self.db.query(Customer).filter(
+            (Customer.name.ilike(search)) | 
+            (Customer.id_number.ilike(search))
+        ).all()
+
     def get_customer_debt(self, customer_id: int):
         """Calculate total debt: unpaid sales - payments"""
         # Sum of unpaid sales

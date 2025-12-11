@@ -231,7 +231,9 @@ class Customer(Base):
     name = Column(String, nullable=False, index=True)
     id_number = Column(String, nullable=True, index=True)  # Cédula/ID
     phone = Column(String, nullable=True)
+    email = Column(String, nullable=True)
     address = Column(Text, nullable=True)
+    credit_limit = Column(Float, default=0.0)
 
     sales = relationship("Sale", back_populates="customer")
     payments = relationship("Payment", back_populates="customer")

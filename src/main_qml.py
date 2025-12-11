@@ -79,6 +79,10 @@ def main():
 
     cash_bridge = CashBridge()
     qml_engine.rootContext().setContextProperty("cashBridge", cash_bridge)
+
+    from bridges.customer_bridge import CustomerBridge
+    customer_bridge = CustomerBridge()
+    qml_engine.rootContext().setContextProperty("customerBridge", customer_bridge)
     
     # Set QML import paths
     qml_dir = Path(__file__).parent / "qml"

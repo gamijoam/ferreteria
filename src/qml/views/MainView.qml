@@ -217,6 +217,10 @@ Rectangle {
                     subtitle: "Crédito y pagos"
                     cardColor: "#9C27B0"
                     visible: mainView.role === "ADMIN" || mainView.role === "CASHIER"
+                    
+                    onClicked: {
+                        stackView.push("CustomerView.qml")
+                    }
                 }
                 
                 // Reports Module
