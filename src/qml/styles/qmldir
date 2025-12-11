@@ -1,0 +1,2 @@
+// qmldir - QML module definition for styles
+singleton Theme 1.0 Theme.qml
