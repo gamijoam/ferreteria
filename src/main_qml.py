@@ -8,6 +8,7 @@ sys.path.insert(0, str(project_root))
 
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
+from PySide6.QtQuickControls2 import QQuickStyle
 from PySide6.QtCore import QUrl
 from database.db import engine as db_engine, Base, SessionLocal
 from bridges.auth_bridge import AuthBridge
@@ -38,6 +39,9 @@ def main():
     app.setApplicationName("POS Ultra")
     app.setOrganizationName("POS Ultra")
     
+    # Set Material Style
+    QQuickStyle.setStyle("Material")
+    
     # Create QML Engine
     qml_engine = QQmlApplicationEngine()
     
@@ -56,9 +60,18 @@ def main():
     
     # Create Python-QML bridges
     auth_bridge = AuthBridge()
+    from bridges.pos_bridge import POSBridge
+    pos_bridge = POSBridge()
+    from bridges.product_bridge import ProductBridge
+    product_bridge = ProductBridge()
+    from bridges.pin_auth_bridge import PINAuthBridge
+    pin_auth_bridge = PINAuthBridge()
     
     # Expose bridges to QML
     qml_engine.rootContext().setContextProperty("authBridge", auth_bridge)
+    qml_engine.rootContext().setContextProperty("posBridge", pos_bridge)
+    qml_engine.rootContext().setContextProperty("productBridge", product_bridge)
+    qml_engine.rootContext().setContextProperty("pinAuthBridge", pin_auth_bridge)
     
     # Set QML import paths
     qml_dir = Path(__file__).parent / "qml"

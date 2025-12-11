@@ -5,7 +5,7 @@ import QtQuick.Layouts
 
 Rectangle {
     id: loginView
-    anchors.fill: parent
+    // anchors.fill: parent (Handled by StackView)
     
     // Gradient background
     gradient: Gradient {

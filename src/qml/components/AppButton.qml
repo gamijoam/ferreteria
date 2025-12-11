@@ -1,4 +1,4 @@
-// Button.qml - Modern Material Design Button Component
+// AppButton.qml - Modern Material Design Button Component
 import QtQuick
 import QtQuick.Controls
 import "../styles"

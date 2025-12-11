@@ -5,7 +5,7 @@ import QtQuick.Layouts
 
 Rectangle {
     id: mainView
-    anchors.fill: parent
+    // anchors.fill: parent (Handled by StackView)
     color: "#f5f5f5"  // Light gray background
     
     // Properties passed from login
@@ -156,6 +156,10 @@ Rectangle {
                     subtitle: "Ventas rápidas"
                     cardColor: "#FF9800"
                     visible: mainView.role === "ADMIN" || mainView.role === "CASHIER"
+                    
+                    onClicked: {
+                        stackView.push("POSView.qml")
+                    }
                 }
                 
                 // Products Module
@@ -167,6 +171,10 @@ Rectangle {
                     subtitle: "Gestión de productos"
                     cardColor: "#4CAF50"
                     visible: mainView.role === "ADMIN" || mainView.role === "WAREHOUSE"
+                    
+                    onClicked: {
+                        stackView.push("ProductView.qml")
+                    }
                 }
                 
                 // Inventory Module
@@ -232,6 +240,94 @@ Rectangle {
                     title: "Usuarios"
                     subtitle: "Gestión de accesos"
                     cardColor: "#607D8B"
+                    visible: mainView.role === "ADMIN"
+                }
+                
+                // Returns Module
+                ModuleCard {
+                    width: (parent.width - (3 * parent.columnSpacing)) / 4
+                    height: 160
+                    icon: "↩️"
+                    title: "Devoluciones"
+                    subtitle: "Gestión de devoluciones"
+                    cardColor: "#FF5722"
+                    visible: mainView.role === "ADMIN" || mainView.role === "CASHIER"
+                }
+                
+                // Quotes Module
+                ModuleCard {
+                    width: (parent.width - (3 * parent.columnSpacing)) / 4
+                    height: 160
+                    icon: "📋"
+                    title: "Cotizaciones"
+                    subtitle: "Gestión de cotizaciones"
+                    cardColor: "#FF9800"
+                    visible: mainView.role === "ADMIN" || mainView.role === "CASHIER"
+                }
+                
+                // Labels Module
+                ModuleCard {
+                    width: (parent.width - (3 * parent.columnSpacing)) / 4
+                    height: 160
+                    icon: "🏷️"
+                    title: "Etiquetas"
+                    subtitle: "Impresión de etiquetas"
+                    cardColor: "#795548"
+                    visible: mainView.role === "ADMIN" || mainView.role === "WAREHOUSE"
+                }
+                
+                // Suppliers Module
+                ModuleCard {
+                    width: (parent.width - (3 * parent.columnSpacing)) / 4
+                    height: 160
+                    icon: "🏭"
+                    title: "Proveedores"
+                    subtitle: "Gestión de proveedores"
+                    cardColor: "#3F51B5"
+                    visible: mainView.role === "ADMIN" || mainView.role === "WAREHOUSE"
+                }
+                
+                // Purchases Module
+                ModuleCard {
+                    width: (parent.width - (3 * parent.columnSpacing)) / 4
+                    height: 160
+                    icon: "🛒"
+                    title: "Compras"
+                    subtitle: "Órdenes de compra"
+                    cardColor: "#3F51B5"
+                    visible: mainView.role === "ADMIN" || mainView.role === "WAREHOUSE"
+                }
+                
+                // Price Rules Module
+                ModuleCard {
+                    width: (parent.width - (3 * parent.columnSpacing)) / 4
+                    height: 160
+                    icon: "💰"
+                    title: "Reglas de Precio"
+                    subtitle: "Precios por mayor"
+                    cardColor: "#009688"
+                    visible: mainView.role === "ADMIN"
+                }
+                
+                // Cash History Module
+                ModuleCard {
+                    width: (parent.width - (3 * parent.columnSpacing)) / 4
+                    height: 160
+                    icon: "📜"
+                    title: "Historial de Caja"
+                    subtitle: "Sesiones anteriores"
+                    cardColor: "#607D8B"
+                    visible: mainView.role === "ADMIN"
+                }
+                
+                // Import Excel Module
+                ModuleCard {
+                    width: (parent.width - (3 * parent.columnSpacing)) / 4
+                    height: 160
+                    icon: "📊"
+                    title: "Importar Excel"
+                    subtitle: "Importar productos"
+                    cardColor: "#4CAF50"
                     visible: mainView.role === "ADMIN"
                 }
             }

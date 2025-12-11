@@ -1,4 +1,4 @@
-// TextField.qml - Modern Material Design Text Input
+// AppTextField.qml - Modern Material Design Text Input
 import QtQuick
 import QtQuick.Controls
 import "../styles"
