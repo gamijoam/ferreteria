@@ -274,19 +274,7 @@ class POSController:
                     )
                     self.db.add(sale_payment)
                     
-                    # Create CashMovement for each payment
-                    payment_currency = payment.get("currency", "Bs")
-                    payment_amount = payment["amount"]
-                    
-                    cash_movement = CashMovement(
-                        session_id=session.id,
-                        type="DEPOSIT",
-                        amount=payment_amount,  # Store original amount
-                        currency=payment_currency,  # Original currency
-                        exchange_rate=exchange_rate,
-                        description=f"Venta #{new_sale.id} - {payment['method']}"
-                    )
-                    self.db.add(cash_movement)
+
 
             # Get business name
             from src.controllers.config_controller import ConfigController

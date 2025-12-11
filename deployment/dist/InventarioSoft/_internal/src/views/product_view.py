@@ -62,6 +62,9 @@ class ProductFormDialog(QDialog):
         self.conversion_factor_input.setEnabled(False)
         self.conversion_factor_input.setText("1")
         
+        self.location_input = QLineEdit()
+        self.location_input.setPlaceholderText("Ej: Estante A-1, Pasillo 3")
+        
         self.unit_type_combo = QComboBox()
         self.unit_type_combo.addItems(["Unidad", "Metro", "Kilo", "Litro"])
         
@@ -73,6 +76,7 @@ class ProductFormDialog(QDialog):
         form_layout.addRow("Stock:", self.stock_input)
         form_layout.addRow("Stock Mínimo (Alerta):", self.min_stock_input)
         form_layout.addRow("Tipo Unidad:", self.unit_type_combo)
+        form_layout.addRow("Ubicación:", self.location_input)
         form_layout.addRow("", self.is_box_check)
         form_layout.addRow("Factor Conversión:", self.conversion_factor_input)
         
@@ -129,6 +133,7 @@ class ProductFormDialog(QDialog):
         self.is_box_check.setChecked(product.is_box)
         self.conversion_factor_input.setText(str(product.conversion_factor))
         self.unit_type_combo.setCurrentText(product.unit_type)
+        self.location_input.setText(product.location or "")
         self.calculate_margin()
     
     def get_data(self):
@@ -142,7 +147,9 @@ class ProductFormDialog(QDialog):
             "min_stock": self.min_stock_input.value(),
             "is_box": self.is_box_check.isChecked(),
             "conversion_factor": int(self.conversion_factor_input.text() or 1),
-            "unit_type": self.unit_type_combo.currentText()
+            "conversion_factor": int(self.conversion_factor_input.text() or 1),
+            "unit_type": self.unit_type_combo.currentText(),
+            "location": self.location_input.text().strip() or None
         }
 
 
@@ -227,9 +234,9 @@ class ProductWindow(QWidget):
         
         # Table
         self.table = QTableWidget()
-        self.table.setColumnCount(12)
+        self.table.setColumnCount(13)
         self.table.setHorizontalHeaderLabels([
-            "ID", "Nombre", "SKU", "Costo", "Precio", "Margen%", "Stock", "Min.", "Es Caja?", "Factor", "Editar", "Eliminar"
+            "ID", "Nombre", "SKU", "Ubicación", "Costo", "Precio", "Margen%", "Stock", "Min.", "Es Caja?", "Factor", "Editar", "Eliminar"
         ])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch) # Name column stretches
@@ -351,8 +358,9 @@ class ProductWindow(QWidget):
             self.table.setItem(row, 0, QTableWidgetItem(str(prod.id)))
             self.table.setItem(row, 1, QTableWidgetItem(prod.name))
             self.table.setItem(row, 2, QTableWidgetItem(prod.sku or ""))
-            self.table.setItem(row, 3, QTableWidgetItem(f"${prod.cost_price:,.2f}"))
-            self.table.setItem(row, 4, QTableWidgetItem(f"${prod.price:,.2f}"))
+            self.table.setItem(row, 3, QTableWidgetItem(prod.location or "-"))
+            self.table.setItem(row, 4, QTableWidgetItem(f"${prod.cost_price:,.2f}"))
+            self.table.setItem(row, 5, QTableWidgetItem(f"${prod.price:,.2f}"))
             
             # Calculate margin
             if prod.price > 0:
@@ -362,9 +370,9 @@ class ProductWindow(QWidget):
                     margin_item.setForeground(QColor("red"))
                 else:
                     margin_item.setForeground(QColor("green"))
-                self.table.setItem(row, 5, margin_item)
+                self.table.setItem(row, 6, margin_item)
             else:
-                self.table.setItem(row, 5, QTableWidgetItem("-"))
+                self.table.setItem(row, 6, QTableWidgetItem("-"))
             
             stock_item = QTableWidgetItem(str(prod.stock))
             min_stock = prod.min_stock if hasattr(prod, 'min_stock') else 5.0
@@ -374,22 +382,24 @@ class ProductWindow(QWidget):
                 stock_item.setFont(QFont("Arial", 10, QFont.Weight.Bold))
                 stock_item.setBackground(QColor("#FFEBEE")) # Light red background
             
-            self.table.setItem(row, 6, stock_item)
-            self.table.setItem(row, 7, QTableWidgetItem(str(min_stock)))
-            self.table.setItem(row, 8, QTableWidgetItem("Sí" if prod.is_box else "No"))
-            self.table.setItem(row, 9, QTableWidgetItem(str(prod.conversion_factor)))
+                stock_item.setBackground(QColor("#FFEBEE")) # Light red background
+            
+            self.table.setItem(row, 7, stock_item)
+            self.table.setItem(row, 8, QTableWidgetItem(str(min_stock)))
+            self.table.setItem(row, 9, QTableWidgetItem("Sí" if prod.is_box else "No"))
+            self.table.setItem(row, 10, QTableWidgetItem(str(prod.conversion_factor)))
             
             # Edit Button
             btn_edit = QPushButton("✏ Editar")
             btn_edit.setStyleSheet("background-color: #2196F3; color: white; padding: 6px; border-radius: 4px;")
             btn_edit.clicked.connect(lambda checked, pid=prod.id: self.open_edit_product_dialog(pid))
-            self.table.setCellWidget(row, 10, btn_edit)
+            self.table.setCellWidget(row, 11, btn_edit)
             
             # Delete Button
             btn_delete = QPushButton("🗑 Eliminar")
             btn_delete.setStyleSheet("background-color: #F44336; color: white; padding: 6px; border-radius: 4px;")
             btn_delete.clicked.connect(lambda checked, pid=prod.id: self.delete_product(pid))
-            self.table.setCellWidget(row, 11, btn_delete)
+            self.table.setCellWidget(row, 12, btn_delete)
 
     def filter_products(self):
         """Filter products based on search text (Debounced)"""

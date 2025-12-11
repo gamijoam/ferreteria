@@ -2,9 +2,9 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, 
     QCheckBox, QPushButton, QTableWidget, QTableWidgetItem, 
     QHeaderView, QMessageBox, QFrame, QComboBox, QCompleter, QDoubleSpinBox,
-    QGroupBox, QFormLayout
+    QGroupBox, QFormLayout, QDialog, QRadioButton, QButtonGroup
 )
-from PyQt6.QtGui import QKeySequence, QFont, QShortcut
+from PyQt6.QtGui import QKeySequence, QFont, QShortcut, QColor
 from PyQt6.QtCore import Qt, QLocale
 from src.database.db import SessionLocal
 from src.controllers.pos_controller import POSController
@@ -299,7 +299,8 @@ class POSWindow(QWidget):
         suggestions = []
         for p in products:
             sku_part = f" - {p.sku}" if p.sku else ""
-            suggestion = f"{p.name}{sku_part} - ${p.price:,.2f}"
+            loc_part = f" (Ubic: {p.location})" if p.location else ""
+            suggestion = f"{p.name}{sku_part} - ${p.price:,.2f}{loc_part}"
             suggestions.append(suggestion)
         
         # Create completer
@@ -659,6 +660,9 @@ class POSWindow(QWidget):
     def process_sale(self, payments, is_credit, customer_id):
         """Process the sale with given payments"""
         
+        # Capture cart items for picking list before they are cleared
+        cart_snapshot = list(self.controller.cart)
+        
         success, msg, ticket = self.controller.finalize_sale(
             payments=payments,
             customer_id=customer_id,
@@ -670,9 +674,13 @@ class POSWindow(QWidget):
         if success:
             if is_credit:
                 QMessageBox.information(self, "Venta a Crédito Exitosa", 
-                                      f"Venta registrada a crédito.\\n\\n{ticket}")
+                                      f"Venta registrada a crédito.\n\n{ticket}")
             else:
-                QMessageBox.information(self, "Venta Exitosa", f"Ticket generado:\\n\\n{ticket}")
+                QMessageBox.information(self, "Venta Exitosa", f"Ticket generado:\n\n{ticket}")
+            
+            # Show Picking List / Locations
+            self.show_picking_list(cart_snapshot)
+            
             self.refresh_table()
             # payment_method_combo removed - no longer needed
         else:
@@ -956,6 +964,158 @@ class POSWindow(QWidget):
                     f"Total ajustado a {new_total:,.2f} {currency}\nDescuento aplicado: ${discount_amount_usd:,.2f}")
             else:
                 QMessageBox.warning(self, "Error", msg)
+
+    def show_picking_list(self, items):
+        """Show dialog with items and locations for warehouse/picking"""
+        if not items:
+            return
+            
+        dialog = QDialog(self)
+        dialog.setWindowTitle("📋 Ubicación de Productos")
+        dialog.resize(700, 500)
+        
+        layout = QVBoxLayout()
+        dialog.setLayout(layout)
+        
+        # Header
+        lbl_title = QLabel("📦 Lista de Recogida / Ubicaciones")
+        lbl_title.setFont(QFont("Arial", 16, QFont.Weight.Bold))
+        lbl_title.setStyleSheet("color: #1976D2; margin-bottom: 10px;")
+        lbl_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(lbl_title)
+        
+        # Info
+        lbl_info = QLabel("Entregue estos productos al cliente:")
+        lbl_info.setFont(QFont("Arial", 12))
+        layout.addWidget(lbl_info)
+        
+        # Table
+        table = QTableWidget()
+        table.setColumnCount(3)
+        table.setHorizontalHeaderLabels(["Producto", "Cantidad", "Ubicación Estante"])
+        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        table.setStyleSheet("font-size: 14pt;")
+        
+        table.setRowCount(len(items))
+        
+        for i, item in enumerate(items):
+            # Name
+            name_item = QTableWidgetItem(item.get("name", ""))
+            table.setItem(i, 0, name_item)
+            
+            # Quantity + Type
+            qty = item.get("quantity", 0)
+            is_box = item.get("is_box", False)
+            type_str = "CAJA" if is_box else "UNID"
+            qty_item = QTableWidgetItem(f"{qty} {type_str}")
+            qty_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            table.setItem(i, 1, qty_item)
+            
+            # Location
+            location = "-"
+            # Try to get from product_obj
+            if "product_obj" in item and hasattr(item["product_obj"], "location"):
+                location = item["product_obj"].location or "-"
+            
+            loc_item = QTableWidgetItem(location)
+            loc_item.setFont(QFont("Arial", 14, QFont.Weight.Bold))
+            loc_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            
+            if location != "-":
+                loc_item.setForeground(QColor("blue"))
+                loc_item.setBackground(QColor("#E3F2FD")) # Light blue bg
+            else:
+                loc_item.setForeground(QColor("gray"))
+                
+            table.setItem(i, 2, loc_item)
+            
+        layout.addWidget(table)
+        
+        # Button
+        btn_close = QPushButton("Listo / Cerrar (Enter)")
+        btn_close.setStyleSheet("background-color: #4CAF50; color: white; padding: 15px; font-weight: bold; font-size: 14pt;")
+        btn_close.clicked.connect(dialog.accept)
+        layout.addWidget(btn_close)
+        
+        dialog.exec()
+
+    def show_picking_list(self, items):
+        """Show dialog with items and locations for warehouse/picking"""
+        if not items:
+            return
+            
+        dialog = QDialog(self)
+        dialog.setWindowTitle("📋 Ubicación de Productos")
+        dialog.resize(700, 500)
+        
+        layout = QVBoxLayout()
+        dialog.setLayout(layout)
+        
+        # Header
+        lbl_title = QLabel("📦 Lista de Recogida / Ubicaciones")
+        lbl_title.setFont(QFont("Arial", 16, QFont.Weight.Bold))
+        lbl_title.setStyleSheet("color: #1976D2; margin-bottom: 10px;")
+        lbl_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(lbl_title)
+        
+        # Info
+        lbl_info = QLabel("Entregue estos productos al cliente:")
+        lbl_info.setFont(QFont("Arial", 12))
+        layout.addWidget(lbl_info)
+        
+        # Table
+        table = QTableWidget()
+        table.setColumnCount(3)
+        table.setHorizontalHeaderLabels(["Producto", "Cantidad", "Ubicación Estante"])
+        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        table.setStyleSheet("font-size: 14pt;")
+        
+        table.setRowCount(len(items))
+        
+        for i, item in enumerate(items):
+            # Name
+            name_item = QTableWidgetItem(item.get("name", ""))
+            table.setItem(i, 0, name_item)
+            
+            # Quantity + Type
+            qty = item.get("quantity", 0)
+            is_box = item.get("is_box", False)
+            type_str = "CAJA" if is_box else "UNID"
+            qty_item = QTableWidgetItem(f"{qty} {type_str}")
+            qty_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            table.setItem(i, 1, qty_item)
+            
+            # Location
+            location = "-"
+            # Try to get from product_obj
+            if "product_obj" in item and hasattr(item["product_obj"], "location"):
+                location = item["product_obj"].location or "-"
+            
+            loc_item = QTableWidgetItem(location)
+            loc_item.setFont(QFont("Arial", 14, QFont.Weight.Bold))
+            loc_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            
+            if location != "-":
+                loc_item.setForeground(QColor("blue"))
+                loc_item.setBackground(QColor("#E3F2FD")) # Light blue bg
+            else:
+                loc_item.setForeground(QColor("gray"))
+                
+            table.setItem(i, 2, loc_item)
+            
+        layout.addWidget(table)
+        
+        # Button
+        btn_close = QPushButton("Listo / Cerrar (Enter)")
+        btn_close.setStyleSheet("background-color: #4CAF50; color: white; padding: 15px; font-weight: bold; font-size: 14pt;")
+        btn_close.clicked.connect(dialog.accept)
+        layout.addWidget(btn_close)
+        
+        dialog.exec()
 
     def closeEvent(self, event):
         self.db.close()
