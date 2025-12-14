@@ -47,7 +47,7 @@ class MainWindow(QMainWindow):
         self.config_controller = ConfigController(self.db)
         self.business_info = self.config_controller.get_business_info()
         
-        self.setWindowTitle(f"🏪 {self.business_info['name']} - ERP")
+        self.setWindowTitle(f"🏪 {self.business_info['name']} - ERP (v1.0.1)")
         # self.resize(900, 700)
         self.showMaximized()
 
