@@ -1,80 +1,87 @@
-from sqlalchemy.orm import Session
-from src.models.models import Product, Kardex, MovementType
+from frontend_caja.services.inventory_service import InventoryService
+# from src.utils.event_bus import event_bus # If we had one
 
 class InventoryController:
-    def __init__(self, db: Session):
-        self.db = db
+    def __init__(self, db=None):
+        self.service = InventoryService()
+        self.db = None # Ignored
 
     def add_stock(self, product_id: int, quantity: int, is_box_input: bool, description: str = "Compra"):
         """
-        Registra una entrada de mercancía (Compra).
-        Maneja la conversión automática de Cajas a Unidades.
+        Registra una entrada de mercancía (Compra) convertida a unidades en backend.
         """
-        product = self.db.query(Product).filter(Product.id == product_id).first()
-        if not product:
-            raise ValueError("Producto no encontrado")
-
-        # Calcular unidades totales
-        total_units = quantity
+        payload = {
+            "product_id": product_id,
+            "quantity": float(quantity), # Ensure float
+            "is_box_input": is_box_input,
+            "description": description,
+            "movement_type": "PURCHASE"
+        }
         
-        # Si la entrada es "por caja", multiplicamos por el factor del producto
-        # OJO: Si el producto NO es caja (is_box=False), ignoramos is_box_input o lanzamos error.
-        # Asumiremos que si el usuario marca "Es Caja" en la entrada, confía en el factor del producto.
-        if is_box_input and product.is_box:
-            total_units = quantity * product.conversion_factor
-            description += f" (Entrada: {quantity} Cajas x {product.conversion_factor})"
+        result = self.service.add_stock(payload)
+        if result:
+            return True, "Stock actualizado" # Or return result['new_stock']
         else:
-            description += f" (Entrada: {quantity} Unidades)"
-
-        # Actualizar Stock
-        product.stock += total_units
-        
-        # Crear Kardex
-        kardex_entry = Kardex(
-            product_id=product.id,
-            movement_type=MovementType.PURCHASE,
-            quantity=total_units,
-            balance_after=product.stock,
-            description=description
-        )
-        
-        self.db.add(kardex_entry)
-        self.db.commit()
-        self.db.refresh(product)
-        return product
+             raise Exception("Error actualizando stock en servidor")
 
     def remove_stock(self, product_id: int, quantity: float, description: str = "Ajuste de Salida"):
         """
         Registra una salida de mercancía (Ajuste / Merma / Donación).
         """
-        product = self.db.query(Product).filter(Product.id == product_id).first()
-        if not product:
-            raise ValueError("Producto no encontrado")
-
-        if product.stock < quantity:
-            raise ValueError(f"Stock insuficiente. Stock actual: {product.stock}")
-
-        # Actualizar Stock
-        product.stock -= quantity
+        payload = {
+            "product_id": product_id,
+            "quantity": quantity,
+            "description": description,
+            "is_box_input": False, # Removal usually in units
+            "movement_type": "ADJUSTMENT_OUT"
+        }
         
-        # Crear Kardex
-        kardex_entry = Kardex(
-            product_id=product.id,
-            movement_type=MovementType.ADJUSTMENT_OUT,
-            quantity=quantity,
-            balance_after=product.stock,
-            description=description
-        )
-        
-        self.db.add(kardex_entry)
-        self.db.commit()
-        self.db.refresh(product)
-        return product
+        result = self.service.remove_stock(payload)
+        if result:
+            return True, "Stock actualizado"
+        else:
+             raise Exception("Error actualizando stock en servidor")
 
-    def get_kardex(self, product_id: int = None):
-        query = self.db.query(Kardex).join(Product)
-        
-        if product_id:
-            query = query.filter(Kardex.product_id == product_id)
+    def get_kardex(self, product_id: int):
+        data_list = self.service.get_kardex(product_id)
+        # Convert to objects if view expects objects with .date, .description
+        # Or return dicts if view handles it.
+        # Assuming view handles objects (it says kardex.description).
+        return [KardexObj(d) for d in data_list]
+
+from datetime import datetime
+
+class KardexObj:
+    def __init__(self, data):
+        self.id = data.get('id')
+        date_val = data.get('date')
+        if isinstance(date_val, str):
+            try:
+                self.date = datetime.fromisoformat(date_val)
+            except ValueError:
+                self.date = datetime.now() # Fallback
+        else:
+            self.date = date_val or datetime.now()
             
-        return query.order_by(Kardex.date.desc()).all()
+        self.movement_type = MockEnum(data.get('movement_type')) # Use MockEnum to handle .value access in view
+        self.quantity = data.get('quantity')
+        self.balance_after = data.get('balance_after')
+        self.description = data.get('description')
+        
+        product_data = data.get('product')
+        if product_data:
+            self.product = SimpleProductObj(product_data)
+        else:
+            self.product = MockProductRef(data.get('product_id'))
+
+class MockEnum:
+    def __init__(self, val):
+        self.value = val
+
+class MockProductRef:
+    def __init__(self, pid):
+        self.name = f"Producto {pid}"
+
+class SimpleProductObj:
+    def __init__(self, data):
+        self.name = data.get('name', 'Desconocido')

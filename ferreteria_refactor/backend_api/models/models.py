@@ -115,6 +115,18 @@ class Sale(Base):
     def __repr__(self):
         return f"<Sale(id={self.id}, total={self.total_amount})>"
 
+class SalePayment(Base):
+    __tablename__ = "sale_payments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    sale_id = Column(Integer, ForeignKey("sales.id"), nullable=False)
+    amount = Column(Float, nullable=False)
+    currency = Column(String, default="USD") # USD or Bs
+    payment_method = Column(String, default="Efectivo") # Efectivo, Tarjeta, etc.
+    exchange_rate = Column(Float, default=1.0) # Rate used for this specific payment
+
+    sale = relationship("Sale", back_populates="payments")
+
 class SaleDetail(Base):
     __tablename__ = "sale_details"
 
@@ -261,19 +273,6 @@ class Payment(Base):
     def __repr__(self):
         return f"<Payment(customer={self.customer_id}, amount={self.amount})>"
 
-class SalePayment(Base):
-    __tablename__ = "sale_payments"
-
-    id = Column(Integer, primary_key=True, index=True)
-    sale_id = Column(Integer, ForeignKey("sales.id"), nullable=False)
-    payment_method = Column(String, nullable=False)  # "Efectivo Bs", "Tarjeta", etc.
-    amount = Column(Float, nullable=False)
-    currency = Column(String, default="Bs")  # Bs or USD
-    
-    sale = relationship("Sale")
-
-    def __repr__(self):
-        return f"<SalePayment(sale={self.sale_id}, method='{self.payment_method}', amount={self.amount})>"
 
 class PriceRule(Base):
     __tablename__ = "price_rules"

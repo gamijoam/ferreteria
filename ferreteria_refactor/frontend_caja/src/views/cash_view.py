@@ -4,8 +4,9 @@ from PyQt6.QtWidgets import (
     QDoubleSpinBox, QComboBox
 )
 from PyQt6.QtCore import Qt
-from src.database.db import SessionLocal
+# from src.database.db import SessionLocal # REMOVED
 from src.controllers.cash_controller import CashController
+from src.controllers.config_controller import ConfigController
 
 class CashWindow(QWidget):
     def __init__(self):
@@ -13,8 +14,9 @@ class CashWindow(QWidget):
         self.setWindowTitle("Caja y Finanzas - Módulo 4")
         self.resize(1200, 750)
         
-        self.db = SessionLocal()
-        self.controller = CashController(self.db)
+        # self.db = SessionLocal() # REMOVED
+        self.controller = CashController(db=None) 
+        self.config_controller = ConfigController(db=None)
         
         self.layout = QVBoxLayout()
         self.setLayout(self.layout)
@@ -29,9 +31,13 @@ class CashWindow(QWidget):
             if widget:
                 widget.deleteLater()
             
-        session = self.controller.get_current_session()
+        # Check active session via API
+        active = self.controller.check_active_session()
         
-        if session:
+        if active:
+            session = self.controller.active_session
+            # Mapping API response to object-like access if needed, or using dict
+            # CashController.active_session comes from API so it's a dict (from requests .json())
             self.show_open_session_ui(session)
         else:
             self.show_closed_session_ui()
@@ -76,7 +82,11 @@ class CashWindow(QWidget):
         self.layout.addStretch()
 
     def show_open_session_ui(self, session):
-        lbl_status = QLabel(f"🟢 CAJA ABIERTA\nInicio: {session.start_time}\nFondo Inicial: ${session.initial_cash:,.2f}")
+        # Session is a dict now
+        start_time = session.get('start_time')
+        initial_cash = session.get('initial_cash', 0.0)
+        
+        lbl_status = QLabel(f"🟢 CAJA ABIERTA\nInicio: {start_time}\nFondo Inicial: ${initial_cash:,.2f}")
         lbl_status.setStyleSheet("font-size: 16px; font-weight: bold; color: green;")
         lbl_status.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.layout.addWidget(lbl_status)
@@ -100,17 +110,18 @@ class CashWindow(QWidget):
             initial_bs = self.initial_bs_input.value()
             
             # Pass both USD and Bs to controller
-            self.controller.open_session(initial_usd, initial_bs)
-            
-            QMessageBox.information(
-                self, 
-                "Éxito", 
-                f"Caja Abierta Correctamente\n\n"
-                f"Fondo Inicial USD: ${initial_usd:,.2f}\n"
-                f"Fondo Inicial Bs: Bs {initial_bs:,.2f}\n\n"
-                f"(Las monedas se manejan por separado)"
-            )
-            self.refresh_ui()
+            if self.controller.open_cash_register(initial_usd, initial_bs):
+                QMessageBox.information(
+                    self, 
+                    "Éxito", 
+                    f"Caja Abierta Correctamente\n\n"
+                    f"Fondo Inicial USD: ${initial_usd:,.2f}\n"
+                    f"Fondo Inicial Bs: Bs {initial_bs:,.2f}\n\n"
+                    f"(Las monedas se manejan por separado)"
+                )
+                self.refresh_ui()
+            else:
+                 QMessageBox.warning(self, "Error", "No se pudo abrir la caja. Verifique conexión.")
             
         except Exception as e:
             QMessageBox.warning(self, "Error", str(e))
@@ -149,21 +160,19 @@ class CashWindow(QWidget):
             
             if amount > 0 and desc:
                 try:
-                    # Get exchange rate if needed (though controller handles it if passed)
-                    # Actually controller just stores it.
-                    # We should get current rate to store with movement
-                    from src.controllers.config_controller import ConfigController
-                    config_ctrl = ConfigController(self.db)
-                    rate = config_ctrl.get_exchange_rate()
+                    # Get rate via config service (API)
+                    # Note: Controller API calls for movement usually don't need rate stored in movement directly 
+                    # if backend handles it, but currently logic is mixed. 
+                    # For layout consistency we assume backend handles Logic.
                     
-                    self.controller.add_movement("EXPENSE", amount, desc, currency, rate)
+                    self.controller.register_movement(amount, "OUT", desc, currency)
                     QMessageBox.information(self, "Éxito", "Gasto registrado")
                 except Exception as e:
                     QMessageBox.warning(self, "Error", str(e))
 
     def handle_close_session(self):
         # Custom dialog for dual currency cash closing
-        from PyQt6.QtWidgets import QDialog, QVBoxLayout, QFormLayout, QDoubleSpinBox, QPushButton, QLabel
+        from PyQt6.QtWidgets import QDialog, QVBoxLayout, QFormLayout, QDoubleSpinBox, QPushButton, QLabel, QHBoxLayout
         
         dialog = QDialog(self)
         dialog.setWindowTitle("Cierre de Caja")
@@ -199,7 +208,6 @@ class CashWindow(QWidget):
         layout.addLayout(form_layout)
         
         # Buttons
-        from PyQt6.QtWidgets import QHBoxLayout
         btn_layout = QHBoxLayout()
         
         btn_ok = QPushButton("Cerrar Caja")
@@ -220,7 +228,8 @@ class CashWindow(QWidget):
                 reported_bs = bs_spin.value()
                 
                 # Get expected cash from controller (dual currency)
-                result = self.controller.close_session(reported_usd, reported_bs)
+                # RESULT IS NOW A DICT FROM API: { "session": {...}, "details": {...}, ... }
+                result = self.controller.close_cash_register(reported_usd, reported_bs)
                 
                 # USD Status
                 diff_usd = result["diff_usd"]
@@ -238,15 +247,20 @@ class CashWindow(QWidget):
                 elif diff_bs < -0.01:
                     status_bs = f"FALTANTE (-Bs {abs(diff_bs):,.2f})"
 
-                # Calculate Digital Totals
+                # Calculate Digital Totals from details
+                details = result['details']
+                sales_by_method = details.get('sales_by_method', {})
+                
                 digital_total = 0.0
                 digital_breakdown = ""
                 
-                for method, amount in result['details']['sales_by_method'].items():
+                for key, amount in sales_by_method.items():
+                    # method key format: "Method (Currency)"
                     # If method is NOT cash, it's digital/bank
-                    if "Efectivo" not in method:
+                    # Check method name
+                    if "Efectivo" not in key:
                         digital_total += amount
-                        digital_breakdown += f"- {method}: ${amount:,.2f}\n"
+                        digital_breakdown += f"- {key}: ${amount:,.2f}\n"
                 
                 if digital_total == 0:
                     digital_breakdown = "(Sin movimientos digitales)\n"
@@ -268,20 +282,16 @@ class CashWindow(QWidget):
                     f"--- Desglose de Ventas ---\n"
                 )
                 
-                for method, amount in result['details']['sales_by_method'].items():
-                    # Check if method is Bs to format correctly
-                    if "Bs" in method:
-                         msg += f"- {method}: ${amount:,.2f} (USD eq)\n"
-                    else:
-                        msg += f"- {method}: ${amount:,.2f}\n"
+                for key, amount in sales_by_method.items():
+                     msg += f"- {key}: ${amount:,.2f}\n"
                     
-                msg += f"\nTOTAL VENTAS (USD eq): ${result['details']['sales_total']:,.2f}\n\n"
+                msg += f"\nTOTAL VENTAS (USD eq): ${details.get('sales_total', 0):,.2f}\n\n"
                 msg += f"--- Movimientos de Caja ---\n"
-                msg += f"- Fondo Inicial: ${result['details']['initial_usd']:,.2f} / Bs {result['details']['initial_bs']:,.2f}\n"
-                msg += f"- Gastos USD: -${result['details']['expenses_usd']:,.2f}\n"
-                msg += f"- Gastos Bs: -Bs {result['details']['expenses_bs']:,.2f}\n"
-                msg += f"- Depósitos USD: +${result['details']['deposits_usd']:,.2f}\n"
-                msg += f"- Depósitos Bs: +Bs {result['details']['deposits_bs']:,.2f}"
+                msg += f"- Fondo Inicial: ${details.get('initial_usd', 0):,.2f} / Bs {details.get('initial_bs', 0):,.2f}\n"
+                msg += f"- Gastos USD: -${details.get('expenses_usd', 0):,.2f}\n"
+                msg += f"- Gastos Bs: -Bs {details.get('expenses_bs', 0):,.2f}\n"
+                msg += f"- Depósitos USD: +${details.get('deposits_usd', 0):,.2f}\n"
+                msg += f"- Depósitos Bs: +Bs {details.get('deposits_bs', 0):,.2f}"
                 
                 QMessageBox.information(self, "Cierre Finalizado", msg)
                 self.refresh_ui()
@@ -290,5 +300,5 @@ class CashWindow(QWidget):
                 QMessageBox.critical(self, "Error", str(e))
 
     def closeEvent(self, event):
-        self.db.close()
+        # self.db.close() # REMOVED
         event.accept()

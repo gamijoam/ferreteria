@@ -1,63 +1,55 @@
-from sqlalchemy.orm import Session
-from src.models.models import Supplier
-from sqlalchemy.exc import IntegrityError
+from frontend_caja.services.supplier_service import SupplierService
 
 class SupplierController:
-    def __init__(self, db: Session):
-        self.db = db
+    def __init__(self, db=None):
+        self.service = SupplierService()
+        self.db = None # Ignored
 
     def create_supplier(self, name, contact_person=None, phone=None, email=None, address=None, notes=None):
-        """Create a new supplier"""
-        try:
-            supplier = Supplier(
-                name=name,
-                contact_person=contact_person,
-                phone=phone,
-                email=email,
-                address=address,
-                notes=notes
-            )
-            self.db.add(supplier)
-            self.db.commit()
-            self.db.refresh(supplier)
-            return supplier, None
-        except IntegrityError:
-            self.db.rollback()
-            return None, "Ya existe un proveedor con ese nombre"
-        except Exception as e:
-            self.db.rollback()
-            return None, str(e)
+        """Create a new supplier via API"""
+        payload = {
+            "name": name,
+            "contact_person": contact_person,
+            "phone": phone,
+            "email": email,
+            "address": address,
+            "notes": notes,
+            "is_active": True
+        }
+        
+        result = self.service.create_supplier(payload)
+        if result:
+            return result, None # Return API dict as object mock? Or just dict if UI handles it.
+            # Assuming UI expects object-like or dict. Old controller returned (obj, error).
+            # The UI probably uses obj.name etc.
+            # Let's return a simple object wrapper or just the dict if the view supports it.
+            # Looking at previous controllers, we wrapped in Obj. Let's do that for consistency if needed.
+            # But here I'll stick to dict if possible, or simple wrapper.
+            return SupplierObj(result), None
+        else:
+            return None, "Error creando proveedor"
 
     def get_all_suppliers(self, active_only=True):
-        """Get all suppliers"""
-        query = self.db.query(Supplier)
-        if active_only:
-            query = query.filter(Supplier.is_active == True)
-        return query.order_by(Supplier.name).all()
+        """Get all suppliers from API"""
+        data = self.service.get_all_suppliers(active_only=active_only)
+        return [SupplierObj(d) for d in data]
 
     def get_supplier(self, supplier_id):
         """Get supplier by ID"""
-        return self.db.query(Supplier).get(supplier_id)
+        data = self.service.get_supplier(supplier_id)
+        return SupplierObj(data) if data else None
 
     def update_supplier(self, supplier_id, **kwargs):
         """Update supplier information"""
-        supplier = self.get_supplier(supplier_id)
-        if not supplier:
-            return False, "Proveedor no encontrado"
-
-        try:
-            for key, value in kwargs.items():
-                if hasattr(supplier, key):
-                    setattr(supplier, key, value)
-            
-            self.db.commit()
+        # API expects partial update via PUT (or PATCH, but here we likely use PUT with full object or handling partials in router)
+        # My router uses exclude_unset=True, so I can send partials.
+        
+        # Mapping kwargs to payload
+        result = self.service.update_supplier(supplier_id, kwargs)
+        if result:
             return True, "Proveedor actualizado correctamente"
-        except IntegrityError:
-            self.db.rollback()
-            return False, "Ya existe un proveedor con ese nombre"
-        except Exception as e:
-            self.db.rollback()
-            return False, str(e)
+        else:
+            return False, "Error al actualizar proveedor"
 
     def deactivate_supplier(self, supplier_id):
         """Deactivate a supplier"""
@@ -66,3 +58,15 @@ class SupplierController:
     def activate_supplier(self, supplier_id):
         """Activate a supplier"""
         return self.update_supplier(supplier_id, is_active=True)
+
+class SupplierObj:
+    """Helper to wrap dict response for UI compatibility (if attributes are accessed via dot notation)"""
+    def __init__(self, data):
+        self.id = data.get('id')
+        self.name = data.get('name')
+        self.contact_person = data.get('contact_person')
+        self.phone = data.get('phone')
+        self.email = data.get('email')
+        self.address = data.get('address')
+        self.notes = data.get('notes')
+        self.is_active = data.get('is_active')

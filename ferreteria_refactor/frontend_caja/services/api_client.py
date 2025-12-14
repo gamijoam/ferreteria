@@ -8,12 +8,16 @@ class APIClient:
 
     def get(self, endpoint: str, **kwargs):
         url = f"{self.base_url}{endpoint}"
+        silent_404 = kwargs.pop('silent_404', False)
         try:
             response = self.session.get(url, **kwargs)
+            if silent_404 and response.status_code == 404:
+                return None
             response.raise_for_status()
             return response.json()
         except requests.RequestException as e:
-            print(f"API Error (GET {endpoint}): {e}")
+            if not silent_404:
+                print(f"API Error (GET {endpoint}): {e}")
             return None
 
     def post(self, endpoint: str, data: dict, **kwargs):
@@ -28,3 +32,23 @@ class APIClient:
             if e.response:
                 print(f"Response: {e.response.text}")
             return None
+
+    def put(self, endpoint: str, data: dict, **kwargs):
+        url = f"{self.base_url}{endpoint}"
+        try:
+            response = self.session.put(url, json=data, **kwargs)
+            response.raise_for_status()
+            return response.json()
+        except requests.RequestException as e:
+            print(f"API Error (PUT {endpoint}): {e}")
+            return None
+
+    def delete(self, endpoint: str, **kwargs):
+        url = f"{self.base_url}{endpoint}"
+        try:
+            response = self.session.delete(url, **kwargs)
+            response.raise_for_status()
+            return True
+        except requests.RequestException as e:
+            print(f"API Error (DELETE {endpoint}): {e}")
+            return False

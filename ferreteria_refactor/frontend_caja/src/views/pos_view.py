@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import QKeySequence, QFont, QShortcut, QColor
 from PyQt6.QtCore import Qt, QLocale
-from src.database.db import SessionLocal
+# from src.database.db import SessionLocal
 from src.controllers.pos_controller import POSController
 from src.controllers.customer_controller import CustomerController
 from src.controllers.quote_controller import QuoteController
@@ -19,11 +19,11 @@ class POSWindow(QWidget):
         self.setWindowTitle("Punto de Venta (POS) - Módulo 3")
         self.showMaximized()  # Maximize window instead of fixed size
         
-        self.db = SessionLocal()
-        self.controller = POSController(self.db)
-        self.customer_controller = CustomerController(self.db)
-        self.quote_controller = QuoteController(self.db)
-        self.config_controller = ConfigController(self.db)
+        self.db = None        # Controllers
+        self.controller = POSController(db=None) 
+        self.config_controller = ConfigController(db=None)
+        self.quote_controller = QuoteController(db=None) # Service-based now
+        self.customer_controller = CustomerController(db=None)
         
         # Get exchange rate
         self.exchange_rate = self.config_controller.get_exchange_rate()
@@ -290,17 +290,24 @@ class POSWindow(QWidget):
     
     def setup_autocomplete(self):
         """Setup autocomplete for product search"""
-        from src.models.models import Product
+        # from src.models.models import Product
         
-        # Get all active products
-        products = self.db.query(Product).filter(Product.is_active == True).all()
+        # Get all active products FROM CONTROLLER CACHE (API)
+        # products = self.db.query(Product).filter(Product.is_active == True).all()
+        products = self.controller.cached_products
         
         # Create list of suggestions: "Name - SKU - $Price"
         suggestions = []
         for p in products:
-            sku_part = f" - {p.sku}" if p.sku else ""
-            loc_part = f" (Ubic: {p.location})" if p.location else ""
-            suggestion = f"{p.name}{sku_part} - ${p.price:,.2f}{loc_part}"
+            # Handle dict access since it's now a list of dicts from API
+            p_sku = p.get('sku', '')
+            p_loc = p.get('location', '')
+            p_name = p.get('name', 'Unknown')
+            p_price = p.get('price', 0.0)
+
+            sku_part = f" - {p_sku}" if p_sku else ""
+            loc_part = f" (Ubic: {p_loc})" if p_loc else ""
+            suggestion = f"{p_name}{sku_part} - ${p_price:,.2f}{loc_part}"
             suggestions.append(suggestion)
         
         # Create completer
@@ -663,11 +670,16 @@ class POSWindow(QWidget):
         # Capture cart items for picking list before they are cleared
         cart_snapshot = list(self.controller.cart)
         
+        # Determine currency from payments (use first payment's currency)
+        primary_currency = "USD"
+        if payments and len(payments) > 0:
+            primary_currency = payments[0]["currency"]
+        
         success, msg, ticket = self.controller.finalize_sale(
             payments=payments,
             customer_id=customer_id,
             is_credit=is_credit,
-            currency="USD",  # Default, actual currency is in each payment
+            currency=primary_currency,
             exchange_rate=self.exchange_rate,
             notes=""  # Notes field removed from UI
         )
@@ -1118,5 +1130,5 @@ class POSWindow(QWidget):
         dialog.exec()
 
     def closeEvent(self, event):
-        self.db.close()
+        # self.db.close()
         event.accept()

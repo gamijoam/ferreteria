@@ -16,8 +16,8 @@ class InventoryWindow(QWidget):
         self.setWindowTitle("Gestión de Inventario (Bodega) - Módulo 2")
         self.resize(1200, 750)
         
-        self.db = SessionLocal()
-        self.controller = InventoryController(self.db)
+        # self.db = SessionLocal() # Removed
+        self.controller = InventoryController() # No DB needed
         
         self.layout = QVBoxLayout()
         self.setLayout(self.layout)
@@ -157,14 +157,22 @@ class InventoryWindow(QWidget):
 
     def setup_product_autocomplete(self):
         """Setup autocomplete for product search in entry tab"""
-        products = self.db.query(Product).filter(Product.is_active == True).all()
+        # products = self.db.query(Product).filter(Product.is_active == True).all()
+        # Use ProductService directly or Controller
+        # Since we don't have ProductController passed in, let's instantiate one or use Service
+        from src.controllers.product_controller import ProductController
+        self.product_controller = ProductController()
+        products = self.product_controller.get_active_products()
         
         # Create list of suggestions with product data
         self.product_map = {}  # Map suggestion text to product
         suggestions = []
         for p in products:
-            sku_part = f" - {p.sku}" if p.sku else ""
-            suggestion = f"{p.name}{sku_part}"
+            # p is likely a dictionary from API
+            sku = p.get('sku', '')
+            name = p.get('name', '')
+            sku_part = f" - {sku}" if sku else ""
+            suggestion = f"{name}{sku_part}"
             suggestions.append(suggestion)
             self.product_map[suggestion] = p
         
@@ -182,22 +190,24 @@ class InventoryWindow(QWidget):
         
         # Find product in map
         product = self.product_map.get(text)
+        # Fallback search if not in map (e.g. typed manually) not strictly needed if completer works well
+        # but for robustness:
         if not product:
-            # Try to find by name or SKU
-            product = self.db.query(Product).filter(
-                (Product.name.ilike(f"%{text}%")) | (Product.sku == text),
-                Product.is_active == True
-            ).first()
+             # Try API search? For now assume map covers active products loaded
+             pass
         
         if product:
-            self.selected_product_id = product.id
-            self.selected_product_label.setText(f"✓ {product.name}")
+            self.selected_product_id = product.get('id')
+            self.selected_product_label.setText(f"✓ {product.get('name')}")
             self.selected_product_label.setStyleSheet("font-weight: bold; color: green;")
-            self.current_stock_label.setText(f"Stock Actual: {product.stock} {product.unit_type}")
+            stock = product.get('stock', 0)
+            unit = product.get('unit_type', 'Unidad')
+            self.current_stock_label.setText(f"Stock Actual: {stock} {unit}")
             
-            if product.is_box:
+            if product.get('is_box'):
                 self.is_box_check.setEnabled(True)
-                self.is_box_check.setText(f"Es Caja (x{product.conversion_factor} {product.unit_type})")
+                factor = product.get('conversion_factor', 1)
+                self.is_box_check.setText(f"Es Caja (x{factor} {unit})")
             else:
                 self.is_box_check.setEnabled(False)
                 self.is_box_check.setChecked(False)
@@ -284,13 +294,21 @@ class InventoryWindow(QWidget):
         layout.addStretch()
 
     def setup_stock_out_product_autocomplete(self):
-        products = self.db.query(Product).filter(Product.is_active == True).all()
+        # products = self.db.query(Product).filter(Product.is_active == True).all()
+        # Ensure controller exists
+        if not hasattr(self, 'product_controller'):
+             from src.controllers.product_controller import ProductController
+             self.product_controller = ProductController()
+             
+        products = self.product_controller.get_active_products()
         
         self.out_product_map = {}
         suggestions = []
         for p in products:
-            sku_part = f" - {p.sku}" if p.sku else ""
-            suggestion = f"{p.name}{sku_part}"
+            sku = p.get('sku', '')
+            name = p.get('name', '')
+            sku_part = f" - {sku}" if sku else ""
+            suggestion = f"{name}{sku_part}"
             suggestions.append(suggestion)
             self.out_product_map[suggestion] = p
         
@@ -305,17 +323,15 @@ class InventoryWindow(QWidget):
             return
             
         product = self.out_product_map.get(text)
-        if not product:
-            product = self.db.query(Product).filter(
-                (Product.name.ilike(f"%{text}%")) | (Product.sku == text),
-                Product.is_active == True
-            ).first()
+        # Fallback removed as DB is gone
         
         if product:
-            self.selected_out_product_id = product.id
-            self.selected_out_product_label.setText(f"✓ {product.name}")
+            self.selected_out_product_id = product.get('id')
+            self.selected_out_product_label.setText(f"✓ {product.get('name')}")
             self.selected_out_product_label.setStyleSheet("font-weight: bold; color: green;")
-            self.out_current_stock_label.setText(f"Stock Actual: {product.stock} {product.unit_type}")
+            stock = product.get('stock', 0)
+            unit = product.get('unit_type', 'Unidad')
+            self.out_current_stock_label.setText(f"Stock Actual: {stock} {unit}")
         else:
             self.selected_out_product_id = None
             self.selected_out_product_label.setText("Producto no encontrado")
@@ -352,14 +368,21 @@ class InventoryWindow(QWidget):
 
     def setup_history_product_autocomplete(self):
         """Setup autocomplete for product search in history tab"""
-        products = self.db.query(Product).filter(Product.is_active == True).all()
+        # products = self.db.query(Product).filter(Product.is_active == True).all()
+        if not hasattr(self, 'product_controller'):
+             from src.controllers.product_controller import ProductController
+             self.product_controller = ProductController()
+        
+        products = self.product_controller.get_active_products()
         
         # Reuse the same map logic or create new one
         self.history_product_map = {}
         suggestions = []
         for p in products:
-            sku_part = f" - {p.sku}" if p.sku else ""
-            suggestion = f"{p.name}{sku_part}"
+            sku = p.get('sku', '')
+            name = p.get('name', '')
+            sku_part = f" - {sku}" if sku else ""
+            suggestion = f"{name}{sku_part}"
             suggestions.append(suggestion)
             self.history_product_map[suggestion] = p
         
@@ -374,14 +397,10 @@ class InventoryWindow(QWidget):
             return
             
         product = self.history_product_map.get(text)
-        if not product:
-            product = self.db.query(Product).filter(
-                (Product.name.ilike(f"%{text}%")) | (Product.sku == text),
-                Product.is_active == True
-            ).first()
+        # Fallback removed
             
         if product:
-            self.selected_history_product_id = product.id
+            self.selected_history_product_id = product.get('id')
             self.load_kardex()
         else:
             self.selected_history_product_id = None
@@ -443,5 +462,5 @@ class InventoryWindow(QWidget):
             self.kardex_table.setRowHeight(row, 50)
 
     def closeEvent(self, event):
-        self.db.close()
+        # self.db.close()
         event.accept()

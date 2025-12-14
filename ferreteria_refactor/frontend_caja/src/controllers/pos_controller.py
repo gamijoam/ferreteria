@@ -86,6 +86,39 @@ class POSController:
         if 0 <= index < len(self.cart):
             self.cart.pop(index)
 
+    def update_quantity(self, index: int, new_quantity: float):
+        """Update quantity of item in cart"""
+        if not (0 <= index < len(self.cart)):
+             return False, "Ítem inválido"
+             
+        if new_quantity <= 0:
+             return False, "Cantidad debe ser mayor a 0"
+             
+        # Recalculate
+        item = self.cart[index]
+        product = item['product_obj']
+        
+        # Simple price recalculation (ignoring complex box logic for update simplification)
+        # Assuming is_box persists
+        is_box = item['is_box']
+        price_to_use = product['price']
+        
+        # Re-apply box logic if needed
+        # In full version, this depends on product conversion factor
+        conversion_factor = product.get('conversion_factor', 1)
+        
+        if is_box:
+             price_to_use = product['price'] * conversion_factor
+             units_to_deduct = new_quantity * conversion_factor
+        else:
+             units_to_deduct = new_quantity
+             
+        item['quantity'] = new_quantity
+        item['units_deducted'] = units_to_deduct
+        item['subtotal'] = price_to_use * new_quantity
+        
+        return True, "Cantidad actualizada"
+
     def get_total(self):
         return sum(item["subtotal"] for item in self.cart)
 
@@ -104,28 +137,57 @@ class POSController:
             payment_method_str = payments[0]["method"]
 
         # Build payload matching schemas.SaleCreate
+        # Build payload matching schemas.SaleCreate
+        
+        # Build payload matching schemas.SaleCreate
+        
+        # Determine main method and payments list
+        payment_list_payload = []
+        main_method = "Efectivo"
+        if payments:
+            main_method = payments[0]["method"] if len(payments) == 1 else "Mixto"
+            for p in payments:
+                payment_list_payload.append({
+                    "amount": p["amount"],
+                    "currency": p["currency"],
+                    "payment_method": p["method"], # Map frontend 'method' to backend 'payment_method'
+                    "exchange_rate": exchange_rate # Assuming current rate for all
+                })
+        
+        # IMPORTANT: 'total_amount' in SaleCreate is the INVOICE TOTAL.
+        # But 'payments' tracking handles the cash.
+        # We send the invoice total in the header currency (e.g. USD usually)
+        
         sale_payload = {
             "customer_id": customer_id,
-            "payment_method": payment_method_str,
-            "total_amount": total,
-            "items": []
+            "payment_method": main_method,
+            "total_amount": total, # Invoice total in USD (or base currency)
+            "currency": currency,
+            "exchange_rate": exchange_rate,
+            "notes": notes,
+            "is_credit": is_credit, # Passed from argument
+            "items": [],
+            "payments": payment_list_payload
         }
 
         for item in self.cart:
             sale_payload["items"].append({
                 "product_id": item["product_id"],
                 "quantity": item["quantity"], 
-                "is_box": item["is_box"]
+                "is_box": item["is_box"],
+                # Assuming cart items might have discount info in future refactor
+                "discount": item.get("discount", 0.0),
+                "discount_type": item.get("discount_type", "NONE")
             })
 
         # Call Service
-        print("Sending sale to API...")
+        print(f"Sending sale to API (Total: {total})...")
         try:
             result = self.product_service.record_sale(sale_payload)
             
             if result and result.get("status") == "success":
                 sale_id = result.get("sale_id")
-                ticket = f"Venta #{sale_id} Exitosa!\nTotal: ${total:.2f}\n(Procesado por API)"
+                ticket = f"Venta #{sale_id} Exitosa!\nTotal: ${total:,.2f}\n(Procesado por API)"
                 self.cart.clear()
                 self.reload_products() 
                 return True, "¡Venta Registrada!", ticket

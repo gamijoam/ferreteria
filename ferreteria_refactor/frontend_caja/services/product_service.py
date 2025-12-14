@@ -10,6 +10,10 @@ class ProductService:
         # Backend returns list of dicts.
         return self.client.get("/api/v1/products/")
 
+    def update_product(self, product_id, update_data: dict):
+        """Update a product via API"""
+        return self.client.put(f"/api/v1/products/{product_id}", update_data)
+
     def record_sale(self, sale_data: dict):
         """
         Send sale data to the backend to process inventory and recording.

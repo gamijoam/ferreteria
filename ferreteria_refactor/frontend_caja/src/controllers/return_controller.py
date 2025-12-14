@@ -1,123 +1,114 @@
-from sqlalchemy.orm import Session
-from src.models.models import Sale, SaleDetail, Return, ReturnDetail, Product, Kardex, MovementType, CashSession, CashMovement
+from frontend_caja.services.return_service import ReturnService
 import datetime
 
 class ReturnController:
-    def __init__(self, db: Session):
-        self.db = db
+    def __init__(self, db=None):
+        self.service = ReturnService()
+        self.db = None  # Ignored
 
     def find_sale(self, sale_id: int):
-        return self.db.query(Sale).filter(Sale.id == sale_id).first()
+        """Find sale by ID"""
+        data = self.service.get_sale_for_return(sale_id)
+        return SaleObj(data) if data else None
 
     def get_recent_sales(self, limit=50):
-        return self.db.query(Sale).order_by(Sale.date.desc()).limit(limit).all()
+        """Get recent sales"""
+        data = self.service.search_sales()
+        return [SaleObj(s) for s in data] if data else []
 
     def search_sales(self, query: str):
-        if not query:
-            return self.get_recent_sales()
-            
-        # Try to parse as ID
-        if query.isdigit():
-            return self.db.query(Sale).filter(Sale.id == int(query)).all()
-        
-        # Search by customer name
-        from src.models.models import Customer
-        return self.db.query(Sale).join(Customer, isouter=True).filter(
-            Customer.name.ilike(f"%{query}%")
-        ).order_by(Sale.date.desc()).limit(50).all()
+        """Search sales by ID or customer name"""
+        data = self.service.search_sales(query)
+        return [SaleObj(s) for s in data] if data else []
 
     def process_return(self, sale_id: int, items_to_return: list, reason: str, refund_currency: str = "USD", exchange_rate: float = 1.0):
         """
+        Process a return
         items_to_return: List of dicts {product_id, quantity}
         """
-        sale = self.find_sale(sale_id)
-        if not sale:
-            raise ValueError("Venta no encontrada")
-
-        # Calculate total refund
-        total_refund = 0
+        payload = {
+            "sale_id": sale_id,
+            "items": items_to_return,
+            "reason": reason,
+            "refund_currency": refund_currency,
+            "exchange_rate": exchange_rate
+        }
         
-        # Create Return Record
-        new_return = Return(
-            sale_id=sale.id,
-            total_refunded=0, # Will update later
-            reason=reason
-        )
-        self.db.add(new_return)
-        self.db.flush() # Get ID
+        result = self.service.process_return(payload)
+        if result:
+            return ReturnObj(result)
+        else:
+            raise Exception("Error procesando devolución")
 
-        for item in items_to_return:
-            product_id = item['product_id']
-            qty_return = item['quantity']
-            
-            if qty_return <= 0:
-                continue
+    def get_returns(self, skip=0, limit=100):
+        """Get list of returns"""
+        data = self.service.get_returns(skip, limit)
+        return [ReturnObj(r) for r in data]
 
-            # Find original sale detail to get price
-            # Note: A sale might have multiple lines for same product (unlikely but possible).
-            # We take the first matching one or sum them up. For simplicity, we assume unique product per sale.
-            detail = self.db.query(SaleDetail).filter(
-                SaleDetail.sale_id == sale.id, 
-                SaleDetail.product_id == product_id
-            ).first()
-            
-            if not detail:
-                raise ValueError(f"Producto {product_id} no pertenece a esta venta")
-            
-            # Validation: Cannot return more than sold? 
-            # Ideally we should check if already returned previously.
-            # For this MVP, we just check against original qty.
-            if qty_return > detail.quantity:
-                 raise ValueError(f"No puedes devolver más de lo comprado ({detail.quantity})")
+    def get_return(self, return_id):
+        """Get specific return"""
+        data = self.service.get_return(return_id)
+        return ReturnObj(data) if data else None
 
-            # Calculate refund amount for this item (Always in USD base)
-            # Price per unit * qty
-            refund_amount = detail.unit_price * qty_return
-            total_refund += refund_amount
+class SaleObj:
+    """Helper to wrap sale dict for UI compatibility"""
+    def __init__(self, data):
+        self.id = data.get('id')
+        self.date = data.get('date')
+        if isinstance(self.date, str):
+            try:
+                self.date = datetime.datetime.fromisoformat(self.date)
+            except:
+                self.date = datetime.datetime.now()
+        self.total_amount = data.get('total_amount')
+        self.payment_method = data.get('payment_method')
+        self.customer_id = data.get('customer_id')
+        customer_data = data.get('customer')
+        self.customer = CustomerObj(customer_data) if customer_data else None
+        # Wrap details
+        details_data = data.get('details', [])
+        self.details = [SaleDetailObj(d) for d in details_data]
 
-            # Create Return Detail
-            ret_detail = ReturnDetail(
-                return_id=new_return.id,
-                product_id=product_id,
-                quantity=qty_return
-            )
-            self.db.add(ret_detail)
+class SaleDetailObj:
+    """Helper to wrap sale detail dict"""
+    def __init__(self, data):
+        self.id = data.get('id')
+        self.product_id = data.get('product_id')
+        self.quantity = data.get('quantity')
+        self.unit_price = data.get('unit_price')
+        self.subtotal = data.get('subtotal')
+        self.is_box_sale = data.get('is_box_sale', False)
+        product_data = data.get('product')
+        self.product = ProductObj(product_data) if product_data else None
 
-            # 1. Restore Stock
-            product = self.db.query(Product).get(product_id)
-            product.stock += qty_return
+class ProductObj:
+    """Helper to wrap product dict"""
+    def __init__(self, data):
+        self.id = data.get('id')
+        self.name = data.get('name', 'Producto')
+        self.sku = data.get('sku')
+        self.price = data.get('price')
+        self.stock = data.get('stock')
 
-            # 2. Kardex Entry
-            kardex = Kardex(
-                product_id=product.id,
-                movement_type=MovementType.RETURN,
-                quantity=qty_return,
-                balance_after=product.stock,
-                description=f"Devolución Venta #{sale.id}"
-            )
-            self.db.add(kardex)
+class CustomerObj:
+    """Helper to wrap customer dict"""
+    def __init__(self, data):
+        self.id = data.get('id')
+        self.name = data.get('name', 'Sin nombre')
+        self.phone = data.get('phone')
+        self.email = data.get('email')
 
-        new_return.total_refunded = total_refund
-
-        # 3. Cash Impact (Refund)
-        # Check if session is open
-        session = self.db.query(CashSession).filter(CashSession.status == "OPEN").first()
-        if session:
-            # Determine amount to record in cash movement based on currency
-            amount_to_record = total_refund
-            if refund_currency == "Bs":
-                # Convert USD refund amount to Bs
-                amount_to_record = total_refund * exchange_rate
-            
-            cash_movement = CashMovement(
-                session_id=session.id,
-                type="EXPENSE", # Refund is an expense/withdrawal
-                amount=amount_to_record,
-                currency=refund_currency,
-                exchange_rate=exchange_rate,
-                description=f"Devolución Venta #{sale.id}: {reason}"
-            )
-            self.db.add(cash_movement)
-        
-        self.db.commit()
-        return new_return
+class ReturnObj:
+    """Helper to wrap dict response for UI compatibility"""
+    def __init__(self, data):
+        self.id = data.get('id')
+        self.sale_id = data.get('sale_id')
+        self.date = data.get('date')
+        if isinstance(self.date, str):
+            try:
+                self.date = datetime.datetime.fromisoformat(self.date)
+            except:
+                self.date = datetime.datetime.now()
+        self.total_refunded = data.get('total_refunded')
+        self.reason = data.get('reason')
+        self.details = data.get('details', [])

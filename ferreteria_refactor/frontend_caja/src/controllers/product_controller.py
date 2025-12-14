@@ -17,7 +17,11 @@ class ProductController:
 
     def update_product(self, product_id, **kwargs):
         """Update an existing product via API"""
-        pass # Not implemented in API yet
+        try:
+            return self.product_service.update_product(product_id, kwargs)
+        except Exception as e:
+            print(f"Error updating product: {e}")
+            return None
 
     def delete_product(self, product_id):
         """active=False via API"""
