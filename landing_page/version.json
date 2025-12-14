@@ -1,6 +1,6 @@
 {
     "version": "1.0.4",
     "update_url": "https://inventariosoft.netlify.app/version.json",
-    "download_url": "",
+    "download_url": "downloads/update_ferreteria.zip",
     "release_notes": "Versión Instalada Localmente"
 }
