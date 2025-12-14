@@ -14,8 +14,7 @@ class ConfigDialog(QDialog):
         self.setWindowTitle("Configuración del Negocio")
         self.resize(800, 600)
         
-        self.db = SessionLocal()
-        self.controller = ConfigController(self.db)
+        self.controller = ConfigController()
         
         self.setup_ui()
         self.load_data()
@@ -194,7 +193,12 @@ class ConfigDialog(QDialog):
                 QMessageBox.warning(self, "Error", "El nombre del negocio es obligatorio")
                 return
                 
-            self.controller.update_business_info(name, rif, address, phone)
+            self.controller.update_business_info({
+                "name": name,
+                "rif": rif,
+                "address": address,
+                "phone": phone
+            })
             
             # Save business type
             business_type = self.business_type_combo.currentText()
@@ -257,5 +261,4 @@ class ConfigDialog(QDialog):
         dialog.exec()
 
     def closeEvent(self, event):
-        self.db.close()
         event.accept()

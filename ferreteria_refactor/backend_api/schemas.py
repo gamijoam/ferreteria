@@ -6,6 +6,8 @@ class ProductBase(BaseModel):
     name: str
     sku: Optional[str] = None
     price: float
+    price_mayor_1: Optional[float] = 0.0
+    price_mayor_2: Optional[float] = 0.0
     stock: float
     description: Optional[str] = None
     cost_price: Optional[float] = 0.0
@@ -22,6 +24,8 @@ class ProductUpdate(BaseModel):
     name: Optional[str] = None
     sku: Optional[str] = None
     price: Optional[float] = None
+    price_mayor_1: Optional[float] = None
+    price_mayor_2: Optional[float] = None
     stock: Optional[float] = None
     description: Optional[str] = None
     cost_price: Optional[float] = None
@@ -32,8 +36,26 @@ class ProductUpdate(BaseModel):
     supplier_id: Optional[int] = None
     is_active: Optional[bool] = None
 
+    class Config:
+        from_attributes = True
+
+class PriceRuleCreate(BaseModel):
+    product_id: int
+    min_quantity: float
+    price: float
+
+class PriceRuleRead(BaseModel):
+    id: int
+    product_id: int
+    min_quantity: float
+    price: float
+
+    class Config:
+        from_attributes = True
+
 class ProductRead(ProductBase):
     id: int
+    price_rules: List[PriceRuleRead] = []
     
     class Config:
         from_attributes = True
@@ -236,12 +258,15 @@ class SupplierRead(SupplierBase):
 
 class ReturnItemCreate(BaseModel):
     product_id: int
-    quantity: float
+    product: Optional[ProductRead] = None
+
+    class Config:
+        from_attributes = True
 
 class ReturnCreate(BaseModel):
-    sale_id: int
+    sale_id: int # Often implicit in URL but good to have
     items: List[ReturnItemCreate]
-    reason: str
+    reason: Optional[str] = None
     refund_currency: str = "USD"
     exchange_rate: float = 1.0
 
@@ -249,6 +274,7 @@ class ReturnDetailRead(BaseModel):
     id: int
     product_id: int
     quantity: float
+    unit_price: float
     product: Optional[ProductRead] = None
 
     class Config:
@@ -305,3 +331,47 @@ class PurchaseOrderRead(BaseModel):
 
 class PurchaseOrderReceive(BaseModel):
     user_id: int = 1  # Default user
+
+# User Management Schemas
+class UserCreate(BaseModel):
+    username: str
+    password: str
+    role: str = "CASHIER"  # ADMIN, CASHIER, MANAGER
+    full_name: Optional[str] = None
+
+class UserUpdate(BaseModel):
+    password: Optional[str] = None
+    role: Optional[str] = None
+    full_name: Optional[str] = None
+    is_active: Optional[bool] = None
+
+class UserRead(BaseModel):
+    id: int
+    username: str
+    role: str
+    full_name: Optional[str]
+    is_active: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+# Business Configuration Schemas
+class BusinessConfigBase(BaseModel):
+    key: str
+    value: Optional[str] = None
+
+class BusinessConfigRead(BusinessConfigBase):
+    pass
+
+class BusinessConfigCreate(BusinessConfigBase):
+    pass
+
+class BulkImportResult(BaseModel):
+    success_count: int
+    failed_count: int
+    errors: List[str]

@@ -11,11 +11,13 @@ from src.controllers.pos_controller import POSController
 from src.controllers.customer_controller import CustomerController
 from src.controllers.quote_controller import QuoteController
 from src.controllers.config_controller import ConfigController
+from frontend_caja.services.cash_service import CashService
 from src.utils.event_bus import event_bus
 
 class POSWindow(QWidget):
-    def __init__(self):
+    def __init__(self, user=None):
         super().__init__()
+        self.user = user
         self.setWindowTitle("Punto de Venta (POS) - Módulo 3")
         self.showMaximized()  # Maximize window instead of fixed size
         
@@ -24,6 +26,7 @@ class POSWindow(QWidget):
         self.config_controller = ConfigController(db=None)
         self.quote_controller = QuoteController(db=None) # Service-based now
         self.customer_controller = CustomerController(db=None)
+        self.cash_service = CashService()
         
         # Get exchange rate
         self.exchange_rate = self.config_controller.get_exchange_rate()
@@ -83,11 +86,19 @@ class POSWindow(QWidget):
         right_panel.addWidget(mode_group)
         
 
+        # Price Tier Group
+        tier_group = QGroupBox("Nivel de Precio")
+        tier_layout = QVBoxLayout()
         
-        # Payment Method - Removed (now handled in payment dialog)
-        # Keeping only credit checkbox for quick access
-        # Payment Method - Removed (now handled in payment dialog)
-        # Keeping only credit checkbox for quick access
+        self.price_tier_combo = QComboBox()
+        self.price_tier_combo.addItem("Precio Detal", "price")
+        self.price_tier_combo.addItem("Mayorista 1", "price_mayor_1")
+        self.price_tier_combo.addItem("Mayorista 2", "price_mayor_2")
+        self.price_tier_combo.setFont(QFont("Arial", 11))
+        tier_layout.addWidget(self.price_tier_combo)
+        
+        tier_group.setLayout(tier_layout)
+        right_panel.addWidget(tier_group)
         
         # Credit Sale Checkbox
         credit_group = QGroupBox("Tipo de Venta")
@@ -330,9 +341,10 @@ class POSWindow(QWidget):
             text = text.split(" - ")[0].strip()
             
         is_box = self.check_box_mode.isChecked()
+        tier = self.price_tier_combo.currentData()
         qty = 1.0 
         
-        success, msg = self.controller.add_to_cart(text, qty, is_box)
+        success, msg = self.controller.add_to_cart(text, qty, is_box, price_tier=tier)
         
         if success:
             self.refresh_table()
@@ -456,7 +468,26 @@ class POSWindow(QWidget):
         if row >= 0:
             self.remove_item(row)
 
+    def validate_session(self):
+        """Check if user has an open cash session"""
+        if not self.user: # Dev/Mock
+            return True
+            
+        try:
+            session = self.cash_service.get_current_session(self.user.id)
+            if not session or session.get("status") != "OPEN":
+                QMessageBox.warning(self, "Caja Cerrada", "Debe abrir una sesión de caja antes de realizar ventas.\nVaya al módulo de Control de Caja.")
+                return False
+            return True
+        except Exception as e:
+            print(f"Error checking session: {e}")
+            # Fail safe: Block if unsure? Or allow? Assuming block.
+            return False
+
     def handle_payment(self):
+        if not self.validate_session():
+            return
+
         if not self.controller.cart:
             return
         
@@ -701,8 +732,15 @@ class POSWindow(QWidget):
     # on_payment_method_changed and on_credit_check_toggled removed
     # Payment methods now handled in payment dialog
 
+
+
     def save_as_quote(self):
-        """Save current cart as a quote (F4)"""
+        # Quotes might not strictly require open cash (no money moves), 
+        # but user likely wants consistency. Optional. I will NOT block quotes for now unless requested.
+        # IF user said "ventas", quotes are pre-sales.
+        # But checking session is good practice.
+        # if not self.validate_session(): return
+        
         if not self.controller.cart:
             QMessageBox.warning(self, "Alerta", "El carrito está vacío")
             return

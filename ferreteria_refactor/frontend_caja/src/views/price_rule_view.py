@@ -3,17 +3,18 @@ from PyQt6.QtWidgets import (
     QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox, 
     QComboBox, QFormLayout, QGroupBox
 )
-from src.database.db import SessionLocal
-from src.models.models import Product, PriceRule
+from src.utils.event_bus import event_bus
+from frontend_caja.services.product_service import ProductService
 
 class PriceRuleWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Precios Mayoristas - Módulo 8")
-        self.resize(1200, 750)
+        self.setWindowTitle("Precios Mayoristas (Reglas) - Módulo 8")
+        self.resize(1000, 600)
         
-        self.db = SessionLocal()
+        self.product_service = ProductService()
         self.current_product = None
+        self.products_map = {} # Cache products by ID
         
         self.layout = QVBoxLayout()
         self.setLayout(self.layout)
@@ -64,11 +65,21 @@ class PriceRuleWindow(QWidget):
         self.layout.addWidget(self.table)
 
     def load_products(self):
+        self.product_combo.blockSignals(True)
         self.product_combo.clear()
         self.product_combo.addItem("Seleccione un producto...", None)
-        products = self.db.query(Product).filter(Product.is_active == True).all()
-        for p in products:
-            self.product_combo.addItem(f"{p.name} (${p.price:,.2f})", p.id)
+        
+        try:
+            products = self.product_service.get_all_products()
+            # products is a list of dicts now
+            for p in products:
+                # Store in map for quick access
+                self.products_map[p['id']] = p
+                self.product_combo.addItem(f"{p['name']} (${p['price']:,.2f})", p['id'])
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Error cargando productos: {str(e)}")
+            
+        self.product_combo.blockSignals(False)
 
     def on_product_selected(self):
         product_id = self.product_combo.currentData()
@@ -78,43 +89,46 @@ class PriceRuleWindow(QWidget):
             self.lbl_base_price.setText("Precio Base: $0.00")
             return
             
-        self.current_product = self.db.query(Product).get(product_id)
-        self.lbl_base_price.setText(f"Precio Base: ${self.current_product.price:,.2f}")
-        self.load_rules()
+        self.current_product = self.products_map.get(product_id)
+        if self.current_product:
+            self.lbl_base_price.setText(f"Precio Base: ${self.current_product['price']:,.2f}")
+            self.load_rules()
 
     def load_rules(self):
         if not self.current_product:
             return
             
-        rules = self.db.query(PriceRule).filter(
-            PriceRule.product_id == self.current_product.id
-        ).order_by(PriceRule.min_quantity).all()
-        
-        self.table.setRowCount(0)
-        for i, rule in enumerate(rules):
-            self.table.insertRow(i)
-            self.table.setRowHeight(i, 50)  # Set row height for better button visibility
-            self.table.setItem(i, 0, QTableWidgetItem(str(rule.id)))
-            self.table.setItem(i, 1, QTableWidgetItem(str(rule.min_quantity)))
-            self.table.setItem(i, 2, QTableWidgetItem(f"${rule.price:,.2f}"))
+        try:
+            rules = self.product_service.get_price_rules(self.current_product['id'])
             
-            btn_del = QPushButton("Eliminar")
-            btn_del.setFixedWidth(70)
-            btn_del.setStyleSheet("""
-                QPushButton {
-                    background-color: #F44336;
-                    color: white;
-                    border: none;
-                    border-radius: 4px;
-                    padding: 6px;
-                    font-size: 9pt;
-                }
-                QPushButton:hover {
-                    background-color: #D32F2F;
-                }
-            """)
-            btn_del.clicked.connect(lambda checked, r=rule: self.delete_rule(r))
-            self.table.setCellWidget(i, 3, btn_del)
+            self.table.setRowCount(0)
+            for i, rule in enumerate(rules):
+                self.table.insertRow(i)
+                self.table.setRowHeight(i, 50) 
+                self.table.setItem(i, 0, QTableWidgetItem(str(rule['id'])))
+                self.table.setItem(i, 1, QTableWidgetItem(str(rule['min_quantity'])))
+                self.table.setItem(i, 2, QTableWidgetItem(f"${rule['price']:,.2f}"))
+                
+                btn_del = QPushButton("Eliminar")
+                btn_del.setFixedWidth(70)
+                btn_del.setStyleSheet("""
+                    QPushButton {
+                        background-color: #F44336;
+                        color: white;
+                        border: none;
+                        border-radius: 4px;
+                        padding: 6px;
+                        font-size: 9pt;
+                    }
+                    QPushButton:hover {
+                        background-color: #D32F2F;
+                    }
+                """)
+                # rule['id'] is correct for dict access
+                btn_del.clicked.connect(lambda checked, rid=rule['id']: self.delete_rule(rid))
+                self.table.setCellWidget(i, 3, btn_del)
+        except Exception as e:
+             QMessageBox.critical(self, "Error", f"Error cargando reglas: {str(e)}")
 
     def add_rule(self):
         if not self.current_product:
@@ -122,19 +136,17 @@ class PriceRuleWindow(QWidget):
             return
             
         try:
-            min_qty = int(self.input_min_qty.text())
+            min_qty = float(self.input_min_qty.text())
             price = float(self.input_price.text())
             
             if min_qty <= 0 or price <= 0:
                 raise ValueError("Los valores deben ser mayores a 0")
                 
-            new_rule = PriceRule(
-                product_id=self.current_product.id,
+            self.product_service.add_price_rule(
+                self.current_product['id'],
                 min_quantity=min_qty,
                 price=price
             )
-            self.db.add(new_rule)
-            self.db.commit()
             
             QMessageBox.information(self, "Éxito", "Regla agregada")
             self.load_rules()
@@ -142,20 +154,24 @@ class PriceRuleWindow(QWidget):
             self.input_price.clear()
             
         except ValueError as e:
+             # Handle int conversion error or logical error
+             QMessageBox.warning(self, "Error", "Valores inválidos. " + str(e))
+        except Exception as e:
             QMessageBox.critical(self, "Error", str(e))
 
-    def delete_rule(self, rule):
+    def delete_rule(self, rule_id):
         reply = QMessageBox.question(
             self, "Confirmar", 
-            f"¿Eliminar regla: {rule.min_quantity}+ unidades a ${rule.price}?",
+            "¿Eliminar esta regla de precio?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         
         if reply == QMessageBox.StandardButton.Yes:
-            self.db.delete(rule)
-            self.db.commit()
-            self.load_rules()
+            try:
+                self.product_service.delete_price_rule(rule_id)
+                self.load_rules()
+            except Exception as e:
+                 QMessageBox.critical(self, "Error", str(e))
 
     def closeEvent(self, event):
-        self.db.close()
         event.accept()

@@ -1,174 +1,259 @@
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox, QDialog
+    QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
+    QPushButton, QHeaderView, QLabel, QDialog, QMessageBox, QFrame,
+    QGridLayout, QScrollArea
 )
-from PyQt6.QtGui import QFont, QColor
 from PyQt6.QtCore import Qt
-from src.database.db import SessionLocal
-from src.models.models import CashSession, CashMovement
+from src.controllers.cash_controller import CashController
+from src.views.printer_view import PrinterConfigDialog # To reuse print logic if possible, or just instantiate controller
+from src.controllers.printer_controller import PrinterController
+import datetime
 
 class CashHistoryWindow(QWidget):
-    """Window to view cash session history"""
-    
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Historial de Cierres de Caja")
-        self.resize(1400, 700)
+        self.resize(1000, 600)
         
-        self.db = SessionLocal()
+        self.controller = CashController()
+        self.printer_controller = PrinterController()
         
+        self.layout = QVBoxLayout()
+        self.setLayout(self.layout)
+        
+        self.setup_ui()
+        self.load_history()
+        
+    def setup_ui(self):
+        # Header
+        header_layout = QHBoxLayout()
+        title = QLabel("Historial de Sesiones de Caja")
+        title.setStyleSheet("font-size: 18px; font-weight: bold;")
+        header_layout.addWidget(title)
+        
+        btn_refresh = QPushButton("🔄 Actualizar")
+        btn_refresh.clicked.connect(self.load_history)
+        header_layout.addWidget(btn_refresh)
+        
+        self.layout.addLayout(header_layout)
+        
+        # Table
+        self.table = QTableWidget()
+        self.table.setColumnCount(7)
+        self.table.setHorizontalHeaderLabels([
+            "ID", "Apertura", "Cierre", "Inicial ($)", "Esperado ($)", "Diferencia ($)", "Acciones"
+        ])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.layout.addWidget(self.table)
+        
+    def load_history(self):
+        try:
+            history = self.controller.get_history()
+            self.table.setRowCount(0)
+            
+            for i, session in enumerate(history):
+                self.table.insertRow(i)
+                self.table.setItem(i, 0, QTableWidgetItem(str(session['id'])))
+                
+                start = datetime.datetime.fromisoformat(session['start_time']).strftime("%d/%m/%Y %H:%M")
+                self.table.setItem(i, 1, QTableWidgetItem(start))
+                
+                end = "Activa"
+                if session.get('end_time'):
+                    end = datetime.datetime.fromisoformat(session['end_time']).strftime("%d/%m/%Y %H:%M")
+                self.table.setItem(i, 2, QTableWidgetItem(end))
+                
+                self.table.setItem(i, 3, QTableWidgetItem(f"${(session.get('initial_cash') or 0):.2f}"))
+                self.table.setItem(i, 4, QTableWidgetItem(f"${(session.get('final_cash_expected') or 0):.2f}"))
+                
+                diff = (session.get('final_cash_reported') or 0) - (session.get('final_cash_expected') or 0)
+                diff_item = QTableWidgetItem(f"${diff:.2f}")
+                if abs(diff) > 0.01:
+                    diff_item.setForeground(Qt.GlobalColor.red if diff < 0 else Qt.GlobalColor.blue)
+                self.table.setItem(i, 5, diff_item)
+                
+                # Actions
+                btn_widget = QWidget()
+                btn_layout = QHBoxLayout()
+                btn_layout.setContentsMargins(0, 0, 0, 0)
+                
+                btn_details = QPushButton("📄 Detalles")
+                btn_details.clicked.connect(lambda checked, s_id=session['id']: self.show_details(s_id))
+                btn_layout.addWidget(btn_details)
+                
+                btn_print = QPushButton("🖨️ Imprimir")
+                btn_print.clicked.connect(lambda checked, s_id=session['id']: self.print_report(s_id))
+                btn_layout.addWidget(btn_print)
+                
+                btn_widget.setLayout(btn_layout)
+                self.table.setCellWidget(i, 6, btn_widget)
+                
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Error al cargar historial: {str(e)}")
+
+    def show_details(self, session_id):
+        try:
+            data = self.controller.get_session_details(session_id)
+            if not data:
+                raise Exception("No se pudieron cargar los detalles")
+            
+            dialog = CashDetailDialog(data, self)
+            dialog.exec()
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Error", str(e))
+
+    def print_report(self, session_id):
+        try:
+            data = self.controller.get_session_details(session_id)
+            if not data:
+                raise Exception("No data")
+            
+            # Reconstruct session object and report dict for printer controller
+            # This is a bit hacky because printer controller expects objects, but we have dicts from API
+            # Ideally we should adapt printer controller
+            
+            class DummySession:
+                def __init__(self, data_dict):
+                    self.id = data_dict['id']
+                    self.start_time = datetime.datetime.fromisoformat(data_dict['start_time'])
+                    self.end_time = datetime.datetime.fromisoformat(data_dict['end_time']) if data_dict.get('end_time') else None
+                    self.initial_cash = data_dict['initial_cash']
+                    self.initial_cash_bs = data_dict.get('initial_cash_bs', 0)
+            
+            session_obj = DummySession(data['session'])
+            
+            report_data = {
+                "expected_usd": data['expected_usd'],
+                "reported_usd": data['session'].get('final_cash_reported', 0),
+                "diff_usd": data.get('diff_usd', 0),
+                "expected_bs": data['expected_bs'],
+                "reported_bs": data['session'].get('final_cash_reported_bs', 0),
+                "diff_bs": data.get('diff_bs', 0)
+            }
+            
+            self.printer_controller.print_cash_report(session_obj, report_data)
+            
+            QMessageBox.information(self, "Éxito", "Reporte reenviado a la impresora")
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Error al imprimir: {str(e)}")
+
+class CashDetailDialog(QDialog):
+    def __init__(self, data, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(f"Detalle de Sesión #{data['session']['id']}")
+        self.resize(600, 700)
+        self.data = data
+        self.setup_ui()
+        
+    def setup_ui(self):
         layout = QVBoxLayout()
         self.setLayout(layout)
         
-        # Title
-        lbl_title = QLabel("Historial de Sesiones de Caja")
-        lbl_title.setFont(QFont("Arial", 16, QFont.Weight.Bold))
-        layout.addWidget(lbl_title)
+        session = self.data['session']
+        details = self.data['details']
         
-        # Sessions table
-        self.sessions_table = QTableWidget()
-        self.sessions_table.setColumnCount(8)
-        self.sessions_table.setHorizontalHeaderLabels([
-            "ID", "Apertura", "Cierre", "Usuario", 
-            "Inicial", "Esperado", "Real", "Diferencia"
-        ])
+        # Summary Group
+        grp_summary = QFrame()
+        grp_summary.setFrameStyle(QFrame.Shape.StyledPanel | QFrame.Shadow.Raised)
+        l_summary = QVBoxLayout()
+        grp_summary.setLayout(l_summary)
         
-        # Set column widths
-        self.sessions_table.setColumnWidth(0, 50)
-        self.sessions_table.setColumnWidth(1, 150)
-        self.sessions_table.setColumnWidth(2, 150)
-        self.sessions_table.setColumnWidth(3, 100)
-        self.sessions_table.setColumnWidth(4, 150)
-        self.sessions_table.setColumnWidth(5, 150)
-        self.sessions_table.setColumnWidth(6, 150)
-        self.sessions_table.setColumnWidth(7, 150)
+        start = datetime.datetime.fromisoformat(session['start_time']).strftime("%d/%m/%Y %H:%M")
+        end = datetime.datetime.fromisoformat(session['end_time']).strftime("%d/%m/%Y %H:%M") if session.get('end_time') else "N/A"
         
-        self.sessions_table.cellDoubleClicked.connect(self.show_details)
-        layout.addWidget(self.sessions_table)
+        l_summary.addWidget(QLabel(f"<b>Apertura:</b> {start}"))
+        l_summary.addWidget(QLabel(f"<b>Cierre:</b> {end}"))
+        l_summary.addWidget(QLabel(f"<b>Estado:</b> {session['status']}"))
         
-        # Info
-        lbl_info = QLabel("Doble clic para ver detalles completos")
-        lbl_info.setStyleSheet("color: #666; font-style: italic;")
-        layout.addWidget(lbl_info)
+        layout.addWidget(grp_summary)
         
-        # Buttons
-        btn_layout = QHBoxLayout()
-        btn_refresh = QPushButton("Actualizar")
-        btn_refresh.clicked.connect(self.load_sessions)
-        btn_refresh.setStyleSheet("background-color: #2196F3; color: white; padding: 8px;")
-        btn_layout.addWidget(btn_refresh)
-        btn_layout.addStretch()
-        layout.addLayout(btn_layout)
+        # Details Grid
+        grid = QGridLayout()
         
-        self.load_sessions()
-    
-    def load_sessions(self):
-        """Load all closed sessions"""
-        self.sessions_table.setRowCount(0)
+        # Headers
+        grid.addWidget(QLabel("<b>Concepto</b>"), 0, 0)
+        grid.addWidget(QLabel("<b>USD ($)</b>"), 0, 1)
+        grid.addWidget(QLabel("<b>Bs</b>"), 0, 2)
         
-        sessions = self.db.query(CashSession).filter(
-            CashSession.status == "CLOSED"
-        ).order_by(CashSession.end_time.desc()).all()
+        row = 1
+        # Initial
+        grid.addWidget(QLabel("Caja Inicial"), row, 0)
+        grid.addWidget(QLabel(f"{details['initial_usd']:.2f}"), row, 1)
+        grid.addWidget(QLabel(f"{details.get('initial_bs', 0):.2f}"), row, 2)
+        row += 1
         
-        for i, s in enumerate(sessions):
-            self.sessions_table.insertRow(i)
+        # Sales (Cash) -> Need to parse from details['sales_by_method']
+        # This is a simplification, relying on calculated totals passed in 'sales_total' roughly
+        # Better to show total sales
+        grid.addWidget(QLabel("Ventas Totales (Eq)"), row, 0)
+        grid.addWidget(QLabel(f"{details.get('sales_total', 0):.2f}"), row, 1)
+        grid.addWidget(QLabel("-"), row, 2)
+        row += 1
+        
+        # Expenses
+        grid.addWidget(QLabel("Gastos/Salidas"), row, 0)
+        grid.addWidget(QLabel(f"{details.get('expenses_usd', 0):.2f}"), row, 1)
+        grid.addWidget(QLabel(f"{details.get('expenses_bs', 0):.2f}"), row, 2)
+        row += 1
+        
+        # Deposits
+        grid.addWidget(QLabel("Ingresos/Depósitos"), row, 0)
+        grid.addWidget(QLabel(f"{details.get('deposits_usd', 0):.2f}"), row, 1)
+        grid.addWidget(QLabel(f"{details.get('deposits_bs', 0):.2f}"), row, 2)
+        row += 1
+        
+        # Divider
+        line = QFrame()
+        line.setFrameShape(QFrame.Shape.HLine)
+        grid.addWidget(line, row, 0, 1, 3)
+        row += 1
+        
+        # Expected
+        grid.addWidget(QLabel("<b>Total Esperado</b>"), row, 0)
+        grid.addWidget(QLabel(f"<b>{self.data['expected_usd']:.2f}</b>"), row, 1)
+        grid.addWidget(QLabel(f"<b>{self.data['expected_bs']:.2f}</b>"), row, 2)
+        row += 1
+        
+        # Reported
+        grid.addWidget(QLabel("Total Declarado"), row, 0)
+        grid.addWidget(QLabel(f"{(session.get('final_cash_reported') or 0):.2f}"), row, 1)
+        grid.addWidget(QLabel(f"{(session.get('final_cash_reported_bs') or 0):.2f}"), row, 2)
+        row += 1
+        
+        # Diff
+        grid.addWidget(QLabel("<b>Diferencia</b>"), row, 0)
+        diff_usd = self.data['diff_usd']
+        diff_bs = self.data['diff_bs']
+        
+        lbl_diff_usd = QLabel(f"{diff_usd:.2f}")
+        if abs(diff_usd) > 0.01:
+            lbl_diff_usd.setStyleSheet("color: red;" if diff_usd < 0 else "color: blue;")
+        grid.addWidget(lbl_diff_usd, row, 1)
             
-            self.sessions_table.setItem(i, 0, QTableWidgetItem(str(s.id)))
-            self.sessions_table.setItem(i, 1, QTableWidgetItem(s.start_time.strftime("%Y-%m-%d %H:%M") if s.start_time else "-"))
-            self.sessions_table.setItem(i, 2, QTableWidgetItem(s.end_time.strftime("%Y-%m-%d %H:%M") if s.end_time else "-"))
+        lbl_diff_bs = QLabel(f"{diff_bs:.2f}")
+        if abs(diff_bs) > 0.01:
+            lbl_diff_bs.setStyleSheet("color: red;" if diff_bs < 0 else "color: blue;")
+        grid.addWidget(lbl_diff_bs, row, 2)
+        
+        layout.addLayout(grid)
+        
+        # Sales Breakdown
+        layout.addWidget(QLabel("Checking breakdown..."))
+        if 'sales_by_method' in details and details['sales_by_method']:
+            gb = QFrame()
+            l_gb = QVBoxLayout()
+            gb.setLayout(l_gb)
+            l_gb.addWidget(QLabel("<b>Desglose de Ventas:</b>"))
             
-            # Show actual username
-            username = s.user.username if s.user else "N/A"
-            self.sessions_table.setItem(i, 3, QTableWidgetItem(username))
+            for method, amount in details['sales_by_method'].items():
+                l_gb.addWidget(QLabel(f"{method}: {amount:.2f}"))
             
-            # Amounts
-            self.sessions_table.setItem(i, 4, QTableWidgetItem(f"${s.initial_cash:.2f} / Bs{s.initial_cash_bs:.2f}"))
-            self.sessions_table.setItem(i, 5, QTableWidgetItem(f"${s.final_cash_expected or 0:.2f} / Bs{s.final_cash_expected_bs or 0:.2f}"))
-            self.sessions_table.setItem(i, 6, QTableWidgetItem(f"${s.final_cash_reported or 0:.2f} / Bs{s.final_cash_reported_bs or 0:.2f}"))
-            
-            # Difference with color
-            diff_usd = s.difference or 0
-            diff_bs = s.difference_bs or 0
-            diff_item = QTableWidgetItem(f"${diff_usd:.2f} / Bs{diff_bs:.2f}")
-            
-            if abs(diff_usd) < 0.01 and abs(diff_bs) < 0.01:
-                diff_item.setBackground(QColor("#c8e6c9"))
-            elif diff_usd < 0 or diff_bs < 0:
-                diff_item.setBackground(QColor("#ffcdd2"))
-                diff_item.setForeground(Qt.GlobalColor.darkRed)
-            else:
-                diff_item.setBackground(QColor("#fff9c4"))
-                diff_item.setForeground(Qt.GlobalColor.darkGreen)
-            
-            self.sessions_table.setItem(i, 7, diff_item)
-            self.sessions_table.setRowHeight(i, 40)
-    
-    def show_details(self, row, column):
-        """Show session details"""
-        session_id = int(self.sessions_table.item(row, 0).text())
-        session = self.db.query(CashSession).get(session_id)
+            layout.addWidget(gb)
         
-        if not session:
-            QMessageBox.warning(self, "Error", "Sesión no encontrada")
-            return
+        layout.addStretch()
         
-        dialog = QDialog(self)
-        dialog.setWindowTitle(f"Sesión #{session.id}")
-        dialog.resize(900, 600)
-        
-        layout = QVBoxLayout()
-        
-        # Info
-        info = f"""
-<h2>Sesión de Caja #{session.id}</h2>
-<p><b>Apertura:</b> {session.start_time.strftime("%Y-%m-%d %H:%M:%S") if session.start_time else "-"}</p>
-<p><b>Cierre:</b> {session.end_time.strftime("%Y-%m-%d %H:%M:%S") if session.end_time else "-"}</p>
-<hr>
-<h3>Resumen</h3>
-<table border="1" cellpadding="5">
-<tr><th></th><th>USD</th><th>Bs</th></tr>
-<tr><td><b>Inicial</b></td><td>${session.initial_cash:.2f}</td><td>Bs {session.initial_cash_bs:.2f}</td></tr>
-<tr><td><b>Esperado</b></td><td>${session.final_cash_expected or 0:.2f}</td><td>Bs {session.final_cash_expected_bs or 0:.2f}</td></tr>
-<tr><td><b>Real</b></td><td>${session.final_cash_reported or 0:.2f}</td><td>Bs {session.final_cash_reported_bs or 0:.2f}</td></tr>
-<tr><td><b>Diferencia</b></td><td>${session.difference or 0:.2f}</td><td>Bs {session.difference_bs or 0:.2f}</td></tr>
-</table>
-"""
-        
-        lbl_info = QLabel(info)
-        lbl_info.setWordWrap(True)
-        lbl_info.setTextFormat(Qt.TextFormat.RichText)
-        layout.addWidget(lbl_info)
-        
-        # Movements
-        layout.addWidget(QLabel("<h3>Movimientos:</h3>"))
-        
-        mov_table = QTableWidget()
-        mov_table.setColumnCount(5)
-        mov_table.setHorizontalHeaderLabels(["Fecha", "Tipo", "Monto", "Moneda", "Descripción"])
-        
-        movements = self.db.query(CashMovement).filter(
-            CashMovement.session_id == session.id
-        ).order_by(CashMovement.date).all()
-        
-        for i, m in enumerate(movements):
-            mov_table.insertRow(i)
-            mov_table.setItem(i, 0, QTableWidgetItem(m.date.strftime("%Y-%m-%d %H:%M")))
-            mov_table.setItem(i, 1, QTableWidgetItem(m.type))
-            mov_table.setItem(i, 2, QTableWidgetItem(f"${m.amount:.2f}"))
-            mov_table.setItem(i, 3, QTableWidgetItem(m.currency or "USD"))
-            mov_table.setItem(i, 4, QTableWidgetItem(m.description or ""))
-        
-        mov_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
-        layout.addWidget(mov_table)
-        
-        # Close button
         btn_close = QPushButton("Cerrar")
-        btn_close.clicked.connect(dialog.accept)
+        btn_close.clicked.connect(self.accept)
         layout.addWidget(btn_close)
-        
-        dialog.setLayout(layout)
-        dialog.exec()
-    
-    def closeEvent(self, event):
-        self.db.close()
-        event.accept()

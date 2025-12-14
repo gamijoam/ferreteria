@@ -3,18 +3,16 @@ from PyQt6.QtWidgets import (
     QPushButton, QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox, 
     QTabWidget, QFormLayout, QGroupBox, QComboBox, QCheckBox
 )
-from src.database.db import SessionLocal
-from src.controllers.auth_controller import AuthController
+from src.controllers.user_controller import UserController
 from src.models.models import UserRole
 
 class UserManagementWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Gestión de Usuarios - Módulo 11")
+        self.setWindowTitle("Gestión de Usuarios - Módulo 14")
         self.resize(1200, 750)
         
-        self.db = SessionLocal()
-        self.controller = AuthController(self.db)
+        self.controller = UserController()
         self.current_user = None
         
         self.layout = QVBoxLayout()
@@ -111,7 +109,7 @@ class UserManagementWindow(QWidget):
             self.user_table.setRowHeight(i, 50)  # Set row height for better button visibility
             self.user_table.setItem(i, 0, QTableWidgetItem(str(user.id)))
             self.user_table.setItem(i, 1, QTableWidgetItem(user.username))
-            self.user_table.setItem(i, 2, QTableWidgetItem(user.role.value))
+            self.user_table.setItem(i, 2, QTableWidgetItem(user.role))
             self.user_table.setItem(i, 3, QTableWidgetItem("Activo" if user.is_active else "Inactivo"))
             
             # Action buttons
@@ -284,5 +282,4 @@ class UserManagementWindow(QWidget):
                 QMessageBox.critical(self, "Error", str(e))
 
     def closeEvent(self, event):
-        self.db.close()
         event.accept()

@@ -12,8 +12,7 @@ class PrinterConfigDialog(QDialog):
         self.setWindowTitle("Configuración de Impresora")
         self.resize(600, 500)
         
-        self.db = SessionLocal()
-        self.controller = PrinterController(self.db)
+        self.controller = PrinterController()
         
         self.layout = QVBoxLayout()
         self.setLayout(self.layout)
@@ -288,16 +287,42 @@ class PrinterConfigDialog(QDialog):
             import os
             
             # Get the most recent sale or create dummy data
-            sale = self.db.query(Sale).order_by(Sale.id.desc()).first()
+            # sale = self.db.query(Sale).order_by(Sale.id.desc()).first()
+            # For preview without DB, create a dummy object
+            class DummyProduct:
+                def __init__(self, name): self.name = name
             
-            if not sale:
-                QMessageBox.warning(
-                    self,
-                    "Sin Ventas",
-                    "No hay ventas registradas para generar vista previa.\n\n"
-                    "Realice una venta primero para ver cómo se vería el ticket."
-                )
-                return
+            class DummyDetail:
+                def __init__(self, product, qty, price):
+                     self.product = product
+                     self.quantity = qty
+                     self.unit_price = price
+                     self.subtotal = qty * price
+            
+            class DummySale:
+                def __init__(self):
+                    self.id = 999
+                    self.date = datetime.datetime.now()
+                    self.total_amount = 35.50
+                    self.payment_method = "Efectivo"
+                    self.exchange_rate_used = 36.5
+                    self.total_amount_bs = 1295.75
+                    self.details = [
+                        DummyDetail(DummyProduct("Martillo"), 1, 15.00),
+                        DummyDetail(DummyProduct("Clavos 2in Kg"), 2, 5.00),
+                        DummyDetail(DummyProduct("Cinta Metrica"), 1, 10.50)
+                    ]
+
+            sale = DummySale()
+            
+            # if not sale:
+            #     QMessageBox.warning(
+            #         self,
+            #         "Sin Ventas",
+            #         "No hay ventas registradas para generar vista previa.\n\n"
+            #         "Realice una venta primero para ver cómo se vería el ticket."
+            #     )
+            #     return
             
             # Generate PDF
             output_path = os.path.join(os.path.expanduser("~"), "Desktop", f"ticket_preview_{sale.id}.pdf")
@@ -427,5 +452,4 @@ class PrinterConfigDialog(QDialog):
             QMessageBox.critical(dialog, "Error", f"Error al guardar plantilla: {str(e)}")
             
     def closeEvent(self, event):
-        self.db.close()
         event.accept()

@@ -45,6 +45,105 @@ def get_current_session(user_id: int, db: Session = Depends(get_db)):
         
     return active
 
+@router.get("/history", response_model=List[schemas.CashSessionRead])
+def get_session_history(skip: int = 0, limit: int = 20, db: Session = Depends(get_db)):
+    """Get closed session history"""
+    sessions = db.query(models.CashSession).filter(
+        models.CashSession.status == "CLOSED"
+    ).order_by(models.CashSession.end_time.desc()).offset(skip).limit(limit).all()
+    return sessions
+
+def calculate_session_totals(session, db):
+    """Helper to calculate session totals based on time range"""
+    start_time = session.start_time
+    end_time = session.end_time if session.end_time else datetime.datetime.now()
+    
+    # 1. Sales by Method
+    sales_query = db.query(
+        models.SalePayment.payment_method,
+        models.SalePayment.currency,
+        func.sum(models.SalePayment.amount)
+    ).join(models.Sale).filter(
+        models.Sale.date >= start_time,
+        models.Sale.date <= end_time
+    ).group_by(models.SalePayment.payment_method, models.SalePayment.currency).all()
+    
+    sales_by_method = {}
+    sales_total_usd_eq = 0.0
+    
+    # Mocking exchange rate
+    try:
+        current_exchange_rate = db.query(models.PriceRule).filter(models.PriceRule.name == "exchange_rate").first()
+        rate = float(current_exchange_rate.value) if current_exchange_rate and current_exchange_rate.value else 40.0
+    except Exception:
+        rate = 40.0 
+
+    sales_usd_cash = 0.0
+    sales_bs_cash = 0.0
+
+    for method, currency, amount in sales_query:
+        method_str = str(method) if method else "Desconocido"
+        currency_str = str(currency) if currency else "USD"
+        key = f"{method_str} ({currency_str})"
+        
+        val = float(amount) if amount else 0.0
+        sales_by_method[key] = val
+        
+        if currency_str == "USD":
+            sales_total_usd_eq += val
+            if "Efectivo" in method_str:
+                sales_usd_cash += val
+        elif currency_str == "Bs":
+            sales_total_usd_eq += (val / rate) if rate else 0
+            if "Efectivo" in method_str:
+                sales_bs_cash += val
+
+    # 2. Movements
+    movements = db.query(models.CashMovement).filter(models.CashMovement.session_id == session.id).all()
+    
+    expenses_usd = sum(m.amount for m in movements if m.type in ["OUT", "EXPENSE"] and m.currency == "USD")
+    expenses_bs = sum(m.amount for m in movements if m.type in ["OUT", "EXPENSE"] and m.currency == "Bs")
+    deposits_usd = sum(m.amount for m in movements if m.type in ["IN", "DEPOSIT"] and m.currency == "USD")
+    deposits_bs = sum(m.amount for m in movements if m.type in ["IN", "DEPOSIT"] and m.currency == "Bs")
+
+    # 3. Expected Cash
+    expected_usd = session.initial_cash + sales_usd_cash + deposits_usd - expenses_usd
+    expected_bs = session.initial_cash_bs + sales_bs_cash + deposits_bs - expenses_bs
+    
+    return {
+        "expected_usd": expected_usd,
+        "expected_bs": expected_bs,
+        "details": {
+            "initial_usd": session.initial_cash,
+            "initial_bs": session.initial_cash_bs,
+            "sales_total": sales_total_usd_eq,
+            "sales_by_method": sales_by_method,
+            "expenses_usd": expenses_usd,
+            "expenses_bs": expenses_bs,
+            "deposits_usd": deposits_usd,
+            "deposits_bs": deposits_bs
+        }
+    }
+
+@router.get("/history/{session_id}", response_model=schemas.CashSessionCloseResponse)
+def get_session_details(session_id: int, db: Session = Depends(get_db)):
+    """Get details of a closed session (recalculated)"""
+    session = db.query(models.CashSession).filter(models.CashSession.id == session_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    # Calculate totals
+    totals = calculate_session_totals(session, db)
+    
+    return {
+        "session": session,
+        "details": totals["details"],
+        "expected_usd": totals["expected_usd"],
+        "expected_bs": totals["expected_bs"],
+        "diff_usd": session.difference or 0.0,
+        "diff_bs": session.difference_bs or 0.0
+    }
+
 @router.post("/{session_id}/close", response_model=schemas.CashSessionCloseResponse)
 def close_session(session_id: int, close_data: schemas.CashSessionClose, db: Session = Depends(get_db)):
     session = db.query(models.CashSession).filter(models.CashSession.id == session_id).first()
@@ -55,63 +154,10 @@ def close_session(session_id: int, close_data: schemas.CashSessionClose, db: Ses
         raise HTTPException(status_code=400, detail="Session is not open")
     
     try:
-        # --- Calculate Totals ---
-        
-        # 1. Sales by Method
-        # 1. Sales by Method (Refactored to check SalePayment)
-        sales_query = db.query(
-            models.SalePayment.payment_method,
-            models.SalePayment.currency,
-            func.sum(models.SalePayment.amount)
-        ).join(models.Sale).filter(models.Sale.date >= session.start_time).group_by(models.SalePayment.payment_method, models.SalePayment.currency).all()
-        
-        sales_by_method = {}
-        sales_total_usd_eq = 0.0
-        
-        # Mocking exchange rate for reporting if needed, ideally fetched from DB
-        try:
-            current_exchange_rate = db.query(models.PriceRule).filter(models.PriceRule.name == "exchange_rate").first()
-            rate = float(current_exchange_rate.value) if current_exchange_rate and current_exchange_rate.value else 40.0
-        except Exception:
-            rate = 40.0 # Safe fallback
-
-        sales_usd_cash = 0.0
-        sales_bs_cash = 0.0
-
-        for method, currency, amount in sales_query:
-            # Safer key generation
-            method_str = str(method) if method else "Desconocido"
-            currency_str = str(currency) if currency else "USD"
-            key = f"{method_str} ({currency_str})"
-            
-            # Ensure amount is float
-            val = float(amount) if amount else 0.0
-            sales_by_method[key] = val
-            
-            # Add to total USD eq
-            if currency_str == "USD":
-                sales_total_usd_eq += val
-                if "Efectivo" in method_str:
-                    sales_usd_cash += val
-            elif currency_str == "Bs":
-                sales_total_usd_eq += (val / rate) if rate else 0
-                if "Efectivo" in method_str:
-                    sales_bs_cash += val
-
-        # 2. Movements
-        movements = db.query(models.CashMovement).filter(models.CashMovement.session_id == session.id).all()
-        print(f"DEBUG: Found {len(movements)} movements for session {session.id}")
-        for m in movements:
-            print(f"  - Mov: {m.type} {m.currency} {m.amount}")
-        
-        expenses_usd = sum(m.amount for m in movements if m.type in ["OUT", "EXPENSE"] and m.currency == "USD")
-        expenses_bs = sum(m.amount for m in movements if m.type in ["OUT", "EXPENSE"] and m.currency == "Bs")
-        deposits_usd = sum(m.amount for m in movements if m.type in ["IN", "DEPOSIT"] and m.currency == "USD")
-        deposits_bs = sum(m.amount for m in movements if m.type in ["IN", "DEPOSIT"] and m.currency == "Bs")
-
-        # 3. Expected Cash
-        expected_usd = session.initial_cash + sales_usd_cash + deposits_usd - expenses_usd
-        expected_bs = session.initial_cash_bs + sales_bs_cash + deposits_bs - expenses_bs
+        # Calculate expected based on CURRENT time (closing now)
+        totals = calculate_session_totals(session, db)
+        expected_usd = totals["expected_usd"]
+        expected_bs = totals["expected_bs"]
 
         # Calculate Diffs
         diff_usd = close_data.final_cash_reported - expected_usd
@@ -136,16 +182,7 @@ def close_session(session_id: int, close_data: schemas.CashSessionClose, db: Ses
             "expected_bs": expected_bs,
             "diff_usd": diff_usd,
             "diff_bs": diff_bs,
-            "details": {
-                "initial_usd": session.initial_cash,
-                "initial_bs": session.initial_cash_bs,
-                "sales_total": sales_total_usd_eq,
-                "sales_by_method": sales_by_method,
-                "expenses_usd": expenses_usd,
-                "expenses_bs": expenses_bs,
-                "deposits_usd": deposits_usd,
-                "deposits_bs": deposits_bs
-            }
+            "details": totals["details"]
         }
     except Exception as e:
         print(f"Error closing session: {e}")
@@ -174,3 +211,4 @@ def add_movement(movement: schemas.CashMovementCreate, db: Session = Depends(get
     db.commit()
     db.refresh(new_movement)
     return new_movement
+

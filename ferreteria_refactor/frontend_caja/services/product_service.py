@@ -20,3 +20,24 @@ class ProductService:
         sale_data should match schemas.SaleCreate
         """
         return self.client.post("/api/v1/products/sales/", sale_data)
+
+    def get_price_rules(self, product_id):
+        """Get price rules for a product"""
+        return self.client.get(f"/api/v1/products/{product_id}/rules")
+        
+    def add_price_rule(self, product_id, min_quantity: float, price: float):
+        """Add a price rule"""
+        data = {
+            "product_id": product_id,
+            "min_quantity": min_quantity,
+            "price": price
+        }
+        return self.client.post(f"/api/v1/products/{product_id}/rules", data)
+        
+    def delete_price_rule(self, rule_id):
+        """Delete a price rule"""
+        return self.client.delete(f"/api/v1/products/rules/{rule_id}")
+
+    def bulk_create_products(self, products_list: list):
+        """Bulk import products via API"""
+        return self.client.post("/api/v1/products/bulk", products_list)

@@ -1,8 +1,23 @@
 import os
 from dotenv import load_dotenv
 
-env_path = os.path.join(os.path.dirname(__file__), ".env")
-load_dotenv(dotenv_path=env_path)
+import sys
+
+# Determine base path for .env
+if getattr(sys, 'frozen', False):
+    # Valid for PyInstaller compiled executable
+    base_path = os.path.dirname(sys.executable)
+else:
+    # Valid for development script
+    base_path = os.path.dirname(os.path.abspath(__file__))
+
+# Try loading from base path (priority)
+env_path = os.path.join(base_path, ".env")
+if os.path.exists(env_path):
+    load_dotenv(dotenv_path=env_path)
+else:
+    # Fallback to CWD
+    load_dotenv()
 
 class Settings:
     # Support both naming conventions

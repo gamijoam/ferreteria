@@ -7,15 +7,18 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 from src.database.db import SessionLocal
 from src.controllers.return_controller import ReturnController
+from frontend_caja.services.cash_service import CashService
 
 class ReturnDialog(QDialog):
-    def __init__(self):
+    def __init__(self, user=None):
         super().__init__()
+        self.user = user
         self.setWindowTitle("Procesar Devolución - Módulo 6")
         self.resize(1300, 800)
         
         self.db = SessionLocal()
         self.controller = ReturnController(self.db)
+        self.cash_service = CashService()
         self.current_sale = None
         
         self.layout = QHBoxLayout()
@@ -23,6 +26,22 @@ class ReturnDialog(QDialog):
         
         self.setup_ui()
         self.load_initial_sales()
+
+    # ... (setup_ui, load_methods unchanged) ...
+
+    def validate_session(self):
+        """Check if user has an open cash session"""
+        if not self.user: 
+            return True
+        try:
+            session = self.cash_service.get_current_session(self.user.id)
+            if not session or session.get("status") != "OPEN":
+                QMessageBox.warning(self, "Caja Cerrada", "Debe abrir una sesión de caja antes de realizar devoluciones.")
+                return False
+            return True
+        except Exception as e:
+            print(f"Error checking session: {e}")
+            return False
 
     def setup_ui(self):
         # --- LEFT PANEL: Sales List ---
@@ -156,6 +175,8 @@ class ReturnDialog(QDialog):
 
     def void_sale(self):
         """Set all return quantities to max and auto-process"""
+        if not self.validate_session(): return
+
         if not self.current_sale:
             QMessageBox.warning(self, "Alerta", "Seleccione una venta primero")
             return
@@ -221,6 +242,8 @@ class ReturnDialog(QDialog):
             QMessageBox.critical(self, "Error", str(e))
 
     def process_return(self):
+        if not self.validate_session(): return
+
         if not self.current_sale:
             QMessageBox.warning(self, "Alerta", "Seleccione una venta primero")
             return

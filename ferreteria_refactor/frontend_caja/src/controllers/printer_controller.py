@@ -1,5 +1,4 @@
-from sqlalchemy.orm import Session
-from src.models.models import Sale, CashSession, Quote, BusinessConfig
+# from src.models.models import Sale, CashSession, Quote, BusinessConfig # Don't import models to avoid DB dependency issues if possible, or keep as type hints only
 from src.controllers.config_controller import ConfigController
 import datetime
 import json
@@ -28,9 +27,9 @@ except ImportError:
     print("Warning: reportlab not installed. PDF preview not available.")
 
 class PrinterController:
-    def __init__(self, db: Session):
-        self.db = db
-        self.config_ctrl = ConfigController(db)
+    def __init__(self, db=None):
+        self.db = None # Ignored
+        self.config_ctrl = ConfigController()
         self.printer = None
         self.template = self.load_template()
         
@@ -184,7 +183,7 @@ class PrinterController:
         except Exception as e:
             raise Exception(f"Error al imprimir: {str(e)}")
     
-    def print_ticket(self, sale: Sale):
+    def print_ticket(self, sale):
         """Print sale ticket"""
         if not self.connect_printer():
             raise Exception("No se pudo conectar a la impresora")
@@ -279,7 +278,7 @@ class PrinterController:
         except Exception as e:
             raise Exception(f"Error al imprimir ticket: {str(e)}")
     
-    def generate_pdf_preview(self, sale: Sale, output_path: str):
+    def generate_pdf_preview(self, sale, output_path: str):
         """Generate PDF preview of ticket for testing without printer"""
         if not REPORTLAB_AVAILABLE:
             raise Exception("reportlab no está instalado. No se puede generar PDF.")
@@ -382,7 +381,7 @@ class PrinterController:
         except Exception as e:
             raise Exception(f"Error al generar PDF: {str(e)}")
     
-    def print_cash_report(self, session: CashSession, report_data: dict):
+    def print_cash_report(self, session, report_data: dict):
         """Print cash closing report"""
         if not self.connect_printer():
             raise Exception("No se pudo conectar a la impresora")

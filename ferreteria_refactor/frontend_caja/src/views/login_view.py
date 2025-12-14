@@ -4,7 +4,6 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QPixmap, QColor
-from src.database.db import SessionLocal
 from src.controllers.auth_controller import AuthController
 import os
 
@@ -14,8 +13,7 @@ class LoginDialog(QDialog):
         self.setWindowTitle("InventarioSoft - Inicio de Sesión")
         self.setFixedSize(1200, 600)
         
-        self.db = SessionLocal()
-        self.auth_controller = AuthController(self.db)
+        self.auth_controller = AuthController()
         self.user = None
         
         # Set background gradient
@@ -49,7 +47,7 @@ class LoginDialog(QDialog):
         
         # Logo
         from src.controllers.config_controller import ConfigController
-        config_ctrl = ConfigController(self.db)
+        config_ctrl = ConfigController()
         logo_path = config_ctrl.get_config("business_logo_path", "")
         
         if logo_path and os.path.exists(logo_path):
@@ -271,5 +269,5 @@ class LoginDialog(QDialog):
             self.input_password.setFocus()
     
     def closeEvent(self, event):
-        self.db.close()
+        # self.db.close()
         event.accept()

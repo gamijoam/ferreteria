@@ -47,6 +47,11 @@ class ProductFormDialog(QDialog):
         # Force dot as decimal separator
         self.stock_input.setLocale(QLocale(QLocale.Language.English, QLocale.Country.UnitedStates))
         
+        self.price_mayor_1_input = QLineEdit()
+        self.price_mayor_1_input.setPlaceholderText("Precio Mayorista 1 (Opcional)")
+        self.price_mayor_2_input = QLineEdit()
+        self.price_mayor_2_input.setPlaceholderText("Precio Mayorista 2 (Opcional)")
+        
         self.min_stock_input = QDoubleSpinBox()
         self.min_stock_input.setRange(0, 1000000)
         self.min_stock_input.setDecimals(3)
@@ -71,7 +76,10 @@ class ProductFormDialog(QDialog):
         form_layout.addRow("Nombre:*", self.name_input)
         form_layout.addRow("SKU / Código:", self.sku_input)
         form_layout.addRow("Precio Costo:", self.cost_input)
-        form_layout.addRow("Precio Venta:", self.price_input)
+        form_layout.addRow("Precio Costo:", self.cost_input)
+        form_layout.addRow("Precio Detal:", self.price_input)
+        form_layout.addRow("Precio Mayor 1:", self.price_mayor_1_input)
+        form_layout.addRow("Precio Mayor 2:", self.price_mayor_2_input)
         form_layout.addRow("", self.margin_label)
         form_layout.addRow("Stock:", self.stock_input)
         form_layout.addRow("Stock Mínimo (Alerta):", self.min_stock_input)
@@ -127,6 +135,8 @@ class ProductFormDialog(QDialog):
         self.name_input.setText(product.name)
         self.sku_input.setText(product.sku or "")
         self.price_input.setText(str(product.price))
+        self.price_mayor_1_input.setText(str(product.price_mayor_1 or 0.0))
+        self.price_mayor_2_input.setText(str(product.price_mayor_2 or 0.0))
         self.cost_input.setText(str(product.cost_price))
         self.stock_input.setValue(float(product.stock))
         self.min_stock_input.setValue(float(product.min_stock if hasattr(product, 'min_stock') else 5.0))
@@ -141,7 +151,10 @@ class ProductFormDialog(QDialog):
         return {
             "name": self.name_input.text().strip(),
             "sku": self.sku_input.text().strip() or None,
+            "sku": self.sku_input.text().strip() or None,
             "price": float(self.price_input.text() or 0),
+            "price_mayor_1": float(self.price_mayor_1_input.text() or 0),
+            "price_mayor_2": float(self.price_mayor_2_input.text() or 0),
             "cost_price": float(self.cost_input.text() or 0),
             "stock": self.stock_input.value(),
             "min_stock": self.min_stock_input.value(),

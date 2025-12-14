@@ -303,7 +303,7 @@ class MainWindow(QMainWindow):
 
     def open_pos(self):
         if not hasattr(self, 'pos_window') or not self.pos_window.isVisible():
-            self.pos_window = POSWindow()
+            self.pos_window = POSWindow(user=self.user)
             self.pos_window.show()
         else:
             self.pos_window.raise_()
@@ -321,7 +321,7 @@ class MainWindow(QMainWindow):
         self.report_window.show()
 
     def open_returns(self):
-        dialog = ReturnDialog()
+        dialog = ReturnDialog(user=self.user)
         dialog.exec()
 
     def open_customers(self):
@@ -436,19 +436,14 @@ def main():
     # ---------------------
 
     # Show Login First
-    # login = LoginDialog()
-    # Auto-login for refactor verification
-    from src.controllers.auth_controller import UserMock
-    user = UserMock()
-    window = MainWindow(user)
-    window.show()
-    sys.exit(app.exec())
-    # if login.exec() == QDialog.DialogCode.Accepted:
-    #     window = MainWindow(login.user)
-    #     window.show()
-    #     sys.exit(app.exec())
-    # else:
-    #     sys.exit(0)
+    login = LoginDialog()
+    
+    if login.exec() == QDialog.DialogCode.Accepted:
+        window = MainWindow(login.user)
+        window.show()
+        sys.exit(app.exec())
+    else:
+        sys.exit(0)
 
 if __name__ == "__main__":
     main()

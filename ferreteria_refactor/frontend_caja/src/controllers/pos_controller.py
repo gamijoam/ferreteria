@@ -25,9 +25,44 @@ class POSController:
             print(f"Error loading products: {e}")
             self.cached_products = []
 
-    def add_to_cart(self, sku_or_name: str, quantity: float, is_box: bool, product_id: int = None):
+    def get_applicable_price(self, product, quantity, is_box, price_tier="price"):
+        """
+        Calculate unit price based on tier and volume rules.
+        Returns final unit price (per item added, e.g. per box if is_box).
+        """
+        # 1. Base Price from Tier
+        base_price = product.get(price_tier, product['price'])
+        if base_price == 0 and price_tier != "price":
+             base_price = product['price']
+        
+        unit_price = base_price
+        
+        # 2. Check Automatic Rules ONLY if tier is default
+        # Rules are assumed to be per base unit
+        if price_tier == "price" and product.get('price_rules'):
+            total_units = quantity * (product.get('conversion_factor', 1) if is_box else 1)
+            
+            applicable_rules = [
+                r for r in product['price_rules'] 
+                if total_units >= r['min_quantity']
+            ]
+            
+            if applicable_rules:
+                # Pick rule with highest min_quantity (closest tier reached)
+                best_rule = max(applicable_rules, key=lambda x: x['min_quantity'])
+                unit_price = best_rule['price']
+        
+        # 3. Apply Box Factor for final display price
+        final_price = unit_price
+        if is_box:
+             final_price = unit_price * product.get('conversion_factor', 1)
+             
+        return final_price
+
+    def add_to_cart(self, sku_or_name: str, quantity: float, is_box: bool, product_id: int = None, price_tier: str = "price"):
         """
         Refactored add_to_cart to use cached product list from API.
+        price_tier: 'price' (default), 'price_mayor_1', 'price_mayor_2'
         """
         product = None
         
@@ -49,13 +84,12 @@ class POSController:
         if not product:
             return False, "Producto no encontrado"
 
-        # Simplified Pricing Logic (No rules, just base price + box factor)
-        price_to_use = product['price']
-        units_to_deduct = quantity
+        # Pricing Logic
+        price_to_use = self.get_applicable_price(product, quantity, is_box, price_tier)
         
+        units_to_deduct = quantity
         if is_box:
              units_to_deduct = quantity * product['conversion_factor']
-             price_to_use = product['price'] * product['conversion_factor']
 
         subtotal = price_to_use * quantity
         
@@ -69,6 +103,7 @@ class POSController:
             "subtotal": subtotal,
             "is_box": is_box,
             "unit_type": product.get("unit_type", "Unidad"),
+            "price_tier": price_tier, # Store tier for updates
             "product_obj": product # Keep dict as obj
         }
         
@@ -97,24 +132,18 @@ class POSController:
         # Recalculate
         item = self.cart[index]
         product = item['product_obj']
-        
-        # Simple price recalculation (ignoring complex box logic for update simplification)
-        # Assuming is_box persists
         is_box = item['is_box']
-        price_to_use = product['price']
+        price_tier = item.get('price_tier', 'price')
         
-        # Re-apply box logic if needed
-        # In full version, this depends on product conversion factor
-        conversion_factor = product.get('conversion_factor', 1)
+        price_to_use = self.get_applicable_price(product, new_quantity, is_box, price_tier)
         
+        units_to_deduct = new_quantity
         if is_box:
-             price_to_use = product['price'] * conversion_factor
-             units_to_deduct = new_quantity * conversion_factor
-        else:
-             units_to_deduct = new_quantity
+             units_to_deduct = new_quantity * product.get('conversion_factor', 1)
              
         item['quantity'] = new_quantity
         item['units_deducted'] = units_to_deduct
+        item['unit_price'] = price_to_use # Update unit price if rule changed
         item['subtotal'] = price_to_use * new_quantity
         
         return True, "Cantidad actualizada"

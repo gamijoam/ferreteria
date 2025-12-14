@@ -41,3 +41,12 @@ class CashController:
         session_id = self.active_session['id'] if self.active_session else None
         
         return self.service.add_movement(amount, type_mov, reason, currency, session_id)
+
+    def get_history(self, page=1, per_page=20):
+        """Get history of closed sessions"""
+        skip = (page - 1) * per_page
+        return self.service.get_history(skip, per_page)
+
+    def get_session_details(self, session_id):
+        """Get details of a specific closed session"""
+        return self.service.get_session_details(session_id)

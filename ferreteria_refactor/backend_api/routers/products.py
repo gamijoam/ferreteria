@@ -34,6 +34,33 @@ def update_product(product_id: int, product_update: schemas.ProductUpdate, db: S
     db.refresh(db_product)
     return db_product
 
+    db.commit()
+    db.refresh(db_product)
+    return db_product
+
+@router.get("/{product_id}/rules", response_model=List[schemas.PriceRuleRead])
+def read_price_rules(product_id: int, db: Session = Depends(get_db)):
+    rules = db.query(models.PriceRule).filter(models.PriceRule.product_id == product_id).order_by(models.PriceRule.min_quantity).all()
+    return rules
+
+@router.post("/{product_id}/rules", response_model=schemas.PriceRuleRead)
+def create_price_rule(product_id: int, rule: schemas.PriceRuleCreate, db: Session = Depends(get_db)):
+    db_rule = models.PriceRule(**rule.dict())
+    db_rule.product_id = product_id # Override with path param
+    db.add(db_rule)
+    db.commit()
+    db.refresh(db_rule)
+    return db_rule
+
+@router.delete("/rules/{rule_id}")
+def delete_price_rule(rule_id: int, db: Session = Depends(get_db)):
+    rule = db.query(models.PriceRule).filter(models.PriceRule.id == rule_id).first()
+    if not rule:
+        raise HTTPException(status_code=404, detail="Rule not found")
+    db.delete(rule)
+    db.commit()
+    return {"status": "success"}
+
 @router.post("/sales/")
 def create_sale(sale_data: schemas.SaleCreate, db: Session = Depends(get_db)):
     # 1. Create Sale Header
@@ -117,3 +144,46 @@ def create_sale(sale_data: schemas.SaleCreate, db: Session = Depends(get_db)):
 
     db.commit()
     return {"status": "success", "sale_id": new_sale.id}
+
+@router.post("/bulk", response_model=schemas.BulkImportResult)
+def bulk_create_products(products: List[schemas.ProductCreate], db: Session = Depends(get_db)):
+    # Initialize result using Pydantic model
+    result = schemas.BulkImportResult(success_count=0, failed_count=0, errors=[])
+    
+    for p in products:
+        try:
+            # Use nested transaction (savepoint) to isolate each insertion
+            with db.begin_nested():
+                # Check for existing SKU to avoid generic IntegrityError if possible (optimization)
+                # But begin_nested handles it safely.
+                # db_product = models.Product(**p.dict()) 
+                # p.dict() might invoke validations.
+                
+                # Manual mapping or dict unpacking
+                db_product = models.Product(
+                    name=p.name,
+                    sku=p.sku,
+                    price=p.price,
+                    cost_price=p.cost_price,
+                    stock=p.stock,
+                    description=p.description,
+                    min_stock=p.min_stock,
+                    is_box=p.is_box,
+                    conversion_factor=p.conversion_factor,
+                    category_id=p.category_id,
+                    supplier_id=p.supplier_id,
+                    is_active=True # Default true for imports
+                )
+                db.add(db_product)
+                db.flush() # Force SQL execution to catch constraints
+            
+            result.success_count += 1
+        except Exception as e:
+            result.failed_count += 1
+            msg = str(e)
+            if "UNIQUE constraint failed" in msg or "Duplicate entry" in msg:
+                msg = f"SKU '{p.sku}' ya existe."
+            result.errors.append(f"Producto '{p.name}': {msg}")
+            
+    db.commit()
+    return result

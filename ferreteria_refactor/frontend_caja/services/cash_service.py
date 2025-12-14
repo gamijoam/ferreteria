@@ -48,3 +48,20 @@ class CashService:
         except Exception as e:
             print(f"Error adding movement: {e}")
             return None
+
+    def get_history(self, skip=0, limit=20):
+        """Get list of closed sessions"""
+        try:
+            return self.client.get(f"{self.endpoint}/history", params={"skip": skip, "limit": limit})
+        except Exception as e:
+            print(f"Error fetching history: {e}")
+            return []
+
+    def get_session_details(self, session_id):
+        """Get details of a specific session"""
+        try:
+            return self.client.get(f"{self.endpoint}/history/{session_id}")
+        except Exception as e:
+            print(f"Error fetching session details: {e}")
+            return None
+

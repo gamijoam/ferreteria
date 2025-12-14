@@ -51,6 +51,8 @@ class Product(Base):
     sku = Column(String, unique=True, index=True, nullable=True) # Barcode
     description = Column(Text, nullable=True)
     price = Column(Float, nullable=False, default=0.0)
+    price_mayor_1 = Column(Float, default=0.0) # Wholesale Price 1
+    price_mayor_2 = Column(Float, default=0.0) # Wholesale Price 2
     cost_price = Column(Float, default=0.0)  # NEW: Cost for profit margin calculation
     stock = Column(Float, default=0.0) # Base units
     min_stock = Column(Float, default=5.0) # Low stock alert threshold
@@ -66,7 +68,9 @@ class Product(Base):
     supplier_id = Column(Integer, ForeignKey("suppliers.id"), nullable=True)
 
     category = relationship("Category", back_populates="products")
+    category = relationship("Category", back_populates="products")
     supplier = relationship("Supplier", back_populates="products")
+    price_rules = relationship("PriceRule", back_populates="product")
 
     def __repr__(self):
         return f"<Product(name='{self.name}', is_box={self.is_box}, factor={self.conversion_factor})>"
@@ -202,7 +206,9 @@ class User(Base):
     password_hash = Column(String, nullable=False)
     pin = Column(String, nullable=True)  # 4-6 digit PIN for discount authorization
     role = Column(Enum(UserRole), default=UserRole.CASHIER)
+    full_name = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.datetime.now)
 
     def __repr__(self):
         return f"<User(username='{self.username}', role='{self.role}')>"
@@ -282,7 +288,7 @@ class PriceRule(Base):
     min_quantity = Column(Float, nullable=False)  # Minimum qty to apply this price
     price = Column(Float, nullable=False)  # Special price for this tier
 
-    product = relationship("Product")
+    product = relationship("Product", back_populates="price_rules")
 
     def __repr__(self):
         return f"<PriceRule(product={self.product_id}, min_qty={self.min_quantity}, price={self.price})>"
