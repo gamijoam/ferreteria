@@ -5,10 +5,9 @@ from PyQt6.QtWidgets import (
     QDateEdit
 )
 from PyQt6.QtCore import QDate, QLocale
-from src.database.db import SessionLocal
 from src.controllers.purchase_controller import PurchaseController
 from src.controllers.supplier_controller import SupplierController
-from src.models.models import Product
+from src.controllers.product_controller import ProductController
 import datetime
 
 class PurchaseOrderWindow(QWidget):
@@ -17,9 +16,9 @@ class PurchaseOrderWindow(QWidget):
         self.setWindowTitle("Órdenes de Compra - Módulo 15")
         self.resize(1200, 750)
         
-        self.db = SessionLocal()
-        self.controller = PurchaseController(self.db)
-        self.supplier_controller = SupplierController(self.db)
+        self.controller = PurchaseController()
+        self.supplier_controller = SupplierController()
+        self.product_controller = ProductController()
         self.user = user
         self.cart = []  # Temporary cart for creating order
         
@@ -182,7 +181,7 @@ class PurchaseOrderWindow(QWidget):
     def load_products(self):
         self.product_combo.clear()
         self.product_combo.addItem("Seleccione producto...", None)
-        products = self.db.query(Product).filter(Product.is_active == True).all()
+        products = self.product_controller.get_all_products()
         for p in products:
             self.product_combo.addItem(f"{p.name} (Stock: {p.stock})", p.id)
 
@@ -192,7 +191,11 @@ class PurchaseOrderWindow(QWidget):
             QMessageBox.warning(self, "Error", "Seleccione un producto")
             return
         
-        product = self.db.query(Product).get(product_id)
+        product = self.product_controller.get_product_by_id(product_id)
+        if not product:
+            QMessageBox.warning(self, "Error", "Producto no encontrado")
+            return
+            
         quantity = self.quantity_spin.value()
         cost = self.cost_spin.value()
         
@@ -284,12 +287,36 @@ class PurchaseOrderWindow(QWidget):
             
             self.orders_table.setItem(i, 0, QTableWidgetItem(str(order.id)))
             self.orders_table.setItem(i, 1, QTableWidgetItem(order.supplier.name))
-            self.orders_table.setItem(i, 2, QTableWidgetItem(order.order_date.strftime('%Y-%m-%d')))
+            
+            # Parse order_date
+            order_date = order.order_date
+            if isinstance(order_date, str):
+                try:
+                    order_date = datetime.datetime.fromisoformat(order_date)
+                    date_display = order_date.strftime('%Y-%m-%d')
+                except:
+                    date_display = order_date
+            else:
+                date_display = order_date.strftime('%Y-%m-%d') if order_date else "N/A"
+            self.orders_table.setItem(i, 2, QTableWidgetItem(date_display))
+            
             self.orders_table.setItem(i, 3, QTableWidgetItem(f"${order.total_amount:,.2f}"))
             self.orders_table.setItem(i, 4, QTableWidgetItem(order.status))
-            self.orders_table.setItem(i, 5, QTableWidgetItem(
-                order.expected_delivery.strftime('%Y-%m-%d') if order.expected_delivery else "N/A"
-            ))
+            
+            # Parse expected_delivery
+            expected_delivery = order.expected_delivery
+            if expected_delivery:
+                if isinstance(expected_delivery, str):
+                    try:
+                        expected_delivery = datetime.datetime.fromisoformat(expected_delivery)
+                        delivery_display = expected_delivery.strftime('%Y-%m-%d')
+                    except:
+                        delivery_display = expected_delivery
+                else:
+                    delivery_display = expected_delivery.strftime('%Y-%m-%d')
+            else:
+                delivery_display = "N/A"
+            self.orders_table.setItem(i, 5, QTableWidgetItem(delivery_display))
             
             # Action button
             if order.status == "PENDING":
@@ -321,7 +348,19 @@ class PurchaseOrderWindow(QWidget):
             
             self.pending_table.setItem(i, 0, QTableWidgetItem(str(order.id)))
             self.pending_table.setItem(i, 1, QTableWidgetItem(order.supplier.name))
-            self.pending_table.setItem(i, 2, QTableWidgetItem(order.order_date.strftime('%Y-%m-%d')))
+            
+            # Parse order_date
+            order_date = order.order_date
+            if isinstance(order_date, str):
+                try:
+                    order_date = datetime.datetime.fromisoformat(order_date)
+                    date_display = order_date.strftime('%Y-%m-%d')
+                except:
+                    date_display = order_date
+            else:
+                date_display = order_date.strftime('%Y-%m-%d') if order_date else "N/A"
+            self.pending_table.setItem(i, 2, QTableWidgetItem(date_display))
+            
             self.pending_table.setItem(i, 3, QTableWidgetItem(f"${order.total_amount:,.2f}"))
             
             btn_receive = QPushButton("Recibir")
@@ -350,7 +389,8 @@ class PurchaseOrderWindow(QWidget):
         )
         
         if reply == QMessageBox.StandardButton.Yes:
-            success, msg = self.controller.receive_purchase_order(order.id, self.user.id)
+            user_id = getattr(self.user, 'id', 1)  # Default to 1 if user has no id
+            success, msg = self.controller.receive_purchase_order(order.id, user_id)
             if success:
                 QMessageBox.information(self, "Éxito", msg)
                 self.load_pending_orders()
@@ -374,5 +414,4 @@ class PurchaseOrderWindow(QWidget):
                 QMessageBox.critical(self, "Error", msg)
 
     def closeEvent(self, event):
-        self.db.close()
         event.accept()

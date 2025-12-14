@@ -28,17 +28,19 @@ class ProductController:
         pass # Not implemented in API yet
 
     def get_active_products(self):
-        return self.product_service.get_all_products()
+        products = self.product_service.get_all_products()
+        return [MockProduct(p) for p in products] if products else []
 
     def get_all_products(self):
-        return self.product_service.get_all_products()
+        products = self.product_service.get_all_products()
+        return [MockProduct(p) for p in products] if products else []
 
     def get_product_by_id(self, product_id):
-        # Inefficient but simple: fetch all and find
+        # Fetch all and find
         products = self.get_all_products()
         for p in products:
-            if p['id'] == product_id:
-                return MockProduct(p)
+            if p.id == product_id:
+                return p
         return None
 
     def get_products_paginated(self, page=1, page_size=50, search_query=None):

@@ -4,10 +4,10 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import QFont
 from PyQt6.QtCore import Qt
-from src.database.db import SessionLocal
 from src.controllers.report_controller import ReportController
 from src.controllers.profit_controller import ProfitController
-from src.models.models import Quote, Sale
+from src.controllers.quote_controller import QuoteController
+from src.controllers.config_controller import ConfigController
 from src.utils.event_bus import event_bus
 import datetime
 
@@ -17,9 +17,10 @@ class DashboardWindow(QWidget):
         self.setWindowTitle("Dashboard Ejecutivo - Módulo 13")
         self.resize(1200, 750)
         
-        self.db = SessionLocal()
-        self.controller = ReportController(self.db)
-        self.profit_controller = ProfitController(self.db)
+        self.controller = ReportController()
+        self.profit_controller = ProfitController()
+        self.quote_controller = QuoteController()
+        self.config_controller = ConfigController()
         self.main_window = main_window  # Reference to open other modules
         
         self.layout = QVBoxLayout()
@@ -183,14 +184,13 @@ class DashboardWindow(QWidget):
         today_end = datetime.datetime.combine(datetime.date.today(), datetime.time.max)
         
         # Get current exchange rate
-        from src.controllers.config_controller import ConfigController
-        config_ctrl = ConfigController(self.db)
-        rate = config_ctrl.get_exchange_rate()
+        rate = self.config_controller.get_exchange_rate()
         
         # 1. Today's Sales
         summary = self.controller.get_sales_summary(today_start, today_end)
-        self.sales_widget.value_label.setText(f"${summary['total_revenue']:,.2f}\nBs {summary['total_revenue_bs']:,.2f}")
-        self.sales_widget.subtitle_label.setText(f"{summary['total_transactions']} transacciones")
+        if summary:
+            self.sales_widget.value_label.setText(f"${summary['total_revenue']:,.2f}\nBs {summary['total_revenue_bs']:,.2f}")
+            self.sales_widget.subtitle_label.setText(f"{summary['total_transactions']} transacciones")
         
         # 2. Stock Alerts
         low_stock = self.controller.get_low_stock_products(threshold=5)
@@ -202,7 +202,8 @@ class DashboardWindow(QWidget):
             self.stock_widget.value_label.setStyleSheet("color: green;")
         
         # 3. Pending Quotes
-        pending_quotes = self.db.query(Quote).filter(Quote.status == "PENDING").count()
+        quotes = self.quote_controller.get_all_quotes()
+        pending_quotes = len([q for q in quotes if q.status == "PENDING"])
         self.quotes_widget.value_label.setText(str(pending_quotes))
         self.quotes_widget.subtitle_label.setText("sin convertir")
         
@@ -239,5 +240,4 @@ class DashboardWindow(QWidget):
             self.profit_widget.subtitle_label.setText("sin datos")
 
     def closeEvent(self, event):
-        self.db.close()
         event.accept()

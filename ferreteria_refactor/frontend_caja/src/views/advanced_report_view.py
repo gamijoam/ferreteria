@@ -4,9 +4,8 @@ from PyQt6.QtWidgets import (
     QTabWidget, QDateEdit, QComboBox, QFormLayout, QGroupBox, QTextEdit
 )
 from PyQt6.QtCore import QDate
-from src.database.db import SessionLocal
 from src.controllers.report_controller import ReportController
-from src.models.models import Customer, Product
+from src.controllers.customer_controller import CustomerController
 import datetime
 
 class AdvancedReportWindow(QWidget):
@@ -15,8 +14,8 @@ class AdvancedReportWindow(QWidget):
         self.setWindowTitle("Reportes Avanzados - Módulo 12")
         self.resize(1200, 750)
         
-        self.db = SessionLocal()
-        self.controller = ReportController(self.db)
+        self.controller = ReportController()
+        self.customer_controller = CustomerController()
         
         self.layout = QVBoxLayout()
         self.setLayout(self.layout)
@@ -93,8 +92,9 @@ class AdvancedReportWindow(QWidget):
         self.load_customers_for_filter()
 
     def load_customers_for_filter(self):
-        customers = self.db.query(Customer).all()
+        customers = self.customer_controller.get_all_customers()
         for c in customers:
+            # c is a CustomerObj with attributes
             self.sales_customer_combo.addItem(c.name, c.id)
 
     def generate_sales_report(self):
@@ -113,45 +113,54 @@ class AdvancedReportWindow(QWidget):
         summary = self.controller.get_sales_summary(start_dt, end_dt)
         
         # Update summary
-        self.sales_summary_label.setText(
-            f"Total Ventas: ${summary['total_revenue']:,.2f} | "
-            f"Transacciones: {summary['total_transactions']} | "
-            f"Ticket Promedio: ${summary['average_ticket']:,.2f}"
-        )
+        if summary:
+            self.sales_summary_label.setText(
+                f"Total Ventas: ${summary['total_revenue']:,.2f} | "
+                f"Transacciones: {summary['total_transactions']} | "
+                f"Ticket Promedio: ${summary['average_ticket']:,.2f}"
+            )
         
         # Fill table
         self.sales_table.setRowCount(0)
         for i, sale in enumerate(sales):
             self.sales_table.insertRow(i)
-            self.sales_table.setItem(i, 0, QTableWidgetItem(str(sale.id)))
-            self.sales_table.setItem(i, 1, QTableWidgetItem(sale.date.strftime('%Y-%m-%d %H:%M')))
-            self.sales_table.setItem(i, 2, QTableWidgetItem(sale.customer.name if sale.customer else "N/A"))
-            self.sales_table.setItem(i, 2, QTableWidgetItem(sale.customer.name if sale.customer else "N/A"))
-
+            # sale is a dict from API
+            self.sales_table.setItem(i, 0, QTableWidgetItem(str(sale['id'])))
             
-
-            # Display total with correct currency
-
-            # Check payment_method field for currency indicator
-
-            if "Bs" in sale.payment_method or (hasattr(sale, "payments") and sale.payments and sale.payments[0].currency == "Bs"):
-                # Calculate Bs amount correctly
-                if sale.total_amount_bs and sale.total_amount_bs > 0:
-                    amount = sale.total_amount_bs
-                else:
-                    # Fallback: calculate from USD using exchange rate
-                    rate = sale.exchange_rate_used if sale.exchange_rate_used else 1.0
-                    amount = sale.total_amount * rate
-                self.sales_table.setItem(i, 3, QTableWidgetItem(f"Bs{amount:,.2f}"))
-
+            # Parse date
+            date_str = sale['date']
+            if isinstance(date_str, str):
+                try:
+                    date_obj = datetime.datetime.fromisoformat(date_str)
+                    date_display = date_obj.strftime('%Y-%m-%d %H:%M')
+                except:
+                    date_display = date_str
             else:
-
-                self.sales_table.setItem(i, 3, QTableWidgetItem(f"${sale.total_amount:,.2f}"))
-
+                date_display = date_str
+            self.sales_table.setItem(i, 1, QTableWidgetItem(date_display))
             
-
-            self.sales_table.setItem(i, 4, QTableWidgetItem(sale.payment_method))
-            self.sales_table.setItem(i, 5, QTableWidgetItem("Pagado" if sale.paid else "Pendiente"))
+            # Customer name
+            customer = sale.get('customer')
+            customer_name = customer['name'] if customer else "N/A"
+            self.sales_table.setItem(i, 2, QTableWidgetItem(customer_name))
+            
+            # Display total with correct currency
+            payment_method = sale.get('payment_method', '')
+            total_amount = sale.get('total_amount', 0)
+            
+            if "Bs" in payment_method:
+                total_amount_bs = sale.get('total_amount_bs')
+                if total_amount_bs and total_amount_bs > 0:
+                    amount = total_amount_bs
+                else:
+                    rate = sale.get('exchange_rate_used', 1.0)
+                    amount = total_amount * rate
+                self.sales_table.setItem(i, 3, QTableWidgetItem(f"Bs{amount:,.2f}"))
+            else:
+                self.sales_table.setItem(i, 3, QTableWidgetItem(f"${total_amount:,.2f}"))
+            
+            self.sales_table.setItem(i, 4, QTableWidgetItem(payment_method))
+            self.sales_table.setItem(i, 5, QTableWidgetItem("Pagado" if sale.get('paid') else "Pendiente"))
 
 
     def export_sales_report(self):
@@ -225,7 +234,18 @@ class AdvancedReportWindow(QWidget):
         self.cash_table.setRowCount(0)
         for i, mov in enumerate(movements):
             self.cash_table.insertRow(i)
-            self.cash_table.setItem(i, 0, QTableWidgetItem(mov['date'].strftime('%Y-%m-%d %H:%M')))
+            # Parse date string from API
+            date_str = mov['date']
+            if isinstance(date_str, str):
+                try:
+                    date_obj = datetime.datetime.fromisoformat(date_str)
+                    date_display = date_obj.strftime('%Y-%m-%d %H:%M')
+                except:
+                    date_display = date_str
+            else:
+                date_display = date_str.strftime('%Y-%m-%d %H:%M')
+            
+            self.cash_table.setItem(i, 0, QTableWidgetItem(date_display))
             self.cash_table.setItem(i, 1, QTableWidgetItem(mov['type']))
             # Display amount with correct currency symbol
             currency = mov.get('currency', 'USD')
@@ -398,5 +418,4 @@ class AdvancedReportWindow(QWidget):
         self.stock_output.setPlainText(output)
 
     def closeEvent(self, event):
-        self.db.close()
         event.accept()

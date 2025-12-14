@@ -1,60 +1,40 @@
-from sqlalchemy.orm import Session
-from src.models.models import PurchaseOrder, PurchaseOrderDetail, Product, Kardex, MovementType
+from frontend_caja.services.purchase_service import PurchaseService
 import datetime
 
 class PurchaseController:
-    def __init__(self, db: Session):
-        self.db = db
+    def __init__(self, db=None):
+        self.service = PurchaseService()
+        self.db = None  # Ignored
 
     def create_purchase_order(self, supplier_id, items, expected_delivery=None, notes=None):
         """
         Create a new purchase order
         items: list of dicts with {product_id, quantity, unit_cost}
         """
-        try:
-            # Calculate total
-            total = sum(item['quantity'] * item['unit_cost'] for item in items)
-            
-            # Create order
-            order = PurchaseOrder(
-                supplier_id=supplier_id,
-                total_amount=total,
-                expected_delivery=expected_delivery,
-                notes=notes
-            )
-            self.db.add(order)
-            self.db.flush()  # Get order ID
-            
-            # Create details
-            for item in items:
-                detail = PurchaseOrderDetail(
-                    order_id=order.id,
-                    product_id=item['product_id'],
-                    quantity=item['quantity'],
-                    unit_cost=item['unit_cost'],
-                    subtotal=item['quantity'] * item['unit_cost']
-                )
-                self.db.add(detail)
-            
-            self.db.commit()
-            self.db.refresh(order)
-            return order, None
-        except Exception as e:
-            self.db.rollback()
-            return None, str(e)
+        order_data = {
+            "supplier_id": supplier_id,
+            "items": items,
+            "expected_delivery": expected_delivery.isoformat() if expected_delivery else None,
+            "notes": notes
+        }
+        
+        result = self.service.create_purchase_order(order_data)
+        if result:
+            return PurchaseOrderObj(result), None
+        else:
+            return None, "Error creating purchase order"
 
     def get_all_purchase_orders(self, status=None):
         """Get all purchase orders, optionally filtered by status"""
-        query = self.db.query(PurchaseOrder)
-        if status:
-            query = query.filter(PurchaseOrder.status == status)
-        return query.order_by(PurchaseOrder.order_date.desc()).all()
+        data = self.service.get_all_purchase_orders(status)
+        return [PurchaseOrderObj(order) for order in data] if data else []
 
     def get_purchase_order(self, order_id):
         """Get purchase order by ID"""
-        return self.db.query(PurchaseOrder).get(order_id)
+        data = self.service.get_purchase_order(order_id)
+        return PurchaseOrderObj(data) if data else None
 
-    def receive_purchase_order(self, order_id, user_id):
+    def receive_purchase_order(self, order_id, user_id=1):
         """
         Receive a purchase order:
         - Update product stock
@@ -62,66 +42,70 @@ class PurchaseController:
         - Create Kardex entries
         - Mark order as RECEIVED
         """
-        order = self.get_purchase_order(order_id)
-        if not order:
-            return False, "Orden no encontrada"
-        
-        if order.status != "PENDING":
-            return False, f"La orden ya está en estado: {order.status}"
-        
-        try:
-            for detail in order.details:
-                product = self.db.query(Product).get(detail.product_id)
-                if not product:
-                    continue
-                
-                # Update stock
-                old_stock = product.stock
-                product.stock += detail.quantity
-                
-                # Update cost_price with weighted average
-                if product.cost_price == 0:
-                    # First time setting cost
-                    product.cost_price = detail.unit_cost
-                else:
-                    # Weighted average: (old_cost * old_qty + new_cost * new_qty) / total_qty
-                    total_value = (product.cost_price * old_stock) + (detail.unit_cost * detail.quantity)
-                    product.cost_price = total_value / product.stock
-                
-                # Create Kardex entry
-                kardex = Kardex(
-                    product_id=product.id,
-                    movement_type=MovementType.PURCHASE,
-                    quantity=detail.quantity,
-                    balance_after=product.stock,
-                    description=f"Recepción OC #{order.id} - {order.supplier.name}"
-                )
-                self.db.add(kardex)
-            
-            # Mark order as received
-            order.status = "RECEIVED"
-            order.received_date = datetime.datetime.utcnow()
-            order.received_by = user_id
-            
-            self.db.commit()
+        result = self.service.receive_purchase_order(order_id, user_id)
+        if result:
             return True, "Orden recibida correctamente. Stock e inventario actualizados."
-        except Exception as e:
-            self.db.rollback()
-            return False, str(e)
+        else:
+            return False, "Error receiving purchase order"
 
     def cancel_purchase_order(self, order_id):
         """Cancel a purchase order"""
-        order = self.get_purchase_order(order_id)
-        if not order:
-            return False, "Orden no encontrada"
-        
-        if order.status == "RECEIVED":
-            return False, "No se puede cancelar una orden ya recibida"
-        
-        try:
-            order.status = "CANCELLED"
-            self.db.commit()
+        result = self.service.cancel_purchase_order(order_id)
+        if result:
             return True, "Orden cancelada"
-        except Exception as e:
-            self.db.rollback()
-            return False, str(e)
+        else:
+            return False, "Error cancelling purchase order"
+
+class PurchaseOrderObj:
+    """Helper to wrap purchase order dict for UI compatibility"""
+    def __init__(self, data):
+        self.id = data.get('id')
+        self.supplier_id = data.get('supplier_id')
+        self.order_date = data.get('order_date')
+        if isinstance(self.order_date, str):
+            try:
+                self.order_date = datetime.datetime.fromisoformat(self.order_date)
+            except:
+                self.order_date = datetime.datetime.now()
+        self.total_amount = data.get('total_amount')
+        self.status = data.get('status')
+        self.expected_delivery = data.get('expected_delivery')
+        self.received_date = data.get('received_date')
+        self.received_by = data.get('received_by')
+        self.notes = data.get('notes')
+        
+        # Wrap supplier and details
+        supplier_data = data.get('supplier')
+        self.supplier = SupplierObj(supplier_data) if supplier_data else None
+        
+        details_data = data.get('details', [])
+        self.details = [PurchaseDetailObj(d) for d in details_data]
+
+class PurchaseDetailObj:
+    """Helper to wrap purchase detail dict"""
+    def __init__(self, data):
+        self.id = data.get('id')
+        self.product_id = data.get('product_id')
+        self.quantity = data.get('quantity')
+        self.unit_cost = data.get('unit_cost')
+        self.subtotal = data.get('subtotal')
+        product_data = data.get('product')
+        self.product = ProductObj(product_data) if product_data else None
+
+class SupplierObj:
+    """Helper to wrap supplier dict"""
+    def __init__(self, data):
+        self.id = data.get('id')
+        self.name = data.get('name', 'Proveedor')
+        self.contact_name = data.get('contact_name')
+        self.phone = data.get('phone')
+        self.email = data.get('email')
+
+class ProductObj:
+    """Helper to wrap product dict"""
+    def __init__(self, data):
+        self.id = data.get('id')
+        self.name = data.get('name', 'Producto')
+        self.sku = data.get('sku')
+        self.price = data.get('price')
+        self.stock = data.get('stock')

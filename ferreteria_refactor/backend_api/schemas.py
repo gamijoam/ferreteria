@@ -265,3 +265,43 @@ class ReturnRead(BaseModel):
     class Config:
         from_attributes = True
 
+class PurchaseOrderItemCreate(BaseModel):
+    product_id: int
+    quantity: float
+    unit_cost: float
+
+class PurchaseOrderCreate(BaseModel):
+    supplier_id: int
+    items: List[PurchaseOrderItemCreate]
+    expected_delivery: Optional[datetime] = None
+    notes: Optional[str] = None
+
+class PurchaseOrderDetailRead(BaseModel):
+    id: int
+    product_id: int
+    quantity: float
+    unit_cost: float
+    subtotal: float
+    product: Optional[ProductRead] = None
+
+    class Config:
+        from_attributes = True
+
+class PurchaseOrderRead(BaseModel):
+    id: int
+    supplier_id: int
+    order_date: datetime
+    total_amount: float
+    status: str
+    expected_delivery: Optional[datetime]
+    received_date: Optional[datetime]
+    received_by: Optional[int]
+    notes: Optional[str]
+    details: List[PurchaseOrderDetailRead] = []
+    supplier: Optional[SupplierRead] = None
+
+    class Config:
+        from_attributes = True
+
+class PurchaseOrderReceive(BaseModel):
+    user_id: int = 1  # Default user

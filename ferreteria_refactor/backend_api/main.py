@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .models import models
 from .database.db import engine
-from .routers import products, customers, quotes, cash, suppliers, inventory, returns
+from .routers import products, customers, quotes, cash, suppliers, inventory, returns, reports, purchases
 
 # Create tables
 models.Base.metadata.create_all(bind=engine)
@@ -25,3 +25,5 @@ app.include_router(cash.router, prefix="/api/v1")
 app.include_router(suppliers.router, prefix="/api/v1")
 app.include_router(inventory.router, prefix="/api/v1")
 app.include_router(returns.router, prefix="/api/v1")
+app.include_router(reports.router, prefix="/api/v1")
+app.include_router(purchases.router, prefix="/api/v1")
