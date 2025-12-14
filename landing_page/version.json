@@ -1,5 +1,6 @@
 {
-    "version": "1.0.0",
-    "download_url": "https://tu-enlace-de-descarga.com/instalador.exe",
-    "release_notes": "Lanzamiento inicial del sistema POS Ultra."
+    "version": "1.0.1",
+    "update_url": "https://inventariosoft.netlify.app/version.json",
+    "download_url": "",
+    "release_notes": "Versión Instalada Localmente"
 }
