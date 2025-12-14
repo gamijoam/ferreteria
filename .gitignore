@@ -32,3 +32,6 @@ dist/
 src.rar
 deployment/dist/
 deployment/build/
+
+# Exceptions (Allow these zips)
+!landing_page/downloads/*.zip
