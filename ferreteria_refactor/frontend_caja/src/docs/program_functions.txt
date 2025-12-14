@@ -1,0 +1,46 @@
+## Funciones del Programa Ferretería ERP
+
+### 1️⃣ `main.py`
+- **`main()`**: Inicializa la base de datos, aplica el tema moderno y muestra la ventana de login.
+- **`MainWindow`**: Ventana principal que contiene el menú de módulos.
+  - `create_module_button(icon, title, subtitle, color)`: Crea botones estilo tarjeta.
+  - `darken_color(hex_color, factor=0.15)`: Oscurece colores para efectos hover/press.
+  - **Abridores de módulos** (`open_products`, `open_inventory`, `open_pos`, `open_cash`, `open_dashboard`, `open_suppliers`, `open_purchases`, `open_customers`, `open_returns`, `open_price_rules`, `open_quotes`, `open_labels`, `open_user_management`, `open_reports`): Cada uno instancia y muestra la ventana correspondiente.
+  - **`open_excel_import`**: (oculta) permite cargar datos desde Excel; mantiene la lógica pero no está expuesta en la UI.
+
+### 2️⃣ `models/models.py`
+- Define los **modelos ORM** con SQLAlchemy:
+  - `User`, `Product`, `Category`, `Supplier`, `Customer`, `PurchaseOrder`, `PurchaseOrderDetail`, `Quote`, `Sale`, `Kardex`, etc.
+  - Cada modelo incluye campos relevantes (p.ej., `cost_price` en `Product`, `is_active` en `Supplier`).
+
+### 3️⃣ Controladores (`src/controllers/`)
+- **`product_controller.py`**: CRUD de productos, cálculo de márgenes.
+- **`supplier_controller.py`**: Gestión de proveedores (crear, listar, activar/desactivar).
+- **`purchase_controller.py`**: Creación y recepción de órdenes de compra, actualización de stock y costo promedio.
+- **`profit_controller.py`**: Obtiene la rentabilidad mensual y margen promedio.
+- **`excel_import_controller.py`**: (oculto) importa datos desde Excel leyendo cada hoja (Products, Suppliers, Categories, Customers).
+- **`report_controller.py`**: Genera reportes de ventas, stock, deudas, etc.
+
+### 4️⃣ Vistas (`src/views/`)
+- **`product_view.py`**: Formulario de productos con cálculo de margen en tiempo real.
+- **`supplier_view.py`**: Interfaz para crear/editar proveedores.
+- **`purchase_view.py`**: Pantalla para crear y recibir órdenes de compra.
+- **`dashboard_view.py`**: Panel ejecutivo con métricas clave (ventas, stock, deuda, valor inventario, ticket promedio, ganancia del mes).
+- **`customer_view.py`, `price_rule_view.py`, `quote_view.py`, `label_view.py`, `user_management_view.py`, `return_view.py`, `advanced_report_view.py`**: Vistas auxiliares para sus respectivas funcionalidades.
+
+### 5️⃣ Utilidades
+- **`theme.py`**: Define `MODERN_THEME` con colores premium, gradientes y tipografía moderna.
+- **`generate_import_template.py`**: Genera una plantilla Excel (`template_import.xlsx`) con hojas y columnas esperadas para la importación.
+
+## Beneficios del Sistema Ferretería ERP
+
+- **Gestión integral**: controla productos, proveedores, compras, ventas, clientes y reportes desde una única aplicación.
+- **Rentabilidad visible**: cálculo automático de margen de ganancia y widget de ganancia mensual en el dashboard.
+- **Importación masiva**: permite cargar rápidamente catálogos y datos de proveedores desde Excel (funcionalidad oculta para evitar uso accidental).
+- **Interfaz premium**: diseño moderno con colores vibrantes, tipografía atractiva y micro‑animaciones, ofreciendo una experiencia de usuario de alto nivel.
+- **Escalabilidad**: arquitectura modular (controladores, vistas, modelos) que facilita añadir nuevas funcionalidades.
+- **Seguridad por roles**: acceso basado en roles (`ADMIN`, `WAREHOUSE`, `CASHIER`) para proteger datos críticos.
+- **Auditoría de inventario**: registro automático en Kardex cada movimiento de stock (compras, ventas, devoluciones).
+- **Reportes avanzados**: métricas de ventas, stock bajo, deuda de clientes y análisis de tickets, todo actualizado con un solo click.
+
+Esta lista de funciones y beneficios está pensada para que una IA de marketing pueda generar campañas publicitarias resaltando la **completitud**, **modernidad** y **valor económico** que aporta el ERP a cualquier ferretería.
