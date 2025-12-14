@@ -62,7 +62,7 @@ class LoginDialog(QDialog):
         
         # Brand name
         business_info = config_ctrl.get_business_info()
-        brand_title = QLabel(business_info['name'])
+        brand_title = QLabel(f"{business_info['name']}")
         brand_title.setStyleSheet("""
             color: white;
             font-size: 32pt;
@@ -234,7 +234,7 @@ class LoginDialog(QDialog):
         right_layout.addStretch()
         
         # Version footer
-        version = QLabel("v2.0")
+        version = QLabel("v1.0.2")
         version.setStyleSheet("""
             color: #bdc3c7;
             font-size: 8pt;

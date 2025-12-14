@@ -1,7 +1,8 @@
-import PyInstaller.__main__
+
 import os
 import shutil
-import glob
+import subprocess
+import sys
 
 # Get the directory of this script
 base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -12,30 +13,41 @@ version_file = os.path.join(project_root, 'landing_page', 'version.json')
 dist_dir = os.path.join(base_dir, 'dist')
 build_dir = os.path.join(base_dir, 'build')
 
-print("=== 1. Construyendo Aplicación Principal (FerreteriaApp) ===")
-print(f"Usando especificación: {spec_file}")
+# Helper to run commands
+def run_command(cmd_list, description):
+    print(f"\n=== {description} ===")
+    try:
+        # Use python -m PyInstaller to ensure we use the same python env
+        full_cmd = [sys.executable, '-m', 'PyInstaller'] + cmd_list
+        subprocess.check_call(full_cmd)
+        print("✅ Completado.")
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Error en {description}: {e}")
+        sys.exit(1)
 
-# Construir la app principal (Carpeta 'InventarioSoft')
-PyInstaller.__main__.run([
+# 1. Main App
+run_command([
     spec_file,
     '--distpath', dist_dir,
     '--workpath', build_dir,
     '--noconfirm',
     '--clean'
-])
+], "Construyendo Aplicación Principal (FerreteriaApp)")
 
-print("\n=== 2. Construyendo Launcher (Actualizador) ===")
-# Construir Launcher como archivo único (Launcher.exe)
-PyInstaller.__main__.run([
+# 2. Launcher
+run_command([
     launcher_script,
     '--name', 'Launcher',
     '--onefile',
-    '--noconsole',  # Silencioso (sin ventana negra)
+    '--noconsole',
     '--distpath', dist_dir,
     '--workpath', build_dir,
     '--icon', os.path.join(base_dir, 'assets', 'icon.ico'),
+    '--hidden-import', 'tkinter',
+    '--hidden-import', 'PIL.ImageTk', 
     '--noconfirm'
-])
+], "Construyendo Launcher (Actualizador)")
+
 
 print("\n=== 3. Finalizando Configuración ===")
 
