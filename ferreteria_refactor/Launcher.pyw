@@ -195,29 +195,45 @@ class Launcher(QDialog):
         
         self.launch_app()
 
+    def is_server_running(self):
+        import socket
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(1)
+                return s.connect_ex(('127.0.0.1', 8000)) == 0
+        except:
+            return False
+
     def launch_app(self):
         self.status_label.setText("Iniciando aplicación...")
         QApplication.processEvents()
         
-        # 0. Start Server (if in unified mode and exists)
+        # 0. Start Server (if needed)
         server_process = None
+        server_managed = False  # Flag to know if WE started it
+        
         if os.path.exists(SERVER_EXE):
-            self.status_label.setText("Iniciando Servidor...")
-            QApplication.processEvents()
-            try:
-                # Start Server silently (no window)
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                server_dir = os.path.dirname(SERVER_EXE)
-                
-                server_process = subprocess.Popen(
-                    [SERVER_EXE], 
-                    cwd=server_dir,
-                    startupinfo=startupinfo,
-                    shell=True # Sometimes needed for PyInstaller console apps to hide fully
-                )
-            except Exception as e:
-                print(f"Error starting server: {e}")
+            if self.is_server_running():
+                self.status_label.setText("Servidor ya activo...")
+                print("Server port 8000 busy, assuming running.")
+            else:
+                self.status_label.setText("Iniciando Servidor...")
+                QApplication.processEvents()
+                try:
+                    # Start Server silently (no window) WITHOUT shell=True to get real PID
+                    startupinfo = subprocess.STARTUPINFO()
+                    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                    server_dir = os.path.dirname(SERVER_EXE)
+                    
+                    server_process = subprocess.Popen(
+                        [SERVER_EXE], 
+                        cwd=server_dir,
+                        startupinfo=startupinfo,
+                        shell=False # Changed to False to own the PID directly
+                    )
+                    server_managed = True
+                except Exception as e:
+                    print(f"Error starting server: {e}")
         
         # Check Priorities
         client_process = None
@@ -239,7 +255,7 @@ class Launcher(QDialog):
             QMessageBox.critical(self, "Error Fatal", f"No se encuentra el sistema principal:\nBuscado en:\n{MAIN_EXE_UNIFIED}")
             self.close()
             return
-
+            
         # NOW: Wait for Client to Close
         if client_process:
             self.hide() # Hide Launcher but keep running
@@ -247,17 +263,19 @@ class Launcher(QDialog):
             # Wait for client to finish
             client_process.wait()
             
-            # Client closed, kill Server
-            if server_process:
+            # Client closed, kill Server IF we started it
+            if server_managed and server_process:
                 try:
+                    # Robust Kill
+                    self.status_label.setText("Cerrando servidor...")
+                    import signal
                     server_process.terminate()
-                    server_process.wait(timeout=3)
-                except:
-                    # Force kill if needed
                     try:
-                        server_process.kill()
-                    except:
-                        pass
+                        server_process.wait(timeout=2)
+                    except subprocess.TimeoutExpired:
+                        server_process.kill() # Force kill
+                except Exception as e:
+                    print(f"Error killing server: {e}")
                         
             self.close()
             sys.exit(0)
