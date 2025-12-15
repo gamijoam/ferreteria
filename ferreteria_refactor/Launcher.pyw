@@ -108,7 +108,7 @@ class UpdateThread(QThread):
                 json.dump({"version": remote_version}, f)
                 
             self.status.emit("Actualización completada.")
-            self.finished.emit(True, "Actualizado")
+            self.finished.emit(True, f"Actualizado a v{remote_version}")
             
         except Exception as e:
             self.finished.emit(False, str(e))
@@ -146,6 +146,20 @@ class Launcher(QDialog):
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title.setStyleSheet("font-size: 20px; font-weight: bold; margin-top: 10px;")
         layout.addWidget(title)
+        
+        # Determine current version
+        local_version = "Detectando..."
+        if os.path.exists(LOCAL_VERSION_FILE):
+            try:
+                with open(LOCAL_VERSION_FILE, 'r') as f:
+                    local_version = json.load(f).get("version", "0.0.0")
+            except:
+                local_version = "E: Lectura"
+        
+        self.lbl_version = QLabel(f"Versión: {local_version}")
+        self.lbl_version.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lbl_version.setStyleSheet("color: #bdc3c7; font-size: 10px; margin-bottom: 5px;")
+        layout.addWidget(self.lbl_version)
         
         self.status_label = QLabel("Iniciando...")
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
