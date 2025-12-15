@@ -6,3 +6,7 @@ requests
 python-dotenv
 PyQt6
 psycopg2-binary
+pandas
+openpyxl
+reportlab
+xlrd

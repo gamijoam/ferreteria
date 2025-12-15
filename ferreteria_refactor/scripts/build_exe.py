@@ -35,6 +35,8 @@ def build_frontend():
         # Hidden imports often needed for ORMs or specialized libs
         '--hidden-import=sqlalchemy.sql.default_comparator',
         '--hidden-import=pydantic',
+        '--hidden-import=pandas',
+        '--hidden-import=openpyxl',
         '--collect-all=reportlab',
         '--additional-hooks-dir=.', 
         # Add data if needed (e.g., config templates, although config is dynamic)
