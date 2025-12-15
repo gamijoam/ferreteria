@@ -26,6 +26,7 @@ else:
 
 MAIN_EXE_UNIFIED = os.path.join(BASE_DIR, "Client", "Ferreteria.exe")
 MAIN_EXE_LEGACY = os.path.join(BASE_DIR, "frontend_caja", "Ferreteria.exe")
+SERVER_EXE = os.path.join(BASE_DIR, "Server", "Server.exe")
 MAIN_SCRIPT_DEV = os.path.join(BASE_DIR, "frontend_caja", "src", "main.py")
 
 LOCAL_VERSION_FILE = os.path.join(BASE_DIR, "version.json")
@@ -184,26 +185,69 @@ class Launcher(QDialog):
         self.status_label.setText("Iniciando aplicación...")
         QApplication.processEvents()
         
+        # 0. Start Server (if in unified mode and exists)
+        server_process = None
+        if os.path.exists(SERVER_EXE):
+            self.status_label.setText("Iniciando Servidor...")
+            QApplication.processEvents()
+            try:
+                # Start Server silently (no window)
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                server_dir = os.path.dirname(SERVER_EXE)
+                
+                server_process = subprocess.Popen(
+                    [SERVER_EXE], 
+                    cwd=server_dir,
+                    startupinfo=startupinfo,
+                    shell=True # Sometimes needed for PyInstaller console apps to hide fully
+                )
+            except Exception as e:
+                print(f"Error starting server: {e}")
+        
         # Check Priorities
+        client_process = None
+        
         if os.path.exists(MAIN_EXE_UNIFIED):
              # Launch with Client/ as CWD so it finds .env
              client_dir = os.path.dirname(MAIN_EXE_UNIFIED)
-             subprocess.Popen([MAIN_EXE_UNIFIED], cwd=client_dir)
-             self.close()
+             client_process = subprocess.Popen([MAIN_EXE_UNIFIED], cwd=client_dir)
+             
         elif os.path.exists(MAIN_EXE_LEGACY):
              legacy_dir = os.path.dirname(MAIN_EXE_LEGACY)
-             subprocess.Popen([MAIN_EXE_LEGACY], cwd=legacy_dir)
-             self.close()
+             client_process = subprocess.Popen([MAIN_EXE_LEGACY], cwd=legacy_dir)
+             
         elif os.path.exists(MAIN_SCRIPT_DEV):
-            # Launch without blocking
-            # Dev mode usually expects cwd at root of frontend_caja? Or root of repo?
-            # src code expects frontend_caja as root or ferreteria_refactor?
-            # Let's set it to frontend_caja
             dev_dir = os.path.dirname(os.path.dirname(MAIN_SCRIPT_DEV))
-            subprocess.Popen([sys.executable, MAIN_SCRIPT_DEV], cwd=dev_dir)
-            self.close()
+            client_process = subprocess.Popen([sys.executable, MAIN_SCRIPT_DEV], cwd=dev_dir)
+            
         else:
             QMessageBox.critical(self, "Error Fatal", f"No se encuentra el sistema principal:\nBuscado en:\n{MAIN_EXE_UNIFIED}")
+            self.close()
+            return
+
+        # NOW: Wait for Client to Close
+        if client_process:
+            self.hide() # Hide Launcher but keep running
+            
+            # Wait for client to finish
+            client_process.wait()
+            
+            # Client closed, kill Server
+            if server_process:
+                try:
+                    server_process.terminate()
+                    server_process.wait(timeout=3)
+                except:
+                    # Force kill if needed
+                    try:
+                        server_process.kill()
+                    except:
+                        pass
+                        
+            self.close()
+            sys.exit(0)
+        else:
             self.close()
 
 if __name__ == "__main__":

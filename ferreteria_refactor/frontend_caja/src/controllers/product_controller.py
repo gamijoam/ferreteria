@@ -8,12 +8,11 @@ class ProductController:
 
     def create_product(self, **kwargs):
         """Create a new product via API"""
-        # Adapt kwargs to API schema if needed
-        # For now assuming API accepts similar payload
-        # API expects: name, sku, price, stock...
-        # We might need to map keys if they differ
-        pass # Not implemented in API yet (only GET / POST sales)
-        # TODO: Implement POST /products in Backend
+        try:
+            return self.product_service.create_product(kwargs)
+        except Exception as e:
+            print(f"Error creating product: {e}")
+            raise e
 
     def update_product(self, product_id, **kwargs):
         """Update an existing product via API"""

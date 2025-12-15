@@ -14,6 +14,10 @@ class ProductService:
         """Update a product via API"""
         return self.client.put(f"/api/v1/products/{product_id}", update_data)
 
+    def create_product(self, product_data: dict):
+        """Create a new product via API"""
+        return self.client.post("/api/v1/products/", product_data)
+
     def record_sale(self, sale_data: dict):
         """
         Send sale data to the backend to process inventory and recording.
