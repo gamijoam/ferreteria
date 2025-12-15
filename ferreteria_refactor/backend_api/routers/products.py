@@ -4,6 +4,8 @@ from typing import List
 from ..database.db import get_db
 from ..models import models
 from .. import schemas
+from ..dependencies import has_role, get_current_active_user
+from ..models.models import UserRole
 
 router = APIRouter(prefix="/products", tags=["products"])
 
@@ -12,7 +14,7 @@ def read_products(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)
     products = db.query(models.Product).filter(models.Product.is_active == True).offset(skip).limit(limit).all()
     return products
 
-@router.post("/", response_model=schemas.ProductRead)
+@router.post("/", response_model=schemas.ProductRead, dependencies=[Depends(has_role([UserRole.ADMIN, UserRole.WAREHOUSE]))])
 def create_product(product: schemas.ProductCreate, db: Session = Depends(get_db)):
     db_product = models.Product(**product.dict())
     db.add(db_product)

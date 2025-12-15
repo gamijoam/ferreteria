@@ -177,9 +177,9 @@ class POSWindow(QWidget):
         
         # Table (in left panel)
         self.table = QTableWidget()
-        self.table.setColumnCount(6)
+        self.table.setColumnCount(7)
         self.table.setHorizontalHeaderLabels([
-            "Producto", "Cant.", "Tipo", "Precio Unit.", "Subtotal", "Eliminar"
+            "Producto", "Cant.", "Tipo", "Ubicación", "Precio Unit.", "Subtotal", "Eliminar"
         ])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.setFont(QFont("Arial", 12))
@@ -385,15 +385,21 @@ class POSWindow(QWidget):
             type_item.setFlags(type_item.flags() ^ Qt.ItemFlag.ItemIsEditable)
             self.table.setItem(i, 2, type_item)
             
+            # Location (Not editable)
+            loc_text = item.get("location") or "-"
+            loc_item = QTableWidgetItem(loc_text)
+            loc_item.setFlags(loc_item.flags() ^ Qt.ItemFlag.ItemIsEditable)
+            self.table.setItem(i, 3, loc_item)
+            
             # Unit Price (Not editable)
             price_item = QTableWidgetItem(f"${item['unit_price']:,.2f}")
             price_item.setFlags(price_item.flags() ^ Qt.ItemFlag.ItemIsEditable)
-            self.table.setItem(i, 3, price_item)
+            self.table.setItem(i, 4, price_item)
             
             # Subtotal (Not editable)
             subtotal_item = QTableWidgetItem(f"${item['subtotal']:,.2f}")
             subtotal_item.setFlags(subtotal_item.flags() ^ Qt.ItemFlag.ItemIsEditable)
-            self.table.setItem(i, 4, subtotal_item)
+            self.table.setItem(i, 5, subtotal_item)
             
             # Delete Button
             btn_del = QPushButton("Eliminar")
@@ -412,7 +418,7 @@ class POSWindow(QWidget):
                 }
             """)
             btn_del.clicked.connect(lambda checked, idx=i: self.remove_item(idx))
-            self.table.setCellWidget(i, 5, btn_del)
+            self.table.setCellWidget(i, 6, btn_del)
             
             total += item["subtotal"]
             
@@ -474,7 +480,8 @@ class POSWindow(QWidget):
             return True
             
         try:
-            session = self.cash_service.get_current_session(self.user.id)
+            # Check Global Session (Any open box)
+            session = self.cash_service.get_active_session_global()
             if not session or session.get("status") != "OPEN":
                 QMessageBox.warning(self, "Caja Cerrada", "Debe abrir una sesión de caja antes de realizar ventas.\nVaya al módulo de Control de Caja.")
                 return False
@@ -1140,10 +1147,18 @@ class POSWindow(QWidget):
             table.setItem(i, 1, qty_item)
             
             # Location
-            location = "-"
-            # Try to get from product_obj
-            if "product_obj" in item and hasattr(item["product_obj"], "location"):
-                location = item["product_obj"].location or "-"
+            location = item.get("location")
+            
+            if not location or location == "-":
+                 if "product_obj" in item:
+                     p_obj = item["product_obj"]
+                     # Handle as dict (API response) or object (Database model)
+                     if isinstance(p_obj, dict):
+                         location = p_obj.get("location")
+                     elif hasattr(p_obj, "location"):
+                         location = p_obj.location
+            
+            location = location or "-"
             
             loc_item = QTableWidgetItem(location)
             loc_item.setFont(QFont("Arial", 14, QFont.Weight.Bold))

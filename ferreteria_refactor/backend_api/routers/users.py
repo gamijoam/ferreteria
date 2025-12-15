@@ -14,13 +14,11 @@ router = APIRouter(
 
 security = HTTPBasic()
 
-def hash_password(password: str) -> str:
-    """Hash password using SHA256"""
-    return hashlib.sha256(password.encode()).hexdigest()
+from datetime import timedelta
+from ..security import verify_password, get_password_hash, create_access_token
+from ..config import settings
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify password against hash"""
-    return hash_password(plain_password) == hashed_password
+# Deleted local hash_password and verify_password in favor of imported ones
 
 @router.post("/", response_model=schemas.UserRead)
 def create_user(user_data: schemas.UserCreate, db: Session = Depends(get_db)):
@@ -33,7 +31,7 @@ def create_user(user_data: schemas.UserCreate, db: Session = Depends(get_db)):
     # Create user
     user = models.User(
         username=user_data.username,
-        password_hash=hash_password(user_data.password),
+        password_hash=get_password_hash(user_data.password),
         role=user_data.role,
         full_name=user_data.full_name
     )
@@ -63,7 +61,7 @@ def update_user(user_id: int, user_data: schemas.UserUpdate, db: Session = Depen
         raise HTTPException(status_code=404, detail="User not found")
     
     if user_data.password:
-        user.password_hash = hash_password(user_data.password)
+        user.password_hash = get_password_hash(user_data.password)
     if user_data.role:
         user.role = user_data.role
     if user_data.full_name is not None:

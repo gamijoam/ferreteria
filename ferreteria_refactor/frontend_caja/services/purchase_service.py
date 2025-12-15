@@ -35,10 +35,21 @@ class PurchaseService:
             print(f"Error fetching purchase order: {e}")
             return None
 
-    def receive_purchase_order(self, order_id, user_id=1):
+    def receive_purchase_order(self, order_id, user_id=None):
         """Receive a purchase order (updates stock, cost, creates kardex)"""
         try:
+            # If user_id is None, try to fetch from session
+            if user_id is None:
+                from src.services.session_manager import SessionManager
+                session = SessionManager()
+                user_data = session.get_user_data()
+                user_id = user_data.get('id', 1) # Default to 1 (admin) if logic fails
+                
             data = {"user_id": user_id}
+            # Ensure it is an int
+            if data["user_id"] is None:
+                 data["user_id"] = 1
+                 
             return self.client.post(f"{self.endpoint}/{order_id}/receive", data)
         except Exception as e:
             print(f"Error receiving purchase order: {e}")

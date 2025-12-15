@@ -121,7 +121,14 @@ class CashWindow(QWidget):
                 )
                 self.refresh_ui()
             else:
-                 QMessageBox.warning(self, "Error", "No se pudo abrir la caja. Verifique conexión.")
+                 # If it failed, it might be because it's already open (400 Bad Request).
+                 # Let's try to refresh UI to see if we are actually open.
+                 active = self.controller.check_active_session()
+                 if active:
+                     QMessageBox.warning(self, "Aviso", "La caja ya estaba abierta. Se ha actualizado la vista.")
+                     self.refresh_ui()
+                 else:
+                     QMessageBox.warning(self, "Error", "No se pudo abrir la caja. \nSi el error persiste, cierre sesión o contacte soporte.")
             
         except Exception as e:
             QMessageBox.warning(self, "Error", str(e))

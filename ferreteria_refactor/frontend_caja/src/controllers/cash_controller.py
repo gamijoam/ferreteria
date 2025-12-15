@@ -4,12 +4,21 @@ import datetime
 class CashController:
     def __init__(self, db=None):
         self.service = CashService()
-        self.current_user_id = 1 # Simplification for now
+        from src.services.session_manager import SessionManager
+        self.session_manager = SessionManager()
+        
+        # Try to get ID, default to 1 if not logged in (logic safety)
+        if self.session_manager.is_authenticated:
+            self.current_user_id = self.session_manager.get_user_data().get('id', 1)
+        else:
+            self.current_user_id = 1
+            
         self.active_session = None
 
     def check_active_session(self):
-        """Check if there is an open session for current user"""
-        session = self.service.get_current_session(self.current_user_id)
+        """Check if there is ANY open session (Global Lock)"""
+        # User ID is irrelevant for the lock check in single-terminal mode
+        session = self.service.get_active_session_global()
         if session:
             self.active_session = session
             return True

@@ -9,6 +9,17 @@ models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Ferreteria API", version="1.0.0")
 
+@app.middleware("http")
+async def log_requests(request, call_next):
+    import sys
+    print(f"📡 REQUEST: {request.method} {request.url}")
+    auth = request.headers.get("Authorization", "None")
+    print(f"🔑 HEADER AUTH: {auth[:20]}..." if auth else "🔑 HEADER AUTH: Missing")
+    
+    response = await call_next(request)
+    print(f"🔙 RESPONSE STATUS: {response.status_code}")
+    return response
+
 # CORS setup (Allow all for development)
 app.add_middleware(
     CORSMiddleware,
@@ -19,6 +30,7 @@ app.add_middleware(
 )
 
 app.include_router(products.router, prefix="/api/v1")
+# Sales endpoints are inside products router currently
 app.include_router(customers.router, prefix="/api/v1")
 app.include_router(quotes.router, prefix="/api/v1")
 app.include_router(cash.router, prefix="/api/v1")

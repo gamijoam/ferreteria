@@ -117,7 +117,7 @@ class LoginDialog(QDialog):
         # Welcome text
         welcome = QLabel("Bienvenido")
         welcome.setStyleSheet("""
-            color: red;
+            color: #2c3e50;
             font-size: 28pt;
             font-weight: bold;
         """)
@@ -257,14 +257,17 @@ class LoginDialog(QDialog):
             QMessageBox.warning(self, "Error", "Por favor ingrese usuario y contraseña")
             return
         
-        user = self.auth_controller.login(username, password)
+        success, message, user_data = self.auth_controller.login(username, password)
         
-        if user:
-            self.user = user
+        if success:
+            # Need to convert dict/response to UserObj for the app to work
+            # Importing UserObj locally or accessing it if available
+            from ..controllers.auth_controller import UserObj
+            self.user = UserObj(user_data)
             self.accept()
         else:
             QMessageBox.critical(self, "Error de Autenticación", 
-                               "Usuario o contraseña incorrectos.\nPor favor, verifique sus credenciales.")
+                               f"{message}\nPor favor, verifique sus credenciales.")
             self.input_password.clear()
             self.input_password.setFocus()
     

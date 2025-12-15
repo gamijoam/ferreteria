@@ -80,6 +80,8 @@ class MockProduct:
         self.name = data.get('name')
         self.sku = data.get('sku')
         self.price = data.get('price', 0.0)
+        self.price_mayor_1 = data.get('price_mayor_1', 0.0)
+        self.price_mayor_2 = data.get('price_mayor_2', 0.0)
         self.cost_price = data.get('cost_price', 0.0)
         self.stock = data.get('stock', 0.0)
         self.min_stock = data.get('min_stock', 5.0)

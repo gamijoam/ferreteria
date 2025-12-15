@@ -90,6 +90,8 @@ def build_backend():
         '--hidden-import=uvicorn.protocols.http.auto',
         '--hidden-import=uvicorn.lifespan',
         '--hidden-import=uvicorn.lifespan.on',
+        '--hidden-import=email_validator',
+        '--hidden-import=jose',
         '--hidden-import=sqlalchemy.sql.default_comparator',
         '--hidden-import=passlib.handlers.bcrypt',
     ])

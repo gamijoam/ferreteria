@@ -2,7 +2,7 @@ import sys
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, 
     QCheckBox, QComboBox, QPushButton, QTableWidget, QTableWidgetItem, 
-    QHeaderView, QMessageBox, QFormLayout, QGroupBox, QDialog, QDoubleSpinBox
+    QHeaderView, QMessageBox, QFormLayout, QGroupBox, QDialog, QDoubleSpinBox, QGridLayout
 )
 from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtCore import Qt, QLocale
@@ -27,82 +27,122 @@ class ProductFormDialog(QDialog):
         layout = QVBoxLayout()
         self.setLayout(layout)
         
-        # Form
-        form_layout = QFormLayout()
+        # Main Layout using Grid for "Horizontal" feel (2 columns)
+        grid_layout = QGridLayout()
+        grid_layout.setHorizontalSpacing(20)
+        grid_layout.setVerticalSpacing(10)
         
+        # --- FIELDS ---
         self.name_input = QLineEdit()
+        self.name_input.setPlaceholderText("Nombre del Producto")
+        
         self.sku_input = QLineEdit()
-        self.price_input = QLineEdit()
-        self.price_input.textChanged.connect(self.calculate_margin)
+        self.sku_input.setPlaceholderText("Código único")
+        
         self.cost_input = QLineEdit()
-        self.cost_input.setPlaceholderText("Precio de costo")
+        self.cost_input.setPlaceholderText("0.00")
         self.cost_input.textChanged.connect(self.calculate_margin)
+        
+        self.price_input = QLineEdit()
+        self.price_input.setPlaceholderText("0.00")
+        self.price_input.textChanged.connect(self.calculate_margin)
+        
         self.margin_label = QLabel("Margen: -")
         self.margin_label.setStyleSheet("font-weight: bold; color: green;")
         
         self.stock_input = QDoubleSpinBox()
         self.stock_input.setRange(0, 1000000)
-        self.stock_input.setDecimals(3)
-        self.stock_input.setSingleStep(1)
-        # Force dot as decimal separator
+        self.stock_input.setDecimals(2)
         self.stock_input.setLocale(QLocale(QLocale.Language.English, QLocale.Country.UnitedStates))
-        
-        self.price_mayor_1_input = QLineEdit()
-        self.price_mayor_1_input.setPlaceholderText("Precio Mayorista 1 (Opcional)")
-        self.price_mayor_2_input = QLineEdit()
-        self.price_mayor_2_input.setPlaceholderText("Precio Mayorista 2 (Opcional)")
         
         self.min_stock_input = QDoubleSpinBox()
         self.min_stock_input.setRange(0, 1000000)
-        self.min_stock_input.setDecimals(3)
-        self.min_stock_input.setSingleStep(1)
+        self.min_stock_input.setDecimals(2)
         self.min_stock_input.setValue(5.0)
         self.min_stock_input.setLocale(QLocale(QLocale.Language.English, QLocale.Country.UnitedStates))
         
+        self.unit_type_combo = QComboBox()
+        self.unit_type_combo.addItems(["Unidad", "Metro", "Kilo", "Litro", "Servicio"])
+        
+        self.location_input = QLineEdit()
+        self.location_input.setPlaceholderText("Ubicación en almacén")
+        
+        # --- Box / Pack Logic ---
         self.is_box_check = QCheckBox("Es Caja / Pack")
         self.is_box_check.toggled.connect(self.toggle_box_fields)
         
         self.conversion_factor_input = QLineEdit()
-        self.conversion_factor_input.setPlaceholderText("Ej: 50 (Unidades por caja)")
+        self.conversion_factor_input.setPlaceholderText("Unidades por caja")
         self.conversion_factor_input.setEnabled(False)
         self.conversion_factor_input.setText("1")
+
+        # --- Adding to Grid (Label, Widget, Row, Col) ---
+        # First Column
+        grid_layout.addWidget(QLabel("Nombre del Producto:*"), 0, 0)
+        grid_layout.addWidget(self.name_input, 1, 0)
         
-        self.location_input = QLineEdit()
-        self.location_input.setPlaceholderText("Ej: Estante A-1, Pasillo 3")
+        grid_layout.addWidget(QLabel("SKU / Código:"), 2, 0)
+        grid_layout.addWidget(self.sku_input, 3, 0)
         
-        self.unit_type_combo = QComboBox()
-        self.unit_type_combo.addItems(["Unidad", "Metro", "Kilo", "Litro"])
+        grid_layout.addWidget(QLabel("Costo de Compra ($):"), 4, 0)
+        grid_layout.addWidget(self.cost_input, 5, 0)
         
-        form_layout.addRow("Nombre:*", self.name_input)
-        form_layout.addRow("SKU / Código:", self.sku_input)
-        form_layout.addRow("Precio Costo:", self.cost_input)
-        form_layout.addRow("Precio Costo:", self.cost_input)
-        form_layout.addRow("Precio Detal:", self.price_input)
-        form_layout.addRow("Precio Mayor 1:", self.price_mayor_1_input)
-        form_layout.addRow("Precio Mayor 2:", self.price_mayor_2_input)
-        form_layout.addRow("", self.margin_label)
-        form_layout.addRow("Stock:", self.stock_input)
-        form_layout.addRow("Stock Mínimo (Alerta):", self.min_stock_input)
-        form_layout.addRow("Tipo Unidad:", self.unit_type_combo)
-        form_layout.addRow("Ubicación:", self.location_input)
-        form_layout.addRow("", self.is_box_check)
-        form_layout.addRow("Factor Conversión:", self.conversion_factor_input)
+        grid_layout.addWidget(QLabel("Stock Actual:"), 6, 0)
+        grid_layout.addWidget(self.stock_input, 7, 0)
         
-        layout.addLayout(form_layout)
+        grid_layout.addWidget(QLabel("Ubicación:"), 8, 0)
+        grid_layout.addWidget(self.location_input, 9, 0)
+
+        # Second Column
+        grid_layout.addWidget(QLabel("Tipo de Unidad:"), 0, 1)
+        grid_layout.addWidget(self.unit_type_combo, 1, 1)
+
+        grid_layout.addWidget(QLabel("Precio Venta ($):"), 4, 1)
+        grid_layout.addWidget(self.price_input, 5, 1)
+        
+        grid_layout.addWidget(self.margin_label, 6, 1) # Align with Stock/Cost row visually if needed, or put below price
+        
+        grid_layout.addWidget(QLabel("Stock Mínimo (Alerta):"), 6, 1) # Overwriting previous slot visual plan
+        grid_layout.addWidget(self.min_stock_input, 7, 1)
+
+        # Section for Packs
+        pack_group = QGroupBox("Configuración de Empaque")
+        pack_layout = QHBoxLayout()
+        pack_layout.addWidget(self.is_box_check)
+        pack_layout.addWidget(QLabel("Factor:"))
+        pack_layout.addWidget(self.conversion_factor_input)
+        pack_group.setLayout(pack_layout)
+
+        layout.addLayout(grid_layout)
+        layout.addWidget(pack_group)
         
         # Buttons
         btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
         
-        save_btn = QPushButton("Guardar")
-        save_btn.setStyleSheet("background-color: #4CAF50; color: white; padding: 10px; font-size: 12pt;")
+        save_btn = QPushButton("Guardar Producto")
+        save_btn.setStyleSheet("""
+            background-color: #2ecc71; 
+            color: white; 
+            padding: 10px 20px; 
+            font-size: 11pt; 
+            font-weight: bold; 
+            border-radius: 4px;
+        """)
         save_btn.clicked.connect(self.accept)
         
         cancel_btn = QPushButton("Cancelar")
-        cancel_btn.setStyleSheet("background-color: #f44336; color: white; padding: 10px; font-size: 12pt;")
+        cancel_btn.setStyleSheet("""
+            background-color: #e74c3c; 
+            color: white; 
+            padding: 10px 20px; 
+            font-size: 11pt; 
+            border-radius: 4px;
+        """)
         cancel_btn.clicked.connect(self.reject)
         
-        btn_layout.addWidget(save_btn)
         btn_layout.addWidget(cancel_btn)
+        btn_layout.addWidget(save_btn)
         layout.addLayout(btn_layout)
     
     def toggle_box_fields(self, checked):
@@ -135,8 +175,6 @@ class ProductFormDialog(QDialog):
         self.name_input.setText(product.name)
         self.sku_input.setText(product.sku or "")
         self.price_input.setText(str(product.price))
-        self.price_mayor_1_input.setText(str(product.price_mayor_1 or 0.0))
-        self.price_mayor_2_input.setText(str(product.price_mayor_2 or 0.0))
         self.cost_input.setText(str(product.cost_price))
         self.stock_input.setValue(float(product.stock))
         self.min_stock_input.setValue(float(product.min_stock if hasattr(product, 'min_stock') else 5.0))
@@ -153,8 +191,6 @@ class ProductFormDialog(QDialog):
             "sku": self.sku_input.text().strip() or None,
             "sku": self.sku_input.text().strip() or None,
             "price": float(self.price_input.text() or 0),
-            "price_mayor_1": float(self.price_mayor_1_input.text() or 0),
-            "price_mayor_2": float(self.price_mayor_2_input.text() or 0),
             "cost_price": float(self.cost_input.text() or 0),
             "stock": self.stock_input.value(),
             "min_stock": self.min_stock_input.value(),

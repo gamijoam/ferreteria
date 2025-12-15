@@ -33,6 +33,30 @@ def open_session(session_data: schemas.CashSessionCreate, db: Session = Depends(
     db.refresh(new_session)
     return new_session
 
+@router.get("/active", response_model=schemas.CashSessionRead)
+def get_active_session(db: Session = Depends(get_db)):
+    """Get the currently open session (globally)"""
+    active = db.query(models.CashSession).filter(
+        models.CashSession.status == "OPEN"
+    ).first()
+    
+    if not active:
+        raise HTTPException(status_code=404, detail="No active session found")
+        
+    return active
+
+@router.get("/active", response_model=schemas.CashSessionRead)
+def get_active_session(db: Session = Depends(get_db)):
+    """Get the currently open session (globally)"""
+    active = db.query(models.CashSession).filter(
+        models.CashSession.status == "OPEN"
+    ).first()
+    
+    if not active:
+        raise HTTPException(status_code=404, detail="No active session found")
+        
+    return active
+
 @router.get("/current/{user_id}", response_model=schemas.CashSessionRead)
 def get_current_session(user_id: int, db: Session = Depends(get_db)):
     active = db.query(models.CashSession).filter(
@@ -41,7 +65,7 @@ def get_current_session(user_id: int, db: Session = Depends(get_db)):
     ).first()
     
     if not active:
-        raise HTTPException(status_code=404, detail="No active session found")
+        raise HTTPException(status_code=404, detail="No active session found for user")
         
     return active
 

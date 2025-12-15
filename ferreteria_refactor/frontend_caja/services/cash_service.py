@@ -17,6 +17,19 @@ class CashService:
             print(f"Error opening session: {e}")
             return None
 
+    def get_active_session_global(self):
+        try:
+             # Calls the new backend endpoint that returns ANY open session
+             result = self.client.get(f"{self.endpoint}/active", silent_404=True)
+             if result:
+                 print(f"✅ GLOBAL ACTIVE SESSION FOUND: {result}")
+             else:
+                 print(f"❌ GLOBAL ACTIVE SESSION NOT FOUND (Endpoint missing or no session)")
+             return result
+        except Exception as e:
+            print(f"🚨 ERROR CHECKING ACTIVE SESSION: {e}")
+            return None
+
     def get_current_session(self, user_id):
         try:
             return self.client.get(f"{self.endpoint}/current/{user_id}", silent_404=True)

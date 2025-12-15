@@ -16,6 +16,7 @@ class ProductBase(BaseModel):
     conversion_factor: int = 1
     category_id: Optional[int] = None
     supplier_id: Optional[int] = None
+    location: Optional[str] = None
 
 class ProductCreate(ProductBase):
     pass
@@ -34,6 +35,7 @@ class ProductUpdate(BaseModel):
     conversion_factor: Optional[int] = None
     category_id: Optional[int] = None
     supplier_id: Optional[int] = None
+    location: Optional[str] = None
     is_active: Optional[bool] = None
 
     class Config:

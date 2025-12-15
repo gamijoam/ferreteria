@@ -103,6 +103,7 @@ class POSController:
             "subtotal": subtotal,
             "is_box": is_box,
             "unit_type": product.get("unit_type", "Unidad"),
+            "location": product.get("location"),
             "price_tier": price_tier, # Store tier for updates
             "product_obj": product # Keep dict as obj
         }

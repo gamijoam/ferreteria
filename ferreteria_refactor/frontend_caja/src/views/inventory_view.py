@@ -168,9 +168,9 @@ class InventoryWindow(QWidget):
         self.product_map = {}  # Map suggestion text to product
         suggestions = []
         for p in products:
-            # p is likely a dictionary from API
-            sku = p.get('sku', '')
-            name = p.get('name', '')
+            # p is a MockProduct object
+            sku = getattr(p, 'sku', '')
+            name = getattr(p, 'name', '')
             sku_part = f" - {sku}" if sku else ""
             suggestion = f"{name}{sku_part}"
             suggestions.append(suggestion)
@@ -197,16 +197,17 @@ class InventoryWindow(QWidget):
              pass
         
         if product:
-            self.selected_product_id = product.get('id')
-            self.selected_product_label.setText(f"✓ {product.get('name')}")
+            self.selected_product_id = getattr(product, 'id', None)
+            name = getattr(product, 'name', 'Desconocido')
+            self.selected_product_label.setText(f"✓ {name}")
             self.selected_product_label.setStyleSheet("font-weight: bold; color: green;")
-            stock = product.get('stock', 0)
-            unit = product.get('unit_type', 'Unidad')
+            stock = getattr(product, 'stock', 0)
+            unit = getattr(product, 'unit_type', 'Unidad')
             self.current_stock_label.setText(f"Stock Actual: {stock} {unit}")
             
-            if product.get('is_box'):
+            if getattr(product, 'is_box', False):
                 self.is_box_check.setEnabled(True)
-                factor = product.get('conversion_factor', 1)
+                factor = getattr(product, 'conversion_factor', 1)
                 self.is_box_check.setText(f"Es Caja (x{factor} {unit})")
             else:
                 self.is_box_check.setEnabled(False)
@@ -305,8 +306,8 @@ class InventoryWindow(QWidget):
         self.out_product_map = {}
         suggestions = []
         for p in products:
-            sku = p.get('sku', '')
-            name = p.get('name', '')
+            sku = getattr(p, 'sku', '')
+            name = getattr(p, 'name', '')
             sku_part = f" - {sku}" if sku else ""
             suggestion = f"{name}{sku_part}"
             suggestions.append(suggestion)
@@ -326,11 +327,12 @@ class InventoryWindow(QWidget):
         # Fallback removed as DB is gone
         
         if product:
-            self.selected_out_product_id = product.get('id')
-            self.selected_out_product_label.setText(f"✓ {product.get('name')}")
+            self.selected_out_product_id = getattr(product, 'id', None)
+            name = getattr(product, 'name', 'Desconocido')
+            self.selected_out_product_label.setText(f"✓ {name}")
             self.selected_out_product_label.setStyleSheet("font-weight: bold; color: green;")
-            stock = product.get('stock', 0)
-            unit = product.get('unit_type', 'Unidad')
+            stock = getattr(product, 'stock', 0)
+            unit = getattr(product, 'unit_type', 'Unidad')
             self.out_current_stock_label.setText(f"Stock Actual: {stock} {unit}")
         else:
             self.selected_out_product_id = None
@@ -379,8 +381,8 @@ class InventoryWindow(QWidget):
         self.history_product_map = {}
         suggestions = []
         for p in products:
-            sku = p.get('sku', '')
-            name = p.get('name', '')
+            sku = getattr(p, 'sku', '')
+            name = getattr(p, 'name', '')
             sku_part = f" - {sku}" if sku else ""
             suggestion = f"{name}{sku_part}"
             suggestions.append(suggestion)
@@ -400,7 +402,7 @@ class InventoryWindow(QWidget):
         # Fallback removed
             
         if product:
-            self.selected_history_product_id = product.get('id')
+            self.selected_history_product_id = getattr(product, 'id', None)
             self.load_kardex()
         else:
             self.selected_history_product_id = None
