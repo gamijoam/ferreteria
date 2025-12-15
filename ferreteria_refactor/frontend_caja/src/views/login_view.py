@@ -117,7 +117,7 @@ class LoginDialog(QDialog):
         # Welcome text
         welcome = QLabel("Bienvenido")
         welcome.setStyleSheet("""
-            color: #2c3e50;
+            color: red;
             font-size: 28pt;
             font-weight: bold;
         """)

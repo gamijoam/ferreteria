@@ -103,7 +103,7 @@ class MainWindow(QMainWindow):
         header_layout.addWidget(title)
 
         user_label = QLabel(f"👤 Usuario: {user.username} | Rol: {user.role.value}")
-        user_label.setStyleSheet("color: white; font-size: 12pt;")
+        user_label.setStyleSheet("color: red; font-size: 12pt; font-weight: bold;")
         user_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header_layout.addWidget(user_label)
 
