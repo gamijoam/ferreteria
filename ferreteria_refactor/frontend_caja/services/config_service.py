@@ -58,7 +58,11 @@ class ConfigService:
     def get_currencies(self):
         """Get all available currencies"""
         try:
-            return self.client.get(f"{self.endpoint}/currencies")
+            result = self.client.get(f"{self.endpoint}/currencies")
+            if isinstance(result, list):
+                return result
+            print(f"Warning: get_currencies expected list, got {type(result)}: {result}")
+            return []
         except Exception as e:
             print(f"Error fetching currencies: {e}")
             return []
@@ -66,7 +70,11 @@ class ConfigService:
     def get_exchange_rates(self):
         """Get all exchange rates"""
         try:
-            return self.client.get(f"{self.endpoint}/exchange-rates")
+            result = self.client.get(f"{self.endpoint}/exchange-rates")
+            if isinstance(result, list):
+                return result
+            print(f"Warning: get_exchange_rates expected list, got {type(result)}: {result}")
+            return []
         except Exception as e:
             print(f"Error fetching exchange rates: {e}")
             return []
