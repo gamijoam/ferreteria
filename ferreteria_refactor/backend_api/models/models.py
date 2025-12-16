@@ -12,6 +12,46 @@ class MovementType(enum.Enum):
     ADJUSTMENT_IN = "ADJUSTMENT_IN"
     ADJUSTMENT_OUT = "ADJUSTMENT_OUT"
 
+# ============================================================================
+# MULTI-CURRENCY SYSTEM
+# ============================================================================
+
+class Currency(Base):
+    """Catalog of available currencies (USD, VES, EUR, etc.)"""
+    __tablename__ = "currencies"
+
+    code = Column(String(3), primary_key=True, index=True)  # USD, VES, EUR
+    name = Column(String, nullable=False)  # Dólar Estadounidense, Bolívar
+    symbol = Column(String, nullable=False)  # $, Bs, €
+
+    exchange_rates = relationship("ExchangeRate", back_populates="currency")
+
+    def __repr__(self):
+        return f"<Currency(code='{self.code}', name='{self.name}')>"
+
+class ExchangeRate(Base):
+    """Dynamic exchange rates for different purposes (BCV, Monitor, Internal, etc.)"""
+    __tablename__ = "exchange_rates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)  # "BCV", "Monitor", "Mayorista"
+    currency_code = Column(String(3), ForeignKey("currencies.code"), nullable=False)
+    rate = Column(Float, nullable=False)  # Conversion rate to base currency (USD)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.datetime.now)
+    updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
+
+    currency = relationship("Currency", back_populates="exchange_rates")
+    products = relationship("Product", back_populates="default_rate")
+    price_rules = relationship("PriceRule", back_populates="exchange_rate")
+
+    def __repr__(self):
+        return f"<ExchangeRate(name='{self.name}', rate={self.rate}, currency='{self.currency_code}')>"
+
+# ============================================================================
+# EXISTING MODELS
+# ============================================================================
+
 class Category(Base):
     __tablename__ = "categories"
 
@@ -66,10 +106,14 @@ class Product(Base):
 
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
     supplier_id = Column(Integer, ForeignKey("suppliers.id"), nullable=True)
+    
+    # Exchange Rate Support
+    default_rate_id = Column(Integer, ForeignKey("exchange_rates.id"), nullable=True)
 
     category = relationship("Category", back_populates="products")
     category = relationship("Category", back_populates="products")
     supplier = relationship("Supplier", back_populates="products")
+    default_rate = relationship("ExchangeRate", back_populates="products")
     price_rules = relationship("PriceRule", back_populates="product")
 
     def __repr__(self):
@@ -146,6 +190,10 @@ class SaleDetail(Base):
     
     subtotal = Column(Float, nullable=False)
     is_box_sale = Column(Boolean, default=False) # Was it sold as a box?
+    
+    # Audit: Exchange rate used at time of sale
+    exchange_rate_name = Column(String, nullable=True)
+    exchange_rate_value = Column(Float, nullable=True)
 
     sale = relationship("Sale", back_populates="details")
     product = relationship("Product")
@@ -287,8 +335,12 @@ class PriceRule(Base):
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
     min_quantity = Column(Float, nullable=False)  # Minimum qty to apply this price
     price = Column(Float, nullable=False)  # Special price for this tier
+    
+    # Exchange Rate Support (allows different rates for wholesale)
+    exchange_rate_id = Column(Integer, ForeignKey("exchange_rates.id"), nullable=True)
 
     product = relationship("Product", back_populates="price_rules")
+    exchange_rate = relationship("ExchangeRate", back_populates="price_rules")
 
     def __repr__(self):
         return f"<PriceRule(product={self.product_id}, min_qty={self.min_quantity}, price={self.price})>"

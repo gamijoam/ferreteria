@@ -12,12 +12,12 @@ app = FastAPI(title="Ferreteria API", version="1.0.0")
 @app.middleware("http")
 async def log_requests(request, call_next):
     import sys
-    print(f"📡 REQUEST: {request.method} {request.url}")
+    print(f"[REQUEST] {request.method} {request.url}")
     auth = request.headers.get("Authorization", "None")
-    print(f"🔑 HEADER AUTH: {auth[:20]}..." if auth else "🔑 HEADER AUTH: Missing")
+    print(f"[AUTH] HEADER AUTH: {auth[:20]}..." if auth else "[AUTH] HEADER AUTH: Missing")
     
     response = await call_next(request)
-    print(f"🔙 RESPONSE STATUS: {response.status_code}")
+    print(f"[RESPONSE] STATUS: {response.status_code}")
     return response
 
 # CORS setup (Allow all for development)
@@ -47,10 +47,13 @@ app.include_router(auth.router, prefix="/api/v1")
 def startup_event():
     from .database.db import SessionLocal
     from .routers.auth import init_admin_user
+    from .database.init_currencies import init_currency_system
+    
     db = SessionLocal()
     try:
         init_admin_user(db)
+        init_currency_system(db)  # Initialize multi-currency system
     except Exception as e:
-        print(f"Error initializing admin user: {e}")
+        print(f"[ERROR] Error during startup initialization: {e}")
     finally:
         db.close()
