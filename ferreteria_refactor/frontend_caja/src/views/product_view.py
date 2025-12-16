@@ -16,7 +16,8 @@ class ProductFormDialog(QDialog):
         super().__init__(parent)
         self.product = product
         self.setWindowTitle("Editar Producto" if product else "Nuevo Producto")
-        self.resize(500, 600)
+        self.resize(600, 500)  # Reasonable initial size
+        self.setMinimumHeight(400)  # Prevent window from being too small
         
         self.setup_ui()
         
@@ -24,13 +25,25 @@ class ProductFormDialog(QDialog):
             self.populate_form(product)
     
     def setup_ui(self):
-        layout = QVBoxLayout()
-        self.setLayout(layout)
+        # Main layout (only 2 elements: scroll area + buttons)
+        main_layout = QVBoxLayout()
+        self.setLayout(main_layout)
         
         # Get base currency configuration
         self.base_currency, self.currency_symbol = self.get_base_currency()
         
-        # Main Layout using Grid for "Horizontal" feel (2 columns)
+        # ===== ELEMENT 1: SCROLL AREA (Scrollable Content) =====
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll_area.setFrameShape(QScrollArea.Shape.NoFrame)
+        
+        # Container widget for all form fields
+        scroll_content = QWidget()
+        content_layout = QVBoxLayout()
+        scroll_content.setLayout(content_layout)
+        
+        # Grid Layout for form fields (2 columns)
         grid_layout = QGridLayout()
         grid_layout.setHorizontalSpacing(20)
         grid_layout.setVerticalSpacing(10)
@@ -49,7 +62,7 @@ class ProductFormDialog(QDialog):
         self.price_input = QLineEdit()
         self.price_input.setPlaceholderText("0.00")
         self.price_input.textChanged.connect(self.calculate_margin)
-        self.price_input.textChanged.connect(self.update_converted_price)  # Real-time conversion
+        self.price_input.textChanged.connect(self.update_converted_price)
         
         self.margin_label = QLabel("Margen: -")
         self.margin_label.setStyleSheet("font-weight: bold; color: green;")
@@ -71,7 +84,7 @@ class ProductFormDialog(QDialog):
         self.location_input = QLineEdit()
         self.location_input.setPlaceholderText("Ubicación en almacén")
         
-        # --- Box / Pack Logic ---
+        # Box / Pack Logic
         self.is_box_check = QCheckBox("Es Caja / Pack")
         self.is_box_check.toggled.connect(self.toggle_box_fields)
         
@@ -109,11 +122,14 @@ class ProductFormDialog(QDialog):
         grid_layout.addWidget(price_label, 4, 1)
         grid_layout.addWidget(self.price_input, 5, 1)
         
-        grid_layout.addWidget(self.margin_label, 6, 1) # Align with Stock/Cost row visually if needed, or put below price
+        grid_layout.addWidget(self.margin_label, 6, 1)
         
-        grid_layout.addWidget(QLabel("Stock Mínimo (Alerta):"), 6, 1) # Overwriting previous slot visual plan
-        grid_layout.addWidget(self.min_stock_input, 7, 1)
+        grid_layout.addWidget(QLabel("Stock Mínimo (Alerta):"), 7, 1)
+        grid_layout.addWidget(self.min_stock_input, 8, 1)
 
+        # Add grid to content layout
+        content_layout.addLayout(grid_layout)
+        
         # Currency Reference Section
         currency_group = QGroupBox("Conversión de Moneda (Referencia)")
         currency_layout = QFormLayout()
@@ -142,6 +158,7 @@ class ProductFormDialog(QDialog):
         currency_layout.addRow("", self.converted_price_label)
         
         currency_group.setLayout(currency_layout)
+        content_layout.addWidget(currency_group)
         
         # Section for Packs
         pack_group = QGroupBox("Configuración de Empaque")
@@ -150,12 +167,16 @@ class ProductFormDialog(QDialog):
         pack_layout.addWidget(QLabel("Factor:"))
         pack_layout.addWidget(self.conversion_factor_input)
         pack_group.setLayout(pack_layout)
-
-        layout.addLayout(grid_layout)
-        layout.addWidget(currency_group)
-        layout.addWidget(pack_group)
+        content_layout.addWidget(pack_group)
         
-        # Buttons
+        # Add stretch to push content to top
+        content_layout.addStretch()
+        
+        # Set scroll content
+        scroll_area.setWidget(scroll_content)
+        main_layout.addWidget(scroll_area)
+        
+        # ===== ELEMENT 2: FIXED FOOTER (Buttons) =====
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
         
@@ -182,7 +203,7 @@ class ProductFormDialog(QDialog):
         
         btn_layout.addWidget(cancel_btn)
         btn_layout.addWidget(save_btn)
-        layout.addLayout(btn_layout)
+        main_layout.addLayout(btn_layout)
     
     def toggle_box_fields(self, checked):
         self.conversion_factor_input.setEnabled(checked)

@@ -13,7 +13,8 @@ class ConfigDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Configuración del Negocio")
-        self.resize(800, 600)
+        self.resize(700, 550)  # Reasonable initial size
+        self.setMinimumHeight(450)  # Prevent window from being too small
         
         self.controller = ConfigController()
         
@@ -21,17 +22,29 @@ class ConfigDialog(QDialog):
         self.load_data()
 
     def setup_ui(self):
+        # Main layout (only 2 elements: scroll area + save button)
         main_layout = QVBoxLayout()
         self.setLayout(main_layout)
+        
+        # ===== ELEMENT 1: SCROLL AREA (Scrollable Content) =====
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll_area.setFrameShape(QScrollArea.Shape.NoFrame)
+        
+        # Container widget for all content
+        scroll_content = QWidget()
+        content_main_layout = QVBoxLayout()
+        scroll_content.setLayout(content_main_layout)
         
         # Header
         header = QLabel("Datos de la Empresa")
         header.setStyleSheet("font-size: 18px; font-weight: bold; margin-bottom: 10px;")
-        main_layout.addWidget(header)
+        content_main_layout.addWidget(header)
         
         # Create horizontal layout for two columns
         content_layout = QHBoxLayout()
-        main_layout.addLayout(content_layout)
+        content_main_layout.addLayout(content_layout)
         
         # LEFT COLUMN
         left_column = QVBoxLayout()
@@ -207,7 +220,14 @@ class ConfigDialog(QDialog):
         
         right_column.addStretch()
         
-        # BOTTOM: Save button (full width)
+        # Add stretch to push content to top
+        content_main_layout.addStretch()
+        
+        # Set scroll content
+        scroll_area.setWidget(scroll_content)
+        main_layout.addWidget(scroll_area)
+        
+        # ===== ELEMENT 2: FIXED FOOTER (Save Button) =====
         btn_save = QPushButton("Guardar Cambios")
         btn_save.setStyleSheet("""
             QPushButton {
