@@ -25,6 +25,142 @@ class POSController:
             print(f"Error loading products: {e}")
             self.cached_products = []
 
+    def search_product_by_barcode(self, code):
+        """
+        Intelligent barcode search:
+        1. Search in Product table by SKU
+        2. If not found, search in ProductUnit table by barcode
+        3. Calculate final price in Bs using default_rate_id
+        
+        Returns: dict with product info, unit details, and calculated prices
+        """
+        try:
+            # Step 1: Search in Product table (by SKU)
+            for product in self.cached_products:
+                if product.get('sku') == code:
+                    # Found in Product table - use base unit
+                    return self._build_product_result(
+                        product=product,
+                        unit_name=product.get('base_unit', 'UNIDAD'),
+                        conversion_factor=1.0,
+                        unit_price=None,  # Use product price
+                        barcode=code
+                    )
+            
+            # Step 2: Search in ProductUnit table
+            from frontend_caja.services.product_service import ProductService
+            service = ProductService()
+            
+            # Get all product units and search by barcode
+            for product in self.cached_products:
+                try:
+                    units = service.get_product_units(product['id'])
+                    for unit in units:
+                        if unit.get('barcode') == code and unit.get('is_active', True):
+                            # Found in ProductUnit table
+                            return self._build_product_result(
+                                product=product,
+                                unit_name=unit.get('name', 'Presentación'),
+                                conversion_factor=unit.get('conversion_factor', 1.0),
+                                unit_price=unit.get('price'),  # May be None
+                                barcode=code,
+                                unit_id=unit.get('id')
+                            )
+                except:
+                    continue  # Skip if can't get units for this product
+            
+            return None  # Not found
+            
+        except Exception as e:
+            print(f"Error in barcode search: {e}")
+            return None
+    
+    def _build_product_result(self, product, unit_name, conversion_factor, unit_price, barcode, unit_id=None):
+        """
+        Build standardized product result with price calculations
+        """
+        # Determine base price (USD or base currency)
+        if unit_price is not None and unit_price > 0:
+            # Use specific unit price
+            base_price_usd = unit_price
+        else:
+            # Use product price * conversion factor
+            base_price_usd = product.get('price', 0) * conversion_factor
+        
+        # Get exchange rate for this product
+        rate_info = self._get_exchange_rate_for_product(product)
+        
+        # Calculate price in Bs
+        final_price_bs = base_price_usd * rate_info['rate_value']
+        
+        return {
+            # Product info
+            'product_id': product['id'],
+            'name': product['name'],
+            'sku': product.get('sku'),
+            
+            # Unit info
+            'unit_name': unit_name,
+            'unit_id': unit_id,
+            'conversion_factor': conversion_factor,
+            'barcode': barcode,
+            
+            # Pricing
+            'base_price_usd': base_price_usd,
+            'rate_name': rate_info['rate_name'],
+            'rate_value': rate_info['rate_value'],
+            'final_price_bs': final_price_bs,
+            
+            # Stock info
+            'stock': product.get('stock', 0),
+            'location': product.get('location'),
+            
+            # Full product object for compatibility
+            'product_obj': product
+        }
+    
+    def _get_exchange_rate_for_product(self, product):
+        """
+        Get exchange rate for a product based on its default_rate_id
+        Returns dict with rate_name and rate_value
+        """
+        try:
+            from src.controllers.config_controller import ConfigController
+            config_controller = ConfigController()
+            
+            # Get product's default rate
+            default_rate_id = product.get('default_rate_id')
+            
+            if default_rate_id:
+                # Get all rates and find the one we need
+                rates = config_controller.get_exchange_rates()
+                for rate in rates:
+                    if rate.get('id') == default_rate_id and rate.get('is_active', True):
+                        return {
+                            'rate_name': rate.get('name', 'Tasa'),
+                            'rate_value': rate.get('rate', 1.0)
+                        }
+            
+            # Fallback: get operating currency rate or 1:1
+            operating_currency = config_controller.get_config('OPERATING_CURRENCY', 'VES')
+            
+            if operating_currency != 'USD':
+                # Try to get a rate for operating currency
+                rates = config_controller.get_exchange_rates()
+                for rate in rates:
+                    if rate.get('currency_code') == operating_currency and rate.get('is_active', True):
+                        return {
+                            'rate_name': rate.get('name', 'Estándar'),
+                            'rate_value': rate.get('rate', 1.0)
+                        }
+            
+            # Ultimate fallback
+            return {'rate_name': 'Estándar (1:1)', 'rate_value': 1.0}
+            
+        except Exception as e:
+            print(f"Error getting exchange rate: {e}")
+            return {'rate_name': 'Estándar (1:1)', 'rate_value': 1.0}
+
     def get_applicable_price(self, product, quantity, is_box, price_tier="price"):
         """
         Calculate unit price based on tier and volume rules.
