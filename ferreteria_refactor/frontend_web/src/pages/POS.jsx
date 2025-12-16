@@ -1,4 +1,4 @@
-```javascript
+
 import { useState, useRef, useEffect } from 'react';
 import { Search, ShoppingCart, Trash2, Edit, AlertCircle } from 'lucide-react';
 import { useCart } from '../context/CartContext';
@@ -13,7 +13,7 @@ import CashMovementModal from '../components/cash/CashMovementModal';
 const POS = () => {
     const { cart, addToCart, removeFromCart, updateQuantity, clearCart, totalUSD, totalBs } = useCart();
     const { isSessionOpen, openSession } = useCash();
-    
+
     // UI State
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedProductForAdd, setSelectedProductForAdd] = useState(null);
@@ -137,28 +137,28 @@ const POS = () => {
             {/* RIGHT COLUMN: Ticket (30%) */}
             <div className="w-[30%] bg-white flex flex-col shadow-2xl h-full border-l">
                 <div className="bg-slate-800 text-white p-4 shadow-md">
-                     <div className="flex justify-between items-center mb-2">
+                    <div className="flex justify-between items-center mb-2">
                         <h2 className="text-xl font-bold flex items-center">
                             <ShoppingCart className="mr-2" /> Ticket
                         </h2>
                         <button onClick={clearCart} className="text-xs bg-red-500 hover:bg-red-600 px-2 py-1 rounded transition">
                             Limpiar
                         </button>
-                     </div>
-                     <div className="flex space-x-2">
-                        <button 
+                    </div>
+                    <div className="flex space-x-2">
+                        <button
                             onClick={() => setIsMovementOpen(true)}
                             className="flex-1 text-xs bg-slate-700 hover:bg-slate-600 py-1 rounded text-center border border-slate-600"
                         >
                             Gasto/Retiro
                         </button>
-                        <Link 
+                        <Link
                             to="/cash-close"
                             className="flex-1 text-xs bg-slate-700 hover:bg-slate-600 py-1 rounded text-center border border-slate-600 block"
                         >
                             Cerrar Caja
                         </Link>
-                     </div>
+                    </div>
                 </div>
 
                 {/* List */}
@@ -229,7 +229,7 @@ const POS = () => {
                 onDelete={removeFromCart}
             />
 
-            <PaymentModal 
+            <PaymentModal
                 isOpen={isPaymentOpen}
                 totalUSD={totalUSD}
                 totalBs={totalBs}
@@ -237,9 +237,9 @@ const POS = () => {
                 onConfirm={handleCheckout}
             />
 
-            <CashMovementModal 
-                 isOpen={isMovementOpen}
-                 onClose={() => setIsMovementOpen(false)}
+            <CashMovementModal
+                isOpen={isMovementOpen}
+                onClose={() => setIsMovementOpen(false)}
             />
 
             {!isSessionOpen && (
