@@ -18,6 +18,8 @@ class InventoryWindow(QWidget):
         
         # self.db = SessionLocal() # Removed
         self.controller = InventoryController() # No DB needed
+        from src.controllers.product_controller import ProductController
+        self.product_controller = ProductController()
         
         self.layout = QVBoxLayout()
         self.setLayout(self.layout)
@@ -46,23 +48,165 @@ class InventoryWindow(QWidget):
             self.on_stock_out_product_selected()
         if self.selected_history_product_id:
             self.load_kardex()
+        
+        # Refresh stock table if it exists
+        if hasattr(self, 'stock_table'):
+            self.load_stock_table()
 
     def setup_ui(self):
         # Tabs for Entry and History
         self.tabs = QTabWidget()
         self.layout.addWidget(self.tabs)
         
+        self.stock_tab = QWidget() # NEW TAB
         self.entry_tab = QWidget()
         self.stock_out_tab = QWidget()
         self.history_tab = QWidget()
         
+        self.tabs.addTab(self.stock_tab, "📦 Stock Actual")
         self.tabs.addTab(self.entry_tab, "Entrada de Mercancía")
         self.tabs.addTab(self.stock_out_tab, "Salida / Ajuste")
         self.tabs.addTab(self.history_tab, "Kardex / Historial")
         
+        self.setup_stock_tab() # NEW SETUP
         self.setup_entry_tab()
         self.setup_stock_out_tab()
         self.setup_history_tab()
+
+    def setup_stock_tab(self):
+        layout = QVBoxLayout()
+        self.stock_tab.setLayout(layout)
+        
+        # Filter Layout
+        filter_layout = QHBoxLayout()
+        filter_layout.addWidget(QLabel("Buscar Producto:"))
+        
+        self.stock_search_input = QLineEdit()
+        self.stock_search_input.setPlaceholderText("Filtrar por nombre, SKU...")
+        self.stock_search_input.textChanged.connect(self.filter_stock_table)
+        filter_layout.addWidget(self.stock_search_input)
+        
+        btn_refresh = QPushButton("🔄 Actualizar")
+        btn_refresh.clicked.connect(self.load_stock_table)
+        filter_layout.addWidget(btn_refresh)
+        
+        layout.addLayout(filter_layout)
+        
+        # Table
+        self.stock_table = QTableWidget()
+        self.stock_table.setColumnCount(5)
+        self.stock_table.setHorizontalHeaderLabels([
+            "Código/SKU", "Producto", "Ubicación", "Stock Base", "Visualización Inteligente"
+        ])
+        self.stock_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        self.stock_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
+        self.stock_table.setAlternatingRowColors(True)
+        
+        layout.addWidget(self.stock_table)
+        
+        # Load initial data
+        self.load_stock_table()
+
+    def load_stock_table(self):
+        self.stock_table.setRowCount(0)
+        
+        # Use ProductController to fetch products
+        products = self.product_controller.get_active_products()
+        
+        # Store for filtering
+        self.all_inventory_products = products
+        
+        self.populate_stock_table(products)
+
+    def populate_stock_table(self, products):
+        self.stock_table.setRowCount(0)
+        
+        for row, p in enumerate(products):
+            self.stock_table.insertRow(row)
+            
+            # SKU
+            self.stock_table.setItem(row, 0, QTableWidgetItem(p.sku or ""))
+            
+            # Name
+            item_name = QTableWidgetItem(p.name)
+            item_name.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+            self.stock_table.setItem(row, 1, item_name)
+            
+            # Location
+            self.stock_table.setItem(row, 2, QTableWidgetItem(p.location or "-"))
+            
+            # Stock Base
+            base_unit = getattr(p, 'unit_type', 'UNIDAD')
+            self.stock_table.setItem(row, 3, QTableWidgetItem(f"{p.stock} {base_unit}"))
+            
+            # SMART COLUMN
+            # Need to get units for this product to calculate
+            # Optimization: If many products, this is slow. But for <100 items ok.
+            # Ideally fetch units in bulk or lazy load.
+            units = self.product_controller.get_product_units(p.id)
+            smart_display = self.format_stock_display(p.stock, units, base_unit)
+            
+            smart_item = QTableWidgetItem(smart_display)
+            smart_item.setForeground(QColor("blue"))
+            smart_item.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+            self.stock_table.setItem(row, 4, smart_item)
+
+    def filter_stock_table(self):
+        query = self.stock_search_input.text().lower()
+        if not hasattr(self, 'all_inventory_products'):
+            return
+            
+        filtered = [
+            p for p in self.all_inventory_products 
+            if query in p.name.lower() or (p.sku and query in p.sku.lower())
+        ]
+        self.populate_stock_table(filtered)
+
+    def format_stock_display(self, total_qty, units, base_unit="UNIDAD"):
+        """
+        Calculates smart display string.
+        total_qty: float (Real stock in base units)
+        units: list of dicts (ProductUnit)
+        base_unit: str
+        """
+        if not units or total_qty == 0:
+            return f"{total_qty} {base_unit}"
+        
+        # Sort units by conversion factor (Descending) to use largest first
+        # Filter active units
+        active_units = [u for u in units if u.get('is_active', True) and u.get('conversion_factor', 0) > 0]
+        sorted_units = sorted(active_units, key=lambda x: x['conversion_factor'], reverse=True)
+        
+        if not sorted_units:
+             return f"{total_qty} {base_unit}"
+        
+        parts = []
+        remaining = total_qty
+        
+        # Use the LARGEST unit primarily
+        largest_unit = sorted_units[0]
+        factor = largest_unit['conversion_factor']
+        unit_name = largest_unit['name']
+        
+        if factor > 1:
+            main_count = int(remaining // factor)
+            if main_count > 0:
+                parts.append(f"{main_count} {unit_name}")
+                remaining %= factor
+        
+        # Remainder in base unit
+        # Round logic to avoid floating point errors (e.g. 0.0000001)
+        remaining = round(remaining, 3)
+        
+        if remaining > 0:
+            parts.append(f"{remaining} {base_unit}")
+            
+        final_str = ", ".join(parts)
+        if not final_str:
+            final_str = f"0 {base_unit}"
+            
+        # Add total reference
+        return f"{final_str} ({total_qty} {base_unit})"
 
     def setup_entry_tab(self):
         layout = QVBoxLayout()

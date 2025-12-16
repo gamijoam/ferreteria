@@ -108,12 +108,14 @@ class ConfigDialog(QDialog):
         self.rates_table.setHorizontalHeaderLabels([
             "Nombre", "Moneda", "Tasa", "Activa", "Acciones"
         ])
-        self.rates_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        self.rates_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
-        self.rates_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
-        self.rates_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
-        self.rates_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
-        self.rates_table.setMaximumHeight(200)
+        
+        # FIX: Apply Stretch to headers
+        header = self.rates_table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        
+        self.rates_table.setMinimumHeight(200) # Ensure visibility
+        # self.rates_table.setMaximumHeight(200) # Removed limitation
+        
         currency_layout.addRow(self.rates_table)
         
         # Buttons for rate management

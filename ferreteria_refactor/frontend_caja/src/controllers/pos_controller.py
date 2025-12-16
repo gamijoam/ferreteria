@@ -195,10 +195,11 @@ class POSController:
              
         return final_price
 
-    def add_to_cart(self, sku_or_name: str, quantity: float, is_box: bool, product_id: int = None, price_tier: str = "price"):
+    def add_to_cart(self, sku_or_name: str, quantity: float, is_box: bool, product_id: int = None, price_tier: str = "price", unit_data: dict = None):
         """
         Refactored add_to_cart to use cached product list from API.
         price_tier: 'price' (default), 'price_mayor_1', 'price_mayor_2'
+        unit_data: Optional dict with specific unit details (if selection made)
         """
         product = None
         
@@ -220,14 +221,75 @@ class POSController:
         if not product:
             return False, "Producto no encontrado"
 
-        # Pricing Logic
-        price_to_use = self.get_applicable_price(product, quantity, is_box, price_tier)
-        
-        units_to_deduct = quantity
-        if is_box:
-             units_to_deduct = quantity * product['conversion_factor']
+        # === AMBIGUITY CHECK (Only if not box mode and no specific unit data provided) ===
+        if not is_box and not unit_data:
+            # Check for active units
+            try:
+                # We need to fetch units. Note: This might be slow if we do it for every scan, 
+                # but essential for this feature.
+                units = self.product_service.get_product_units(product['id'])
+                active_units = [u for u in units if u.get('is_active', True)]
+                
+                if active_units:
+                    # AMBIGUITY DETECTED -> Signal View to show dialog
+                    # We return a special payload dictionary as second argument instead of message string
+                    return False, {
+                        'status': 'SELECTION_NEEDED',
+                        'product': product,
+                        'units': active_units
+                    }
+            except Exception as e:
+                print(f"Error checking units: {e}")
+                # Continue as normal if error (fail safe to base unit)
 
-        subtotal = price_to_use * quantity
+        # === PRICING & UNIT LOGIC ===
+        
+        # Default numeric values
+        conversion_factor = 1.0
+        unit_name = product.get('base_unit', 'UNIDAD')
+        base_price_usd = product.get(price_tier, product['price'])
+        # Handle 0 price in tier
+        if base_price_usd == 0 and price_tier != "price":
+             base_price_usd = product['price']
+
+        # If specific unit was selected (from Dialog)
+        if unit_data:
+            unit_name = unit_data.get('unit_name')
+            conversion_factor = unit_data.get('conversion_factor', 1.0)
+            
+            # Using specific unit price if set, otherwise Base * Factor
+            spec_price = unit_data.get('price')
+            if spec_price and spec_price > 0:
+                 # If unit has specific price, use it (override tier? specific usually overrides)
+                 base_price_usd = spec_price
+            else:
+                 # Recalculate base price based on factor
+                 base_price_usd = base_price_usd * conversion_factor
+                 
+            # Note: Tiers (Mayorista) usually apply to base unit.
+            # If selling a Sack (Factor 50), Mayorista Price * 50 ??
+            # Yes, usually.
+        
+        elif is_box:
+             # Legacy Box Mode logic (F2) 
+             conversion_factor = product.get('conversion_factor', 1) # This is usually 'main_provider_factor' in legacy
+             # Box usually implies multiplied price
+             base_price_usd = base_price_usd * conversion_factor
+             unit_name = "CAJA/PAQUETE" # generic name if not specific unit
+
+        # Validate Price
+        unit_price = base_price_usd # Final unit price to charge
+        
+        units_to_deduct = quantity * conversion_factor
+
+        subtotal = unit_price * quantity
+        
+        # Determine Rate
+        rate_info = self._get_exchange_rate_for_product(product)
+        
+        # Calculate BSF values
+        final_price_bs = unit_price * rate_info['rate_value']
+        subtotal_bs = subtotal * rate_info['rate_value']
         
         item = {
             "product_id": product['id'],
@@ -235,13 +297,22 @@ class POSController:
             "sku": product.get('sku'),
             "quantity": quantity,
             "units_deducted": units_to_deduct,
-            "unit_price": price_to_use,
+            "unit_price": unit_price, # USD
+            "base_price_usd": unit_price,
             "subtotal": subtotal,
             "is_box": is_box,
-            "unit_type": product.get("unit_type", "Unidad"),
+            "unit_type": product.get("unit_type", "Unidad"), # Legacy field
+            "unit_name": unit_name, # New field
+            "unit_id": unit_data.get('unit_id') if unit_data else None,
+            "img_url": product.get('image_url'),
             "location": product.get("location"),
-            "price_tier": price_tier, # Store tier for updates
-            "product_obj": product # Keep dict as obj
+            "price_tier": price_tier, 
+            "product_obj": product,
+            "conversion_factor": conversion_factor,
+            "rate_name": rate_info['rate_name'],
+            "rate_value": rate_info['rate_value'],
+            "final_price_bs": final_price_bs,
+            "subtotal_bs": subtotal_bs
         }
         
         self.cart.append(item)

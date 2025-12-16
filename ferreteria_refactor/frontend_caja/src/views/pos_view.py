@@ -344,12 +344,48 @@ class POSWindow(QWidget):
         tier = self.price_tier_combo.currentData()
         qty = 1.0 
         
+        # Try to add to cart
         success, msg = self.controller.add_to_cart(text, qty, is_box, price_tier=tier)
         
+        # Check for Selection Needed (msg will be a dict)
+        if not success and isinstance(msg, dict) and msg.get('status') == 'SELECTION_NEEDED':
+            # Open Selection Dialog
+            from src.views.dialogs.unit_selection_dialog import UnitSelectionDialog
+            
+            dialog = UnitSelectionDialog(
+                parent=self,
+                product=msg['product'],
+                units=msg['units'],
+                exchange_rate=self.exchange_rate
+            )
+            
+            if dialog.exec() == QDialog.DialogCode.Accepted and dialog.selected_unit:
+                # Add specific unit
+                success_final, msg_final = self.controller.add_to_cart(
+                    sku_or_name=text,
+                    quantity=qty,
+                    is_box=is_box,
+                    price_tier=tier,
+                    unit_data=dialog.selected_unit,
+                    product_id=msg['product']['id'] # Pass ID to avoid re-search ambiguity
+                )
+                
+                if success_final:
+                    self.refresh_table()
+                else:
+                    QMessageBox.warning(self, "Alerta", msg_final)
+            
+            # Clear input regardless
+            self.input_scan.clear()
+            self.focus_input()
+            return
+        
+        # Standard Success/Fail
         if success:
             self.refresh_table()
         else:
-            QMessageBox.warning(self, "Alerta", msg)
+            # Regular error message
+            QMessageBox.warning(self, "Alerta", str(msg))
         
         self.input_scan.clear()
         # Force clear again just in case completer interferes

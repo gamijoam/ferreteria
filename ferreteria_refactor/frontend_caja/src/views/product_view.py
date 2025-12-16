@@ -111,13 +111,28 @@ class ProductFormDialog(QDialog):
         grid_layout.addWidget(cost_label, 4, 0)
         grid_layout.addWidget(self.cost_input, 5, 0)
         
-        grid_layout.addWidget(QLabel("Stock Actual:"), 6, 0)
-        grid_layout.addWidget(self.stock_input, 7, 0)
+        # STOCK ROW with Calculator
+        self.stock_label = QLabel("Stock Actual:")
+        grid_layout.addWidget(self.stock_label, 6, 0)
+        
+        stock_layout = QHBoxLayout()
+        stock_layout.addWidget(self.stock_input)
+        
+        btn_calc = QPushButton("🖩")
+        btn_calc.setToolTip("Calculadora de Stock (Sacos -> Unidades)")
+        btn_calc.setFixedWidth(40)
+        btn_calc.clicked.connect(self.open_stock_calculator)
+        stock_layout.addWidget(btn_calc)
+        
+        # We need a container widget for the HLayout to put in grid
+        # Or just addLayout to grid? addLayout is supported.
+        grid_layout.addLayout(stock_layout, 7, 0)
         
         grid_layout.addWidget(QLabel("Ubicación:"), 8, 0)
         grid_layout.addWidget(self.location_input, 9, 0)
 
         # Second Column
+        # ... (rest of column 2)
         grid_layout.addWidget(QLabel("Tipo de Unidad:"), 0, 1)
         grid_layout.addWidget(self.unit_type_combo, 1, 1)
 
@@ -178,6 +193,7 @@ class ProductFormDialog(QDialog):
         self.base_unit_combo = QComboBox()
         self.base_unit_combo.addItems(["UNIDAD", "KG", "METRO", "LITRO", "GRAMO"])
         self.base_unit_combo.setToolTip("Unidad base para el inventario")
+        self.base_unit_combo.currentTextChanged.connect(self.update_stock_label)  # CONNECTED
         inventory_layout.addRow("Unidad Base:", self.base_unit_combo)
         
         # Manage Presentations Button
@@ -417,10 +433,13 @@ class ProductFormDialog(QDialog):
         try:
             from src.views.unit_management_dialog import UnitManagementDialog
             
+            base_unit = self.base_unit_combo.currentText()
+            
             dialog = UnitManagementDialog(
                 parent=self,
                 product_id=self.product_id,
-                controller=self.controller
+                controller=self.controller,
+                base_unit_name=base_unit
             )
             dialog.exec()
             
@@ -458,6 +477,78 @@ class ProductFormDialog(QDialog):
             "conversion_factor": int(self.conversion_factor_input.text() or 1),
             "unit_type": self.unit_type_combo.currentText(),
         }
+
+    def update_stock_label(self, text):
+        """Update stock label based on selected unit"""
+        if text:
+            self.stock_label.setText(f"Stock Total en {text}:")
+            self.stock_label.setStyleSheet("color: #1976D2; font-weight: bold;")
+        else:
+            self.stock_label.setText("Stock Actual:")
+
+    def open_stock_calculator(self):
+        """Open simple calculator for packs"""
+        base_unit = self.base_unit_combo.currentText()
+        dialog = StockCalculatorDialog(self, base_unit)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            total = dialog.get_total()
+            self.stock_input.setValue(total)
+
+
+class StockCalculatorDialog(QDialog):
+    def __init__(self, parent=None, base_unit="UNIDAD"):
+        super().__init__(parent)
+        self.setWindowTitle("Calculadora de Stock")
+        self.resize(300, 200)
+        self.setup_ui(base_unit)
+
+    def setup_ui(self, base_unit):
+        layout = QVBoxLayout()
+        self.setLayout(layout)
+        
+        form_layout = QFormLayout()
+        
+        self.packs_input = QDoubleSpinBox()
+        self.packs_input.setRange(0, 10000)
+        self.packs_input.setDecimals(1)
+        self.packs_input.setValue(1)
+        form_layout.addRow("Cantidad de Empaques:", self.packs_input)
+        
+        self.factor_input = QDoubleSpinBox()
+        self.factor_input.setRange(0.001, 10000)
+        self.factor_input.setDecimals(3)
+        self.factor_input.setValue(1)
+        form_layout.addRow(f"Contenido ({base_unit}) por Empaque:", self.factor_input)
+        
+        layout.addLayout(form_layout)
+        
+        # Result Preview
+        self.result_label = QLabel("0.00")
+        self.result_label.setFont(QFont("Arial", 14, QFont.Weight.Bold))
+        self.result_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.result_label.setStyleSheet("color: green; padding: 10px;")
+        layout.addWidget(self.result_label)
+        
+        # Connect
+        self.packs_input.valueChanged.connect(self.calculate)
+        self.factor_input.valueChanged.connect(self.calculate)
+        
+        # Triggers
+        self.calculate()
+        
+        # Buttons
+        btn_layout = QHBoxLayout()
+        btn_ok = QPushButton("Aplicar Stock")
+        btn_ok.clicked.connect(self.accept)
+        btn_layout.addWidget(btn_ok)
+        layout.addLayout(btn_layout)
+
+    def calculate(self):
+        total = self.packs_input.value() * self.factor_input.value()
+        self.result_label.setText(f"Total: {total:,.2f}")
+
+    def get_total(self):
+        return self.packs_input.value() * self.factor_input.value()
 
 
 class ProductWindow(QWidget):
