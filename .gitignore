@@ -35,3 +35,6 @@ deployment/build/
 
 # Exceptions (Allow these zips)
 !landing_page/downloads/*.zip
+
+# Node
+node_modules/

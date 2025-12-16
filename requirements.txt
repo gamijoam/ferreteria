@@ -7,3 +7,5 @@ pandas
 openpyxl
 reportlab
 xlrd
+passlib
+bcrypt==3.2.2
