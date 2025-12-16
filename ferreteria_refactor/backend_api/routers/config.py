@@ -77,8 +77,9 @@ def get_exchange_rate(db: Session = Depends(get_db)):
 def get_currencies(db: Session = Depends(get_db)):
     """Get all available currencies"""
     try:
-        currencies = db.query(models.Currency).filter(models.Currency.is_active == True).all()
-        return [{"id": c.id, "code": c.code, "name": c.name, "symbol": c.symbol} for c in currencies]
+        # Currency model doesn't have is_active, return all
+        currencies = db.query(models.Currency).all()
+        return [{"id": 0, "code": c.code, "name": c.name, "symbol": c.symbol} for c in currencies]
     except Exception as e:
         # Fallback if Currency table doesn't exist
         return [
