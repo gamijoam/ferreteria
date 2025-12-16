@@ -298,6 +298,22 @@ class ProductFormDialog(QDialog):
         self.conversion_factor_input.setText(str(product.conversion_factor))
         self.unit_type_combo.setCurrentText(product.unit_type)
         self.location_input.setText(product.location or "")
+        
+        # Populate Category
+        if hasattr(product, 'category_id') and product.category_id:
+            index = self.category_combo.findData(product.category_id)
+            if index >= 0:
+                self.category_combo.setCurrentIndex(index)
+
+        # Populate Default Rate
+        if hasattr(product, 'default_rate_id') and product.default_rate_id:
+            # Iterate to find item with matching dictionary data 'id'
+            for i in range(self.reference_rate_combo.count()):
+                data = self.reference_rate_combo.itemData(i)
+                if data and data.get('id') == product.default_rate_id:
+                    self.reference_rate_combo.setCurrentIndex(i)
+                    break
+        
         self.calculate_margin()
     
     def get_base_currency(self):
