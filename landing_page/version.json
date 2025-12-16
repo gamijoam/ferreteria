@@ -1,6 +1,5 @@
 {
     "version": "1.0.46",
-    "update_url": "https://inventariosoft.netlify.app/version.json",
-    "download_url": "downloads/update_ferreteria.zip",
-    "release_notes": "Update to 1.0.46"
+    "download_url": "https://drive.google.com/uc?export=download&id=1ZiWQc_Eal3J5W5DmtVkEc_MqTDTAHcli",
+    "release_notes": "Actualización con nuevo sistema de updates"
 }
