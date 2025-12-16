@@ -45,3 +45,20 @@ class ProductService:
     def bulk_create_products(self, products_list: list):
         """Bulk import products via API"""
         return self.client.post("/api/v1/products/bulk", products_list)
+    
+    def get_categories(self):
+        """Get all product categories"""
+        return self.client.get("/api/v1/categories/")
+    
+    def get_product_units(self, product_id):
+        """Get all units/presentations for a product"""
+        return self.client.get(f"/api/v1/products/{product_id}/units")
+    
+    def create_product_unit(self, unit_data: dict):
+        """Create a new product unit/presentation"""
+        product_id = unit_data.get('product_id')
+        return self.client.post(f"/api/v1/products/{product_id}/units", unit_data)
+    
+    def delete_product_unit(self, unit_id):
+        """Delete a product unit/presentation"""
+        return self.client.delete(f"/api/v1/product-units/{unit_id}")

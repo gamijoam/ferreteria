@@ -72,6 +72,45 @@ class ProductController:
         page_items_objs = [MockProduct(p) for p in page_items_dicts]
 
         return page_items_objs, total_items
+    
+    def get_categories(self):
+        """Get all product categories"""
+        try:
+            return self.product_service.get_categories()
+        except Exception as e:
+            print(f"Error getting categories: {e}")
+            # Fallback categories
+            return [
+                {'id': 1, 'name': 'General'},
+                {'id': 2, 'name': 'Construcción'},
+                {'id': 3, 'name': 'Herramientas'},
+                {'id': 4, 'name': 'Eléctrico'},
+                {'id': 5, 'name': 'Plomería'}
+            ]
+    
+    def get_product_units(self, product_id):
+        """Get all units/presentations for a product"""
+        try:
+            return self.product_service.get_product_units(product_id)
+        except Exception as e:
+            print(f"Error getting product units: {e}")
+            return []
+    
+    def create_product_unit(self, unit_data):
+        """Create a new product unit/presentation"""
+        try:
+            return self.product_service.create_product_unit(unit_data)
+        except Exception as e:
+            print(f"Error creating product unit: {e}")
+            raise e
+    
+    def delete_product_unit(self, unit_id):
+        """Delete a product unit/presentation"""
+        try:
+            return self.product_service.delete_product_unit(unit_id)
+        except Exception as e:
+            print(f"Error deleting product unit: {e}")
+            raise e
 
 class MockProduct:
     """Helper class to mimic SQLAlchemy model object behavior for Views"""
