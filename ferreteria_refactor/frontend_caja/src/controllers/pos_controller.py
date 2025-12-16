@@ -391,15 +391,25 @@ class POSController:
         is_box = item['is_box']
         price_tier = item.get('price_tier', 'price')
         
-        price_to_use = self.get_applicable_price(product, new_quantity, is_box, price_tier)
+        # The Bug to Kill: Use stored unit price, don't fallback to base product price recalculation
+        # unless necessary. For now, we trust the stored unit_price (which might be a specific Unit price).
+        price_to_use = item['unit_price']
         
+        # NOTE: If we wanted to support dynamic wholesale tiers on quantity change, we'd need to
+        # check if 'price_rules' exist and if the new quantity triggers them.
+        # But for Unit-based items (Sacks, etc) with fixed prices, keeping the stored price is safer.
+        if product.get('price_rules') and item.get('price_tier') == 'price':
+             # Optional: Check rules if strictly needed, but risk resetting unit price.
+             # User requested: "Usa el precio que ya tenía el item en el carrito"
+             pass
+
         units_to_deduct = new_quantity
         if is_box:
              units_to_deduct = new_quantity * product.get('conversion_factor', 1)
              
         item['quantity'] = new_quantity
         item['units_deducted'] = units_to_deduct
-        item['unit_price'] = price_to_use # Update unit price if rule changed
+        # item['unit_price'] = price_to_use # Keep stored
         item['subtotal'] = price_to_use * new_quantity
         
         # Update Bs

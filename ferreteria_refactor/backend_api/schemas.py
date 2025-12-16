@@ -416,6 +416,14 @@ class ProductUnitBase(BaseModel):
 class ProductUnitCreate(ProductUnitBase):
     product_id: Optional[int] = None  # Can be set from URL path
 
+class ProductUnitUpdate(BaseModel):
+    name: Optional[str] = None
+    conversion_factor: Optional[float] = None
+    barcode: Optional[str] = None
+    price: Optional[float] = None
+    is_default_sale: Optional[bool] = None
+    is_active: Optional[bool] = None
+
 class ProductUnitRead(ProductUnitBase):
     id: int
     product_id: int

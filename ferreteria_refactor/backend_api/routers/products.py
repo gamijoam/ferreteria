@@ -221,6 +221,23 @@ def create_product_unit(product_id: int, unit: schemas.ProductUnitCreate, db: Se
     db.add(db_unit)
     db.commit()
     db.refresh(db_unit)
+    db.commit()
+    db.refresh(db_unit)
+    return db_unit
+
+@router.put("/units/{unit_id}", response_model=schemas.ProductUnitRead)
+def update_product_unit(unit_id: int, unit_update: schemas.ProductUnitUpdate, db: Session = Depends(get_db)):
+    """Update a product unit/presentation"""
+    db_unit = db.query(models.ProductUnit).filter(models.ProductUnit.id == unit_id).first()
+    if not db_unit:
+        raise HTTPException(status_code=404, detail="Unit not found")
+    
+    update_data = unit_update.dict(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_unit, key, value)
+    
+    db.commit()
+    db.refresh(db_unit)
     return db_unit
 
 @router.delete("/units/{unit_id}")

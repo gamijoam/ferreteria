@@ -59,6 +59,10 @@ class ProductService:
         product_id = unit_data.get('product_id')
         return self.client.post(f"/api/v1/products/{product_id}/units", unit_data)
     
+    def update_product_unit(self, unit_id, unit_data: dict):
+        """Update a product unit/presentation"""
+        return self.client.put(f"/api/v1/product-units/units/{unit_id}", unit_data)
+    
     def delete_product_unit(self, unit_id):
         """Delete a product unit/presentation"""
-        return self.client.delete(f"/api/v1/product-units/{unit_id}")
+        return self.client.delete(f"/api/v1/product-units/units/{unit_id}")

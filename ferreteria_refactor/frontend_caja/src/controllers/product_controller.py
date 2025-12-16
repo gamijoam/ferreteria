@@ -103,6 +103,14 @@ class ProductController:
         except Exception as e:
             print(f"Error creating product unit: {e}")
             raise e
+            
+    def update_product_unit(self, unit_id, unit_data):
+        """Update a product unit/presentation"""
+        try:
+            return self.product_service.update_product_unit(unit_id, unit_data)
+        except Exception as e:
+            print(f"Error updating product unit: {e}")
+            raise e
     
     def delete_product_unit(self, unit_id):
         """Delete a product unit/presentation"""

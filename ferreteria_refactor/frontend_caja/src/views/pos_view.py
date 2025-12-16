@@ -350,7 +350,8 @@ class POSWindow(QWidget):
         # Check for Selection Needed (msg will be a dict)
         if not success and isinstance(msg, dict) and msg.get('status') == 'SELECTION_NEEDED':
             # Open Selection Dialog
-            from src.views.dialogs.unit_selection_dialog import UnitSelectionDialog
+            # Open Selection Dialog
+            from src.views.dialogs import UnitSelectionDialog
             
             dialog = UnitSelectionDialog(
                 parent=self,
