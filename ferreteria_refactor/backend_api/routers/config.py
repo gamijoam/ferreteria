@@ -71,3 +71,98 @@ def get_exchange_rate(db: Session = Depends(get_db)):
         return {"rate": float(config.value)}
     except (ValueError, TypeError):
         return {"rate": 1.0}
+
+# Currencies endpoint
+@router.get("/currencies")
+def get_currencies(db: Session = Depends(get_db)):
+    """Get all available currencies"""
+    try:
+        currencies = db.query(models.Currency).filter(models.Currency.is_active == True).all()
+        return [{"id": c.id, "code": c.code, "name": c.name, "symbol": c.symbol} for c in currencies]
+    except Exception as e:
+        # Fallback if Currency table doesn't exist
+        return [
+            {"id": 1, "code": "USD", "name": "Dólar Estadounidense", "symbol": "$"},
+            {"id": 2, "code": "VES", "name": "Bolívar", "symbol": "Bs"},
+            {"id": 3, "code": "EUR", "name": "Euro", "symbol": "€"}
+        ]
+
+# Exchange Rates endpoints
+@router.get("/exchange-rates")
+def get_exchange_rates(db: Session = Depends(get_db)):
+    """Get all exchange rates"""
+    try:
+        rates = db.query(models.ExchangeRate).all()
+        return [{
+            "id": r.id,
+            "name": r.name,
+            "currency_code": r.currency_code,
+            "rate": r.rate,
+            "is_active": r.is_active,
+            "created_at": r.created_at.isoformat() if hasattr(r, 'created_at') else None
+        } for r in rates]
+    except Exception as e:
+        print(f"Error getting exchange rates: {e}")
+        return []
+
+@router.post("/exchange-rates")
+def create_exchange_rate(rate_data: dict, db: Session = Depends(get_db)):
+    """Create new exchange rate"""
+    try:
+        new_rate = models.ExchangeRate(**rate_data)
+        db.add(new_rate)
+        db.commit()
+        db.refresh(new_rate)
+        return {
+            "id": new_rate.id,
+            "name": new_rate.name,
+            "currency_code": new_rate.currency_code,
+            "rate": new_rate.rate,
+            "is_active": new_rate.is_active
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.put("/exchange-rates/{rate_id}")
+def update_exchange_rate(rate_id: int, rate_data: dict, db: Session = Depends(get_db)):
+    """Update exchange rate"""
+    try:
+        rate = db.query(models.ExchangeRate).filter(models.ExchangeRate.id == rate_id).first()
+        if not rate:
+            raise HTTPException(status_code=404, detail="Exchange rate not found")
+        
+        for key, value in rate_data.items():
+            setattr(rate, key, value)
+        
+        db.commit()
+        db.refresh(rate)
+        return {
+            "id": rate.id,
+            "name": rate.name,
+            "currency_code": rate.currency_code,
+            "rate": rate.rate,
+            "is_active": rate.is_active
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.delete("/exchange-rates/{rate_id}")
+def delete_exchange_rate(rate_id: int, db: Session = Depends(get_db)):
+    """Delete exchange rate (soft delete)"""
+    try:
+        rate = db.query(models.ExchangeRate).filter(models.ExchangeRate.id == rate_id).first()
+        if not rate:
+            raise HTTPException(status_code=404, detail="Exchange rate not found")
+        
+        rate.is_active = False
+        db.commit()
+        return {"status": "success", "message": "Exchange rate deleted"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))

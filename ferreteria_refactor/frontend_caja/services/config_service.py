@@ -54,3 +54,43 @@ class ConfigService:
         except Exception as e:
             print(f"Error fetching exchange rate: {e}")
             return 1.0
+    
+    def get_currencies(self):
+        """Get all available currencies"""
+        try:
+            return self.client.get(f"{self.endpoint}/currencies")
+        except Exception as e:
+            print(f"Error fetching currencies: {e}")
+            return []
+    
+    def get_exchange_rates(self):
+        """Get all exchange rates"""
+        try:
+            return self.client.get(f"{self.endpoint}/exchange-rates")
+        except Exception as e:
+            print(f"Error fetching exchange rates: {e}")
+            return []
+    
+    def create_exchange_rate(self, rate_data):
+        """Create new exchange rate"""
+        try:
+            return self.client.post(f"{self.endpoint}/exchange-rates", rate_data)
+        except Exception as e:
+            print(f"Error creating exchange rate: {e}")
+            raise e
+    
+    def update_exchange_rate(self, rate_id, rate_data):
+        """Update exchange rate"""
+        try:
+            return self.client.put(f"{self.endpoint}/exchange-rates/{rate_id}", rate_data)
+        except Exception as e:
+            print(f"Error updating exchange rate: {e}")
+            raise e
+    
+    def delete_exchange_rate(self, rate_id):
+        """Delete exchange rate"""
+        try:
+            return self.client.delete(f"{self.endpoint}/exchange-rates/{rate_id}")
+        except Exception as e:
+            print(f"Error deleting exchange rate: {e}")
+            raise e

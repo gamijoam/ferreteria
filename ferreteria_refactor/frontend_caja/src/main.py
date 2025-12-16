@@ -417,7 +417,8 @@ def main():
     found_envs = [p for p in env_files if os.path.exists(p)]
     debug_msg += f"Found .env files: {found_envs}\n"
     
-    QMessageBox.information(None, "Startup Diagnostic", debug_msg)
+    # QMessageBox.information(None, "Startup Diagnostic", debug_msg)  # COMMENTED - Blocks startup
+    print(debug_msg)  # Print to console instead
     # --- DIAGNOSTIC END ---
 
     # Create tables
@@ -434,15 +435,19 @@ def main():
 
 
     # Apply modern theme
+    print("DEBUG: Aplicando tema...")
     from src.theme import MODERN_THEME
     app.setStyleSheet(MODERN_THEME)
+    print("DEBUG: Tema aplicado.")
 
     # --- LICENSE CHECK ---
+    print("DEBUG: Verificando licencia...")
     from src.controllers.license_controller import LicenseController
     from src.views.license_view import LicenseDialog
     
     license_ctrl = LicenseController()
     status, msg = license_ctrl.check_status()
+    print(f"DEBUG: Licencia verificada. Status: {status}")
     
     if status in ['EXPIRED', 'INVALID']:
         # Show activation dialog
@@ -455,7 +460,9 @@ def main():
     # ---------------------
 
     # Show Login First
+    print("DEBUG: Mostrando ventana de login...")
     login = LoginDialog()
+    print("DEBUG: LoginDialog creado.")
     
     if login.exec() == QDialog.DialogCode.Accepted:
         try:

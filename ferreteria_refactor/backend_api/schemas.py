@@ -65,6 +65,7 @@ class ProductRead(ProductBase):
 class SaleDetailCreate(BaseModel):
     product_id: int
     quantity: float
+    conversion_factor: float = 1.0  # How many base units per presentation
     is_box: bool = False
     discount: float = 0.0
     discount_type: str = "NONE" # NONE, PERCENT, FIXED
@@ -390,11 +391,9 @@ class CategoryCreate(CategoryBase):
 class CategoryUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
-    is_active: Optional[bool] = None
 
 class CategoryRead(CategoryBase):
     id: int
-    is_active: bool = True
     
     class Config:
         from_attributes = True

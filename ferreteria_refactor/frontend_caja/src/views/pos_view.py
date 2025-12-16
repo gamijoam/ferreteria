@@ -177,12 +177,12 @@ class POSWindow(QWidget):
         
         # Table (in left panel)
         self.table = QTableWidget()
-        self.table.setColumnCount(7)
+        self.table.setColumnCount(9)  # Increased from 7 to 9
         self.table.setHorizontalHeaderLabels([
-            "Producto", "Cant.", "Tipo", "Ubicación", "Precio Unit.", "Subtotal", "Eliminar"
+            "Producto", "Presentación", "Cant.", "Precio ($)", "Tasa", "Precio (Bs)", "Subtotal ($)", "Subtotal (Bs)", "Eliminar"
         ])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.table.setFont(QFont("Arial", 12))
+        self.table.setFont(QFont("Arial", 11))  # Slightly smaller font
         
         # Connect cell change signal
         self.table.cellChanged.connect(self.on_cell_changed)
@@ -363,47 +363,61 @@ class POSWindow(QWidget):
         self.table.blockSignals(True)
         
         self.table.setRowCount(0)
-        total = 0
+        total_usd = 0
+        total_bs = 0
+        
         for i, item in enumerate(self.controller.cart):
             self.table.insertRow(i)
             
-            # Product Name (Not editable)
+            # Column 0: Product Name (Not editable)
             name_item = QTableWidgetItem(item["name"])
             name_item.setFlags(name_item.flags() ^ Qt.ItemFlag.ItemIsEditable)
             self.table.setItem(i, 0, name_item)
             
-            # Quantity (Editable)
+            # Column 1: Presentación (Not editable)
+            presentation = item.get("unit_name", item.get("unit_type", "Unidad"))
+            pres_item = QTableWidgetItem(presentation)
+            pres_item.setFlags(pres_item.flags() ^ Qt.ItemFlag.ItemIsEditable)
+            self.table.setItem(i, 1, pres_item)
+            
+            # Column 2: Quantity (Editable)
             qty_item = QTableWidgetItem(str(item["quantity"]))
-            self.table.setItem(i, 1, qty_item)
+            self.table.setItem(i, 2, qty_item)
             
-            # Type (Not editable) - Show unit type (Kg, Metro, etc.) or CAJA
-            if item["is_box"]:
-                type_text = "CAJA"
-            else:
-                type_text = item.get("unit_type", "Unidad")
-            type_item = QTableWidgetItem(type_text)
-            type_item.setFlags(type_item.flags() ^ Qt.ItemFlag.ItemIsEditable)
-            self.table.setItem(i, 2, type_item)
+            # Column 3: Precio ($) - Base price in USD (Not editable)
+            price_usd = item.get("base_price_usd", item.get("unit_price", 0))
+            price_usd_item = QTableWidgetItem(f"${price_usd:,.2f}")
+            price_usd_item.setFlags(price_usd_item.flags() ^ Qt.ItemFlag.ItemIsEditable)
+            self.table.setItem(i, 3, price_usd_item)
             
-            # Location (Not editable)
-            loc_text = item.get("location") or "-"
-            loc_item = QTableWidgetItem(loc_text)
-            loc_item.setFlags(loc_item.flags() ^ Qt.ItemFlag.ItemIsEditable)
-            self.table.setItem(i, 3, loc_item)
+            # Column 4: Tasa (Not editable)
+            rate_name = item.get("rate_name", "Estándar")
+            rate_value = item.get("rate_value", self.exchange_rate)
+            rate_item = QTableWidgetItem(f"{rate_name} ({rate_value:.2f})")
+            rate_item.setFlags(rate_item.flags() ^ Qt.ItemFlag.ItemIsEditable)
+            self.table.setItem(i, 4, rate_item)
             
-            # Unit Price (Not editable)
-            price_item = QTableWidgetItem(f"${item['unit_price']:,.2f}")
-            price_item.setFlags(price_item.flags() ^ Qt.ItemFlag.ItemIsEditable)
-            self.table.setItem(i, 4, price_item)
+            # Column 5: Precio (Bs) - Price in Bs (Not editable)
+            price_bs = price_usd * rate_value
+            price_bs_item = QTableWidgetItem(f"Bs {price_bs:,.2f}")
+            price_bs_item.setFlags(price_bs_item.flags() ^ Qt.ItemFlag.ItemIsEditable)
+            self.table.setItem(i, 5, price_bs_item)
             
-            # Subtotal (Not editable)
-            subtotal_item = QTableWidgetItem(f"${item['subtotal']:,.2f}")
-            subtotal_item.setFlags(subtotal_item.flags() ^ Qt.ItemFlag.ItemIsEditable)
-            self.table.setItem(i, 5, subtotal_item)
+            # Column 6: Subtotal ($) (Not editable)
+            subtotal_usd = item["subtotal"]
+            subtotal_usd_item = QTableWidgetItem(f"${subtotal_usd:,.2f}")
+            subtotal_usd_item.setFlags(subtotal_usd_item.flags() ^ Qt.ItemFlag.ItemIsEditable)
+            self.table.setItem(i, 6, subtotal_usd_item)
             
-            # Delete Button
-            btn_del = QPushButton("Eliminar")
-            btn_del.setFixedWidth(70)
+            # Column 7: Subtotal (Bs) (Not editable)
+            subtotal_bs = subtotal_usd * rate_value
+            subtotal_bs_item = QTableWidgetItem(f"Bs {subtotal_bs:,.2f}")
+            subtotal_bs_item.setFlags(subtotal_bs_item.flags() ^ Qt.ItemFlag.ItemIsEditable)
+            self.table.setItem(i, 7, subtotal_bs_item)
+            
+            # Column 8: Delete Button
+            btn_del = QPushButton("🗑")
+            btn_del.setFixedWidth(50)
             btn_del.setStyleSheet("""
                 QPushButton {
                     background-color: #F44336;
@@ -411,21 +425,21 @@ class POSWindow(QWidget):
                     border: none;
                     border-radius: 4px;
                     padding: 6px;
-                    font-size: 9pt;
+                    font-size: 14pt;
                 }
                 QPushButton:hover {
                     background-color: #D32F2F;
                 }
             """)
             btn_del.clicked.connect(lambda checked, idx=i: self.remove_item(idx))
-            self.table.setCellWidget(i, 6, btn_del)
+            self.table.setCellWidget(i, 8, btn_del)
             
-            total += item["subtotal"]
-            
-        # Calculate total in Bs
-        total_bs = total * self.exchange_rate
+            total_usd += subtotal_usd
+            total_bs += subtotal_bs
         
-        self.lbl_total.setText(f"Total: ${total:,.2f} / Bs {total_bs:,.2f}")
+        # Update total label with LARGE Bs display and small USD display
+        self.lbl_total.setText(f"TOTAL: Bs {total_bs:,.2f}  (${total_usd:,.2f})")
+        self.lbl_total.setStyleSheet("color: #1976D2; font-size: 24px; font-weight: bold;")
         
         self.table.blockSignals(False)
     
@@ -435,8 +449,8 @@ class POSWindow(QWidget):
         self.refresh_table()
 
     def on_cell_changed(self, row, column):
-        # Column 1 is Quantity
-        if column == 1:
+        # Column 2 is Quantity (changed from 1)
+        if column == 2:
             try:
                 new_qty_str = self.table.item(row, column).text()
                 try:

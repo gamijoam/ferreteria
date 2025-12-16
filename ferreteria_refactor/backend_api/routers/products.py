@@ -89,12 +89,19 @@ def create_sale(sale_data: schemas.SaleCreate, db: Session = Depends(get_db)):
         if not product:
             raise HTTPException(status_code=404, detail=f"Product {item.product_id} not found")
         
-        # Calculate Units to Deduct
-        units_to_deduct = item.quantity
+        
+        # CRITICAL: Use conversion_factor from item (supports multi-unit presentations)
+        # Example: Selling 1 Saco with conversion_factor=42.5 will deduct 42.5 kg
+        conversion_factor = getattr(item, 'conversion_factor', 1.0)
+        
+        # Calculate Units to Deduct using the conversion factor
+        units_to_deduct = item.quantity * conversion_factor
         price_used = product.price
+        
+        # Legacy box logic (kept for backward compatibility)
         if item.is_box:
             units_to_deduct = item.quantity * product.conversion_factor
-            price_used = product.price * product.conversion_factor # Assuming price is per unit, check logic
+            price_used = product.price * product.conversion_factor
         
         # Check Stock
         if product.stock < units_to_deduct:

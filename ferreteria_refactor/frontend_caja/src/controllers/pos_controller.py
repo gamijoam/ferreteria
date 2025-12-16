@@ -246,6 +246,54 @@ class POSController:
         
         self.cart.append(item)
         return True, "Agregado al carrito"
+    
+    def add_to_cart_from_barcode(self, barcode: str, quantity: float = 1.0):
+        """
+        Add product to cart using barcode search (supports ProductUnit barcodes)
+        """
+        product_result = self.search_product_by_barcode(barcode)
+        
+        if not product_result:
+            return False, "Código de barras no encontrado"
+        
+        # Extract data
+        conversion_factor = product_result['conversion_factor']
+        base_price_usd = product_result['base_price_usd']
+        rate_value = product_result['rate_value']
+        final_price_bs = product_result['final_price_bs']
+        
+        # Calculate
+        subtotal_usd = base_price_usd * quantity
+        subtotal_bs = final_price_bs * quantity
+        units_to_deduct = quantity * conversion_factor
+        
+        # Build cart item
+        item = {
+            "product_id": product_result['product_id'],
+            "name": product_result['name'],
+            "sku": product_result.get('sku'),
+            "barcode": barcode,
+            "unit_name": product_result['unit_name'],
+            "unit_id": product_result.get('unit_id'),
+            "conversion_factor": conversion_factor,
+            "quantity": quantity,
+            "units_deducted": units_to_deduct,
+            "base_price_usd": base_price_usd,
+            "unit_price": base_price_usd,
+            "subtotal": subtotal_usd,
+            "rate_name": product_result['rate_name'],
+            "rate_value": rate_value,
+            "final_price_bs": final_price_bs,
+            "subtotal_bs": subtotal_bs,
+            "is_box": False,
+            "unit_type": product_result['unit_name'],
+            "location": product_result.get('location'),
+            "price_tier": "price",
+            "product_obj": product_result.get('product_obj')
+        }
+        
+        self.cart.append(item)
+        return True, f"Agregado: {product_result['name']} - {product_result['unit_name']}"
 
     def apply_discount(self, index: int, discount_value: float, discount_type: str):
          # Simplistic mock for UI compatibility
@@ -337,11 +385,15 @@ class POSController:
         }
 
         for item in self.cart:
+            # CRITICAL: Get conversion factor for correct stock deduction
+            # Example: 1 Saco (factor 42.5) will deduct 42.5 kg from stock
+            conversion_factor = item.get("conversion_factor", 1.0)
+            
             sale_payload["items"].append({
                 "product_id": item["product_id"],
-                "quantity": item["quantity"], 
-                "is_box": item["is_box"],
-                # Assuming cart items might have discount info in future refactor
+                "quantity": item["quantity"],  # Quantity of presentations sold
+                "conversion_factor": conversion_factor,  # Units per presentation
+                "is_box": item.get("is_box", False),
                 "discount": item.get("discount", 0.0),
                 "discount_type": item.get("discount_type", "NONE")
             })
