@@ -6,7 +6,9 @@ import DashboardLayout from './layouts/DashboardLayout';
 import Products from './pages/Products';
 import Inventory from './pages/Inventory';
 import POS from './pages/POS';
+import CashClose from './pages/CashClose';
 import { CartProvider } from './context/CartContext';
+import { CashProvider } from './context/CashContext';
 
 const DashboardPlaceholder = () => (
   <div className="text-center p-10">
@@ -18,22 +20,25 @@ const DashboardPlaceholder = () => (
 function App() {
   return (
     <AuthProvider>
-      <CartProvider>
-        <Router>
-          <Routes>
-            <Route path="/login" element={<Login />} />
+      <CashProvider>
+        <CartProvider>
+          <Router>
+            <Routes>
+              <Route path="/login" element={<Login />} />
 
-            <Route element={<ProtectedRoute />}>
-              <Route element={<DashboardLayout />}>
-                <Route path="/" element={<DashboardPlaceholder />} />
-                <Route path="/products" element={<Products />} />
-                <Route path="/inventory" element={<Inventory />} />
-                <Route path="/pos" element={<POS />} />
+              <Route element={<ProtectedRoute />}>
+                <Route element={<DashboardLayout />}>
+                  <Route path="/" element={<DashboardPlaceholder />} />
+                  <Route path="/products" element={<Products />} />
+                  <Route path="/inventory" element={<Inventory />} />
+                  <Route path="/pos" element={<POS />} />
+                  <Route path="/cash-close" element={<CashClose />} />
+                </Route>
               </Route>
-            </Route>
-          </Routes>
-        </Router>
-      </CartProvider>
+            </Routes>
+          </Router>
+        </CartProvider>
+      </CashProvider>
     </AuthProvider>
   );
 }
