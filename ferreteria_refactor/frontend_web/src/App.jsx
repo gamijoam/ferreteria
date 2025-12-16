@@ -5,6 +5,8 @@ import Login from './pages/Login';
 import DashboardLayout from './layouts/DashboardLayout';
 import Products from './pages/Products';
 import Inventory from './pages/Inventory';
+import POS from './pages/POS';
+import { CartProvider } from './context/CartContext';
 
 const DashboardPlaceholder = () => (
   <div className="text-center p-10">
@@ -16,19 +18,22 @@ const DashboardPlaceholder = () => (
 function App() {
   return (
     <AuthProvider>
-      <Router>
-        <Routes>
-          <Route path="/login" element={<Login />} />
+      <CartProvider>
+        <Router>
+          <Routes>
+            <Route path="/login" element={<Login />} />
 
-          <Route element={<ProtectedRoute />}>
-            <Route element={<DashboardLayout />}>
-              <Route path="/" element={<DashboardPlaceholder />} />
-              <Route path="/products" element={<Products />} />
-              <Route path="/inventory" element={<Inventory />} />
+            <Route element={<ProtectedRoute />}>
+              <Route element={<DashboardLayout />}>
+                <Route path="/" element={<DashboardPlaceholder />} />
+                <Route path="/products" element={<Products />} />
+                <Route path="/inventory" element={<Inventory />} />
+                <Route path="/pos" element={<POS />} />
+              </Route>
             </Route>
-          </Route>
-        </Routes>
-      </Router>
+          </Routes>
+        </Router>
+      </CartProvider>
     </AuthProvider>
   );
 }
