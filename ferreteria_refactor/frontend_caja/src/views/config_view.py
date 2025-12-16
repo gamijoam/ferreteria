@@ -69,21 +69,62 @@ class ConfigDialog(QDialog):
         form_group.setLayout(form_layout)
         left_column.addWidget(form_group)
         
-        # Exchange Rate Section
-        exchange_group = QGroupBox("Tasa de Cambio (USD → Bs)")
-        exchange_layout = QFormLayout()
+        # Currency Configuration Section
+        currency_group = QGroupBox("Configuración de Moneda")
+        currency_layout = QFormLayout()
         
-        self.exchange_rate_input = QLineEdit()
-        self.exchange_rate_input.setPlaceholderText("Ej: 36.50")
+        # Base Currency (for inventory prices)
+        self.base_currency_combo = QComboBox()
+        self.base_currency_combo.setToolTip("Moneda en la que se guardan los precios en el sistema")
+        currency_layout.addRow("Moneda de Inventario (Base):", self.base_currency_combo)
         
-        self.exchange_rate_updated_label = QLabel("Nunca actualizada")
-        self.exchange_rate_updated_label.setStyleSheet("color: #666; font-size: 10pt;")
+        # Operating Currency (local currency for payments)
+        self.operating_currency_combo = QComboBox()
+        self.operating_currency_combo.setToolTip("Moneda local para cobros y pagos")
+        currency_layout.addRow("Moneda de Cobro (Principal):", self.operating_currency_combo)
         
-        exchange_layout.addRow("Tasa Actual (1 USD = X Bs):", self.exchange_rate_input)
-        exchange_layout.addRow("Última Actualización:", self.exchange_rate_updated_label)
+        # Exchange Rates Management
+        rates_label = QLabel("Tasas de Cambio:")
+        rates_label.setStyleSheet("font-weight: bold; margin-top: 10px;")
+        currency_layout.addRow(rates_label)
         
-        exchange_group.setLayout(exchange_layout)
-        left_column.addWidget(exchange_group)
+        # Exchange Rates Table
+        from PyQt6.QtWidgets import QTableWidget, QTableWidgetItem, QHeaderView
+        self.rates_table = QTableWidget()
+        self.rates_table.setColumnCount(5)
+        self.rates_table.setHorizontalHeaderLabels([
+            "Nombre", "Moneda", "Tasa", "Activa", "Acciones"
+        ])
+        self.rates_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self.rates_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        self.rates_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        self.rates_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        self.rates_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        self.rates_table.setMaximumHeight(200)
+        currency_layout.addRow(self.rates_table)
+        
+        # Buttons for rate management
+        rate_buttons_layout = QHBoxLayout()
+        self.add_rate_btn = QPushButton("+ Agregar Tasa")
+        self.add_rate_btn.setStyleSheet("background-color: #4CAF50; color: white; padding: 5px 10px; border-radius: 3px;")
+        self.add_rate_btn.clicked.connect(self.add_exchange_rate)
+        
+        self.edit_rate_btn = QPushButton("Editar")
+        self.edit_rate_btn.setStyleSheet("background-color: #2196F3; color: white; padding: 5px 10px; border-radius: 3px;")
+        self.edit_rate_btn.clicked.connect(self.edit_exchange_rate)
+        
+        self.delete_rate_btn = QPushButton("Eliminar")
+        self.delete_rate_btn.setStyleSheet("background-color: #f44336; color: white; padding: 5px 10px; border-radius: 3px;")
+        self.delete_rate_btn.clicked.connect(self.delete_exchange_rate)
+        
+        rate_buttons_layout.addWidget(self.add_rate_btn)
+        rate_buttons_layout.addWidget(self.edit_rate_btn)
+        rate_buttons_layout.addWidget(self.delete_rate_btn)
+        rate_buttons_layout.addStretch()
+        currency_layout.addRow(rate_buttons_layout)
+        
+        currency_group.setLayout(currency_layout)
+        left_column.addWidget(currency_group)
         
         left_column.addStretch()
         
@@ -196,21 +237,11 @@ class ConfigDialog(QDialog):
         if index >= 0:
             self.business_type_combo.setCurrentIndex(index)
         
-        # Load exchange rate
-        exchange_rate = self.controller.get_config("exchange_rate", "1.0")
-        self.exchange_rate_input.setText(exchange_rate)
+        # Load currencies
+        self.load_currencies()
         
-        # Load last updated
-        updated_at = self.controller.get_config("exchange_rate_updated_at", "")
-        if updated_at:
-            from datetime import datetime
-            try:
-                dt = datetime.fromisoformat(updated_at)
-                self.exchange_rate_updated_label.setText(dt.strftime("%Y-%m-%d %H:%M"))
-            except:
-                self.exchange_rate_updated_label.setText("Fecha inválida")
-        else:
-            self.exchange_rate_updated_label.setText("Nunca actualizada")
+        # Load exchange rates
+        self.load_exchange_rates()
         
         # Load logo
         logo_path = self.controller.get_config("business_logo_path", "")
@@ -221,6 +252,68 @@ class ConfigDialog(QDialog):
             self.logo_path = logo_path
         else:
             self.logo_path = ""
+    
+    def load_currencies(self):
+        """Load available currencies from backend"""
+        try:
+            currencies = self.controller.get_currencies()
+            
+            # Clear and populate both combos
+            self.base_currency_combo.clear()
+            self.operating_currency_combo.clear()
+            
+            for currency in currencies:
+                display_text = f"{currency['code']} - {currency['name']} ({currency['symbol']})"
+                self.base_currency_combo.addItem(display_text, currency['code'])
+                self.operating_currency_combo.addItem(display_text, currency['code'])
+            
+            # Load saved selections
+            base_currency = self.controller.get_config("BASE_CURRENCY", "USD")
+            operating_currency = self.controller.get_config("OPERATING_CURRENCY", "VES")
+            
+            # Set current selections
+            base_index = self.base_currency_combo.findData(base_currency)
+            if base_index >= 0:
+                self.base_currency_combo.setCurrentIndex(base_index)
+            
+            operating_index = self.operating_currency_combo.findData(operating_currency)
+            if operating_index >= 0:
+                self.operating_currency_combo.setCurrentIndex(operating_index)
+                
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"Error al cargar monedas: {str(e)}")
+    
+    def load_exchange_rates(self):
+        """Load exchange rates into table"""
+        try:
+            rates = self.controller.get_exchange_rates()
+            
+            self.rates_table.setRowCount(0)
+            
+            for rate in rates:
+                row = self.rates_table.rowCount()
+                self.rates_table.insertRow(row)
+                
+                # Name
+                from PyQt6.QtWidgets import QTableWidgetItem
+                self.rates_table.setItem(row, 0, QTableWidgetItem(rate['name']))
+                
+                # Currency
+                currency_text = f"{rate['currency_code']}"
+                self.rates_table.setItem(row, 1, QTableWidgetItem(currency_text))
+                
+                # Rate
+                self.rates_table.setItem(row, 2, QTableWidgetItem(f"{rate['rate']:.2f}"))
+                
+                # Active
+                active_text = "Sí" if rate.get('is_active', True) else "No"
+                self.rates_table.setItem(row, 3, QTableWidgetItem(active_text))
+                
+                # Store rate ID in first column
+                self.rates_table.item(row, 0).setData(Qt.ItemDataRole.UserRole, rate['id'])
+                
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"Error al cargar tasas: {str(e)}")
 
     def save_config(self):
         try:
@@ -244,21 +337,14 @@ class ConfigDialog(QDialog):
             business_type = self.business_type_combo.currentText()
             self.controller.set_config("BUSINESS_TYPE", business_type)
             
-            # Save exchange rate
-            exchange_rate_text = self.exchange_rate_input.text().strip()
-            if exchange_rate_text:
-                try:
-                    exchange_rate = float(exchange_rate_text)
-                    if exchange_rate <= 0:
-                        QMessageBox.warning(self, "Error", "La tasa de cambio debe ser mayor a 0")
-                        return
-                    
-                    from datetime import datetime
-                    self.controller.set_config("exchange_rate", str(exchange_rate))
-                    self.controller.set_config("exchange_rate_updated_at", datetime.now().isoformat())
-                except ValueError:
-                    QMessageBox.warning(self, "Error", "La tasa de cambio debe ser un número válido")
-                    return
+            # Save currency configuration
+            base_currency = self.base_currency_combo.currentData()
+            operating_currency = self.operating_currency_combo.currentData()
+            
+            if base_currency:
+                self.controller.set_config("BASE_CURRENCY", base_currency)
+            if operating_currency:
+                self.controller.set_config("OPERATING_CURRENCY", operating_currency)
             
             QMessageBox.information(self, "Éxito", "Configuración guardada correctamente.\nReinicie la aplicación para ver algunos cambios.")
             self.accept()
@@ -315,6 +401,172 @@ class ConfigDialog(QDialog):
                 return socket.gethostbyname(socket.gethostname())
             except:
                 return "127.0.0.1"
+    
+    def add_exchange_rate(self):
+        """Open dialog to add new exchange rate"""
+        dialog = ExchangeRateDialog(self)
+        if dialog.exec():
+            rate_data = dialog.get_data()
+            try:
+                self.controller.create_exchange_rate(rate_data)
+                self.load_exchange_rates()
+                QMessageBox.information(self, "Éxito", "Tasa de cambio agregada correctamente")
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Error al agregar tasa: {str(e)}")
+    
+    def edit_exchange_rate(self):
+        """Edit selected exchange rate"""
+        current_row = self.rates_table.currentRow()
+        if current_row < 0:
+            QMessageBox.warning(self, "Advertencia", "Seleccione una tasa para editar")
+            return
+        
+        # Get rate ID from first column
+        rate_id = self.rates_table.item(current_row, 0).data(Qt.ItemDataRole.UserRole)
+        
+        # Get current rate data
+        rate_data = {
+            'id': rate_id,
+            'name': self.rates_table.item(current_row, 0).text(),
+            'currency_code': self.rates_table.item(current_row, 1).text(),
+            'rate': float(self.rates_table.item(current_row, 2).text()),
+            'is_active': self.rates_table.item(current_row, 3).text() == "Sí"
+        }
+        
+        dialog = ExchangeRateDialog(self, rate_data)
+        if dialog.exec():
+            updated_data = dialog.get_data()
+            try:
+                self.controller.update_exchange_rate(rate_id, updated_data)
+                self.load_exchange_rates()
+                QMessageBox.information(self, "Éxito", "Tasa de cambio actualizada correctamente")
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Error al actualizar tasa: {str(e)}")
+    
+    def delete_exchange_rate(self):
+        """Delete selected exchange rate"""
+        current_row = self.rates_table.currentRow()
+        if current_row < 0:
+            QMessageBox.warning(self, "Advertencia", "Seleccione una tasa para eliminar")
+            return
+        
+        rate_name = self.rates_table.item(current_row, 0).text()
+        reply = QMessageBox.question(
+            self,
+            "Confirmar eliminación",
+            f"¿Está seguro de eliminar la tasa '{rate_name}'?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            rate_id = self.rates_table.item(current_row, 0).data(Qt.ItemDataRole.UserRole)
+            try:
+                self.controller.delete_exchange_rate(rate_id)
+                self.load_exchange_rates()
+                QMessageBox.information(self, "Éxito", "Tasa de cambio eliminada correctamente")
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Error al eliminar tasa: {str(e)}")
 
     def closeEvent(self, event):
         event.accept()
+
+
+class ExchangeRateDialog(QDialog):
+    """Dialog for adding/editing exchange rates"""
+    
+    def __init__(self, parent=None, rate_data=None):
+        super().__init__(parent)
+        self.rate_data = rate_data
+        self.setWindowTitle("Gestionar Tasa de Cambio")
+        self.resize(400, 250)
+        
+        self.setup_ui()
+        
+        if rate_data:
+            self.load_data(rate_data)
+    
+    def setup_ui(self):
+        layout = QFormLayout()
+        
+        # Name input
+        self.name_input = QLineEdit()
+        self.name_input.setPlaceholderText("ej: Tasa BCV, Monitor, Paralelo")
+        layout.addRow("Nombre:", self.name_input)
+        
+        # Currency combo
+        self.currency_combo = QComboBox()
+        self.load_currencies()
+        layout.addRow("Moneda:", self.currency_combo)
+        
+        # Rate input
+        from PyQt6.QtWidgets import QDoubleSpinBox
+        self.rate_input = QDoubleSpinBox()
+        self.rate_input.setRange(0.01, 999999.99)
+        self.rate_input.setDecimals(2)
+        self.rate_input.setValue(1.00)
+        layout.addRow("Tasa:", self.rate_input)
+        
+        # Active checkbox
+        from PyQt6.QtWidgets import QCheckBox
+        self.active_checkbox = QCheckBox("Activa")
+        self.active_checkbox.setChecked(True)
+        layout.addRow("", self.active_checkbox)
+        
+        # Buttons
+        from PyQt6.QtWidgets import QDialogButtonBox
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(self.validate_and_accept)
+        buttons.rejected.connect(self.reject)
+        layout.addRow(buttons)
+        
+        self.setLayout(layout)
+    
+    def load_currencies(self):
+        """Load currencies into combo"""
+        try:
+            from src.controllers.config_controller import ConfigController
+            controller = ConfigController()
+            currencies = controller.get_currencies()
+            
+            for currency in currencies:
+                display_text = f"{currency['code']} - {currency['name']}"
+                self.currency_combo.addItem(display_text, currency['code'])
+        except:
+            # Fallback to default currencies
+            self.currency_combo.addItem("USD - Dólar", "USD")
+            self.currency_combo.addItem("VES - Bolívar", "VES")
+    
+    def load_data(self, rate_data):
+        """Load existing rate data into form"""
+        self.name_input.setText(rate_data.get('name', ''))
+        self.rate_input.setValue(rate_data.get('rate', 1.0))
+        self.active_checkbox.setChecked(rate_data.get('is_active', True))
+        
+        # Set currency
+        currency_code = rate_data.get('currency_code', '')
+        index = self.currency_combo.findData(currency_code)
+        if index >= 0:
+            self.currency_combo.setCurrentIndex(index)
+    
+    def validate_and_accept(self):
+        """Validate form before accepting"""
+        if not self.name_input.text().strip():
+            QMessageBox.warning(self, "Error", "El nombre de la tasa es obligatorio")
+            return
+        
+        if self.rate_input.value() <= 0:
+            QMessageBox.warning(self, "Error", "La tasa debe ser mayor a 0")
+            return
+        
+        self.accept()
+    
+    def get_data(self):
+        """Get form data as dictionary"""
+        return {
+            'name': self.name_input.text().strip(),
+            'currency_code': self.currency_combo.currentData(),
+            'rate': self.rate_input.value(),
+            'is_active': self.active_checkbox.isChecked()
+        }

@@ -27,6 +27,9 @@ class ProductFormDialog(QDialog):
         layout = QVBoxLayout()
         self.setLayout(layout)
         
+        # Get base currency configuration
+        self.base_currency, self.currency_symbol = self.get_base_currency()
+        
         # Main Layout using Grid for "Horizontal" feel (2 columns)
         grid_layout = QGridLayout()
         grid_layout.setHorizontalSpacing(20)
@@ -46,6 +49,7 @@ class ProductFormDialog(QDialog):
         self.price_input = QLineEdit()
         self.price_input.setPlaceholderText("0.00")
         self.price_input.textChanged.connect(self.calculate_margin)
+        self.price_input.textChanged.connect(self.update_converted_price)  # Real-time conversion
         
         self.margin_label = QLabel("Margen: -")
         self.margin_label.setStyleSheet("font-weight: bold; color: green;")
@@ -84,7 +88,10 @@ class ProductFormDialog(QDialog):
         grid_layout.addWidget(QLabel("SKU / Código:"), 2, 0)
         grid_layout.addWidget(self.sku_input, 3, 0)
         
-        grid_layout.addWidget(QLabel("Costo de Compra ($):"), 4, 0)
+        # Dynamic currency labels
+        cost_label = QLabel(f"Costo de Compra ({self.currency_symbol}):")
+        cost_label.setToolTip(f"Precio en {self.base_currency}")
+        grid_layout.addWidget(cost_label, 4, 0)
         grid_layout.addWidget(self.cost_input, 5, 0)
         
         grid_layout.addWidget(QLabel("Stock Actual:"), 6, 0)
@@ -97,7 +104,9 @@ class ProductFormDialog(QDialog):
         grid_layout.addWidget(QLabel("Tipo de Unidad:"), 0, 1)
         grid_layout.addWidget(self.unit_type_combo, 1, 1)
 
-        grid_layout.addWidget(QLabel("Precio Venta ($):"), 4, 1)
+        price_label = QLabel(f"Precio Venta ({self.currency_symbol}):")
+        price_label.setToolTip(f"Precio en {self.base_currency}")
+        grid_layout.addWidget(price_label, 4, 1)
         grid_layout.addWidget(self.price_input, 5, 1)
         
         grid_layout.addWidget(self.margin_label, 6, 1) # Align with Stock/Cost row visually if needed, or put below price
@@ -105,6 +114,35 @@ class ProductFormDialog(QDialog):
         grid_layout.addWidget(QLabel("Stock Mínimo (Alerta):"), 6, 1) # Overwriting previous slot visual plan
         grid_layout.addWidget(self.min_stock_input, 7, 1)
 
+        # Currency Reference Section
+        currency_group = QGroupBox("Conversión de Moneda (Referencia)")
+        currency_layout = QFormLayout()
+        
+        # Reference rate selector
+        self.reference_rate_combo = QComboBox()
+        self.reference_rate_combo.setToolTip("Seleccione una tasa para ver el precio convertido")
+        self.load_exchange_rates()
+        self.reference_rate_combo.currentIndexChanged.connect(self.update_converted_price)
+        currency_layout.addRow("Tasa Referencial:", self.reference_rate_combo)
+        
+        # Converted price display
+        self.converted_price_label = QLabel("")
+        self.converted_price_label.setStyleSheet("""
+            QLabel {
+                font-size: 14px;
+                font-weight: bold;
+                color: #2196F3;
+                padding: 8px;
+                background-color: #E3F2FD;
+                border-radius: 4px;
+                border: 2px solid #2196F3;
+            }
+        """)
+        self.converted_price_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        currency_layout.addRow("", self.converted_price_label)
+        
+        currency_group.setLayout(currency_layout)
+        
         # Section for Packs
         pack_group = QGroupBox("Configuración de Empaque")
         pack_layout = QHBoxLayout()
@@ -114,6 +152,7 @@ class ProductFormDialog(QDialog):
         pack_group.setLayout(pack_layout)
 
         layout.addLayout(grid_layout)
+        layout.addWidget(currency_group)
         layout.addWidget(pack_group)
         
         # Buttons
@@ -184,18 +223,83 @@ class ProductFormDialog(QDialog):
         self.location_input.setText(product.location or "")
         self.calculate_margin()
     
+    def get_base_currency(self):
+        """Get base currency from configuration"""
+        try:
+            from src.controllers.config_controller import ConfigController
+            controller = ConfigController()
+            base_currency = controller.get_config("BASE_CURRENCY", "USD")
+            
+            # Map currency codes to symbols
+            currency_symbols = {
+                "USD": "$",
+                "VES": "Bs",
+                "EUR": "€",
+                "MXN": "$"
+            }
+            
+            return base_currency, currency_symbols.get(base_currency, "$")
+        except:
+            return "USD", "$"
+    
+    def load_exchange_rates(self):
+        """Load active exchange rates into combo"""
+        try:
+            from src.controllers.config_controller import ConfigController
+            controller = ConfigController()
+            rates = controller.get_exchange_rates()
+            
+            self.reference_rate_combo.clear()
+            self.reference_rate_combo.addItem("-- Seleccione tasa --", None)
+            
+            for rate in rates:
+                if rate.get('is_active', True):
+                    display_text = f"{rate['name']} ({rate['currency_code']}: {rate['rate']:.2f})"
+                    self.reference_rate_combo.addItem(display_text, rate)
+        except Exception as e:
+            # Fallback if API fails
+            self.reference_rate_combo.addItem("-- Sin tasas disponibles --", None)
+    
+    def update_converted_price(self):
+        """Calculate and display converted price in real-time"""
+        try:
+            price_text = self.price_input.text().strip()
+            if not price_text:
+                self.converted_price_label.setText("")
+                return
+            
+            price = float(price_text)
+            rate_data = self.reference_rate_combo.currentData()
+            
+            if rate_data and price > 0:
+                rate_value = rate_data['rate']
+                currency_code = rate_data['currency_code']
+                rate_name = rate_data['name']
+                
+                converted = price * rate_value
+                
+                # Get symbol for target currency
+                currency_symbols = {"USD": "$", "VES": "Bs", "EUR": "€", "MXN": "$"}
+                symbol = currency_symbols.get(currency_code, currency_code)
+                
+                self.converted_price_label.setText(
+                    f"≈ {symbol} {converted:,.2f}\n(Calculado con {rate_name})"
+                )
+            else:
+                self.converted_price_label.setText("")
+        except ValueError:
+            self.converted_price_label.setText("")
+    
     def get_data(self):
         """Get form data as dict"""
         return {
             "name": self.name_input.text().strip(),
-            "sku": self.sku_input.text().strip() or None,
             "sku": self.sku_input.text().strip() or None,
             "price": float(self.price_input.text() or 0),
             "cost_price": float(self.cost_input.text() or 0),
             "stock": self.stock_input.value(),
             "min_stock": self.min_stock_input.value(),
             "is_box": self.is_box_check.isChecked(),
-            "conversion_factor": int(self.conversion_factor_input.text() or 1),
             "conversion_factor": int(self.conversion_factor_input.text() or 1),
             "unit_type": self.unit_type_combo.currentText(),
             "location": self.location_input.text().strip() or None

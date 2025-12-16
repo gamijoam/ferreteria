@@ -21,7 +21,16 @@ else:
 
 class Settings:
     # Support both naming conventions
-    DATABASE_URL: str = os.getenv("DB_URL", os.getenv("DATABASE_URL", "sqlite:///./ferreteria.db"))
+    _db_url = os.getenv("DB_URL", os.getenv("DATABASE_URL", "sqlite:///./ferreteria.db"))
+    
+    # Fix PostgreSQL encoding issues
+    if "postgresql" in _db_url:
+        if "?" not in _db_url:
+            _db_url += "?client_encoding=utf8"
+        elif "client_encoding" not in _db_url:
+            _db_url += "&client_encoding=utf8"
+    
+    DATABASE_URL: str = _db_url
     
     # Security
     SECRET_KEY: str = os.getenv("SECRET_KEY", "your-super-secret-key-change-it-in-production")

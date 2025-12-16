@@ -71,3 +71,33 @@ class ConfigController:
             configs['business_rif'] = info_dict['rif']
             
         return self.service.set_configs_batch(configs)
+    
+    def get_currencies(self):
+        """Get all available currencies"""
+        try:
+            return self.service.get_currencies()
+        except:
+            # Fallback to default currencies if API fails
+            return [
+                {'id': 1, 'code': 'USD', 'name': 'Dólar Estadounidense', 'symbol': '$'},
+                {'id': 2, 'code': 'VES', 'name': 'Bolívar', 'symbol': 'Bs'}
+            ]
+    
+    def get_exchange_rates(self):
+        """Get all exchange rates"""
+        try:
+            return self.service.get_exchange_rates()
+        except:
+            return []
+    
+    def create_exchange_rate(self, rate_data):
+        """Create new exchange rate"""
+        return self.service.create_exchange_rate(rate_data)
+    
+    def update_exchange_rate(self, rate_id, rate_data):
+        """Update exchange rate"""
+        return self.service.update_exchange_rate(rate_id, rate_data)
+    
+    def delete_exchange_rate(self, rate_id):
+        """Delete exchange rate"""
+        return self.service.delete_exchange_rate(rate_id)
