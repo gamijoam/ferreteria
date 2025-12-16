@@ -32,9 +32,12 @@ def main():
         with urllib.request.urlopen(UPDATE_URL_JSON) as url:
             data = json.loads(url.read().decode())
             remote_version = data.get("version")
-            download_url_rel = data.get("download_url")
-            base_url = UPDATE_URL_JSON.rsplit('/', 1)[0]
-            download_url = f"{base_url}/{download_url_rel}"
+            download_url = data.get("download_url")
+            
+            # Handle both absolute and relative URLs
+            if not download_url.startswith('http'):
+                base_url = UPDATE_URL_JSON.rsplit('/', 1)[0]
+                download_url = f"{base_url}/{download_url}"
         
         print(f"   Versión disponible: {remote_version}")
         
@@ -75,6 +78,10 @@ def main():
                                 if percent >= last_percent + 5:
                                     print(f"   Progreso: {percent}% ({downloaded / (1024*1024):.1f} MB)")
                                     last_percent = percent
+                    
+                    # VALIDATE: Check if download is complete
+                    if total_size > 0 and downloaded < total_size:
+                        raise Exception(f"Descarga incompleta: {downloaded}/{total_size} bytes")
                     
                     print("   ✓ Descarga completa")
                     return True
