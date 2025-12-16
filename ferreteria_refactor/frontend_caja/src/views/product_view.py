@@ -12,13 +12,16 @@ from src.controllers.product_controller import ProductController
 from src.utils.event_bus import event_bus
 
 class ProductFormDialog(QDialog):
-    """Dialog for creating/editing products"""
-    def __init__(self, parent=None, product=None):
+    """Dialog for creating/editing products with multi-currency and multi-unit support"""
+    def __init__(self, parent=None, product=None, controller=None):
         super().__init__(parent)
         self.product = product
+        self.controller = controller
+        self.product_id = product.id if product else None
+        
         self.setWindowTitle("Editar Producto" if product else "Nuevo Producto")
-        self.resize(600, 500)  # Reasonable initial size
-        self.setMinimumHeight(400)  # Prevent window from being too small
+        self.resize(700, 600)  # Larger for new sections
+        self.setMinimumHeight(500)
         
         self.setup_ui()
         
@@ -161,9 +164,61 @@ class ProductFormDialog(QDialog):
         currency_group.setLayout(currency_layout)
         content_layout.addWidget(currency_group)
         
-        # Section for Packs
-        pack_group = QGroupBox("Configuración de Empaque")
+        # ===== INVENTORY LOGISTICS SECTION =====
+        inventory_group = QGroupBox("📦 Inventario y Logística")
+        inventory_layout = QFormLayout()
+        
+        # Category selector
+        self.category_combo = QComboBox()
+        self.category_combo.setToolTip("Categoría del producto")
+        self.load_categories()
+        inventory_layout.addRow("Categoría:", self.category_combo)
+        
+        # Base Unit selector (Enum from backend)
+        self.base_unit_combo = QComboBox()
+        self.base_unit_combo.addItems(["UNIDAD", "KG", "METRO", "LITRO", "GRAMO"])
+        self.base_unit_combo.setToolTip("Unidad base para el inventario")
+        inventory_layout.addRow("Unidad Base:", self.base_unit_combo)
+        
+        # Manage Presentations Button
+        self.manage_units_btn = QPushButton("📦 Gestionar Presentaciones")
+        self.manage_units_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #FF9800;
+                color: white;
+                padding: 10px 20px;
+                font-size: 11pt;
+                font-weight: bold;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #F57C00;
+            }
+        """)
+        self.manage_units_btn.clicked.connect(self.open_unit_management)
+        self.manage_units_btn.setToolTip(
+            "Gestionar presentaciones del producto (Sacos, Cajas, Pallets, etc.)\n"
+            "Nota: Debe guardar el producto primero"
+        )
+        inventory_layout.addRow("", self.manage_units_btn)
+        
+        inventory_group.setLayout(inventory_layout)
+        content_layout.addWidget(inventory_group)
+        
+        # Section for Packs (DEPRECATED - kept for backward compatibility)
+        pack_group = QGroupBox("⚠️ Configuración de Empaque (Obsoleto)")
+        pack_group.setStyleSheet("QGroupBox { color: #999; }")
         pack_layout = QHBoxLayout()
+        
+        self.is_box_check = QCheckBox("Es Caja / Pack")
+        self.is_box_check.toggled.connect(self.toggle_box_fields)
+        self.is_box_check.setToolTip("OBSOLETO: Use 'Gestionar Presentaciones' en su lugar")
+        
+        self.conversion_factor_input = QLineEdit()
+        self.conversion_factor_input.setPlaceholderText("Unidades por caja")
+        self.conversion_factor_input.setEnabled(False)
+        self.conversion_factor_input.setText("1")
+        
         pack_layout.addWidget(self.is_box_check)
         pack_layout.addWidget(QLabel("Factor:"))
         pack_layout.addWidget(self.conversion_factor_input)
@@ -312,8 +367,60 @@ class ProductFormDialog(QDialog):
         except ValueError:
             self.converted_price_label.setText("")
     
+    def load_categories(self):
+        """Load product categories from backend"""
+        try:
+            if self.controller:
+                categories = self.controller.get_categories()
+                
+                self.category_combo.clear()
+                self.category_combo.addItem("-- Sin categoría --", None)
+                
+                for category in categories:
+                    self.category_combo.addItem(category['name'], category['id'])
+            else:
+                # Fallback if no controller
+                self.category_combo.addItem("General", None)
+        except Exception as e:
+            # Fallback categories
+            self.category_combo.addItem("General", None)
+            self.category_combo.addItem("Construcción", None)
+            self.category_combo.addItem("Herramientas", None)
+    
+    def open_unit_management(self):
+        """Open unit management dialog"""
+        if not self.product_id:
+            QMessageBox.warning(
+                self,
+                "Advertencia",
+                "Debe guardar el producto primero antes de gestionar presentaciones.\n\n"
+                "Haga clic en 'Guardar Producto' y luego podrá agregar presentaciones."
+            )
+            return
+        
+        try:
+            from src.views.unit_management_dialog import UnitManagementDialog
+            
+            dialog = UnitManagementDialog(
+                parent=self,
+                product_id=self.product_id,
+                controller=self.controller
+            )
+            dialog.exec()
+            
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Error al abrir gestor de presentaciones: {str(e)}"
+            )
+    
     def get_data(self):
         """Get form data as dict"""
+        # Get selected rate ID
+        rate_data = self.reference_rate_combo.currentData()
+        default_rate_id = rate_data.get('id') if rate_data else None
+        
         return {
             "name": self.name_input.text().strip(),
             "sku": self.sku_input.text().strip() or None,
@@ -321,10 +428,19 @@ class ProductFormDialog(QDialog):
             "cost_price": float(self.cost_input.text() or 0),
             "stock": self.stock_input.value(),
             "min_stock": self.min_stock_input.value(),
+            "location": self.location_input.text().strip() or None,
+            
+            # Multi-Currency
+            "default_rate_id": default_rate_id,
+            
+            # Multi-Unit (New System)
+            "category_id": self.category_combo.currentData(),
+            "base_unit": self.base_unit_combo.currentText(),
+            
+            # Legacy fields (backward compatibility)
             "is_box": self.is_box_check.isChecked(),
             "conversion_factor": int(self.conversion_factor_input.text() or 1),
             "unit_type": self.unit_type_combo.currentText(),
-            "location": self.location_input.text().strip() or None
         }
 
 
@@ -466,7 +582,7 @@ class ProductWindow(QWidget):
 
     def open_new_product_dialog(self):
         """Open dialog to create new product"""
-        dialog = ProductFormDialog(self)
+        dialog = ProductFormDialog(self, controller=self.controller)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             try:
                 data = dialog.get_data()
@@ -486,7 +602,7 @@ class ProductWindow(QWidget):
         if not product:
             return
         
-        dialog = ProductFormDialog(self, product)
+        dialog = ProductFormDialog(self, product, controller=self.controller)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             try:
                 data = dialog.get_data()
