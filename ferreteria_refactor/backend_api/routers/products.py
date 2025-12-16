@@ -189,3 +189,41 @@ def bulk_create_products(products: List[schemas.ProductCreate], db: Session = De
             
     db.commit()
     return result
+
+# ===== PRODUCT UNITS / PRESENTATIONS ENDPOINTS =====
+
+@router.get("/{product_id}/units", response_model=List[schemas.ProductUnitRead])
+def get_product_units(product_id: int, db: Session = Depends(get_db)):
+    """Get all units/presentations for a product"""
+    units = db.query(models.ProductUnit).filter(
+        models.ProductUnit.product_id == product_id,
+        models.ProductUnit.is_active == True
+    ).all()
+    return units
+
+@router.post("/{product_id}/units", response_model=schemas.ProductUnitRead)
+def create_product_unit(product_id: int, unit: schemas.ProductUnitCreate, db: Session = Depends(get_db)):
+    """Create a new product unit/presentation"""
+    # Verify product exists
+    product = db.query(models.Product).filter(models.Product.id == product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    
+    db_unit = models.ProductUnit(**unit.dict())
+    db_unit.product_id = product_id  # Override with path param
+    db.add(db_unit)
+    db.commit()
+    db.refresh(db_unit)
+    return db_unit
+
+@router.delete("/units/{unit_id}")
+def delete_product_unit(unit_id: int, db: Session = Depends(get_db)):
+    """Delete a product unit/presentation"""
+    unit = db.query(models.ProductUnit).filter(models.ProductUnit.id == unit_id).first()
+    if not unit:
+        raise HTTPException(status_code=404, detail="Unit not found")
+    
+    # Soft delete
+    unit.is_active = False
+    db.commit()
+    return {"status": "success"}

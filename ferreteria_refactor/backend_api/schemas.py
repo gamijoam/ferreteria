@@ -377,3 +377,44 @@ class BulkImportResult(BaseModel):
     success_count: int
     failed_count: int
     errors: List[str]
+
+# ===== CATEGORY SCHEMAS =====
+
+class CategoryBase(BaseModel):
+    name: str
+    description: Optional[str] = None
+
+class CategoryCreate(CategoryBase):
+    pass
+
+class CategoryUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    is_active: Optional[bool] = None
+
+class CategoryRead(CategoryBase):
+    id: int
+    is_active: bool = True
+    
+    class Config:
+        from_attributes = True
+
+# ===== PRODUCT UNIT / PRESENTATION SCHEMAS =====
+
+class ProductUnitBase(BaseModel):
+    name: str
+    conversion_factor: float = 1.0
+    barcode: Optional[str] = None
+    price: Optional[float] = None
+    is_default_sale: bool = False
+
+class ProductUnitCreate(ProductUnitBase):
+    product_id: Optional[int] = None  # Can be set from URL path
+
+class ProductUnitRead(ProductUnitBase):
+    id: int
+    product_id: int
+    is_active: bool = True
+    
+    class Config:
+        from_attributes = True
