@@ -10,57 +10,9 @@ router = APIRouter(
     tags=["config"]
 )
 
-@router.get("/", response_model=List[schemas.BusinessConfigRead])
-def get_all_configs(db: Session = Depends(get_db)):
-    """Get all configuration entries"""
-    return db.query(models.BusinessConfig).all()
-
-@router.get("/dict", response_model=Dict[str, Any])
-def get_all_configs_dict(db: Session = Depends(get_db)):
-    """Get all configuration as a dictionary"""
-    configs = db.query(models.BusinessConfig).all()
-    return {c.key: c.value for c in configs}
-
-@router.get("/{key}", response_model=schemas.BusinessConfigRead)
-def get_config(key: str, db: Session = Depends(get_db)):
-    """Get specific configuration key"""
-    config = db.query(models.BusinessConfig).get(key)
-    if not config:
-        # Return a dummy config object instead of 404 to suppress errors
-        return models.BusinessConfig(key=key, value="")
-    return config
-
-@router.put("/{key}", response_model=schemas.BusinessConfigRead)
-def set_config(key: str, config_data: schemas.BusinessConfigCreate, db: Session = Depends(get_db)):
-    """Set configuration value"""
-    config = db.query(models.BusinessConfig).get(key)
-    if not config:
-        config = models.BusinessConfig(key=key, value=config_data.value)
-        db.add(config)
-    else:
-        config.value = config_data.value
-    
-    db.commit()
-    db.refresh(config)
-    return config
-
-@router.post("/batch")
-def set_configs_batch(configs: Dict[str, str], db: Session = Depends(get_db)):
-    """Set multiple configuration values at once"""
-    results = {}
-    for key, value in configs.items():
-        config = db.query(models.BusinessConfig).get(key)
-        if not config:
-            config = models.BusinessConfig(key=key, value=str(value))
-            db.add(config)
-        else:
-            config.value = str(value)
-        results[key] = value
-    
-    db.commit()
-    return {"message": "Configurations updated", "data": results}
-
-# Helper endpoint for Exchange Rate
+# =============================================================================================
+# Helper endpoint for Exchange Rate - MOVED UP
+# =============================================================================================
 @router.get("/exchange-rate/current")
 def get_exchange_rate(db: Session = Depends(get_db)):
     """Get current exchange rate"""
@@ -72,7 +24,9 @@ def get_exchange_rate(db: Session = Depends(get_db)):
     except (ValueError, TypeError):
         return {"rate": 1.0}
 
-# Currencies endpoint
+# =============================================================================================
+# Currencies endpoints - MOVED UP
+# =============================================================================================
 @router.get("/currencies")
 def get_currencies(db: Session = Depends(get_db)):
     """Get all available currencies"""
@@ -88,7 +42,9 @@ def get_currencies(db: Session = Depends(get_db)):
             {"id": 3, "code": "EUR", "name": "Euro", "symbol": "€"}
         ]
 
-# Exchange Rates endpoints
+# =============================================================================================
+# Exchange Rates endpoints - MOVED UP
+# =============================================================================================
 @router.get("/exchange-rates")
 def get_exchange_rates(db: Session = Depends(get_db)):
     """Get all exchange rates"""
@@ -167,3 +123,59 @@ def delete_exchange_rate(rate_id: int, db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# =============================================================================================
+# General Config Endpoints - MOVED TO BOTTOM (GENERIC ROUTES LAST)
+# =============================================================================================
+
+@router.get("/", response_model=List[schemas.BusinessConfigRead])
+def get_all_configs(db: Session = Depends(get_db)):
+    """Get all configuration entries"""
+    return db.query(models.BusinessConfig).all()
+
+@router.get("/dict", response_model=Dict[str, Any])
+def get_all_configs_dict(db: Session = Depends(get_db)):
+    """Get all configuration as a dictionary"""
+    configs = db.query(models.BusinessConfig).all()
+    return {c.key: c.value for c in configs}
+
+@router.post("/batch")
+def set_configs_batch(configs: Dict[str, str], db: Session = Depends(get_db)):
+    """Set multiple configuration values at once"""
+    results = {}
+    for key, value in configs.items():
+        config = db.query(models.BusinessConfig).get(key)
+        if not config:
+            config = models.BusinessConfig(key=key, value=str(value))
+            db.add(config)
+        else:
+            config.value = str(value)
+        results[key] = value
+    
+    db.commit()
+    return {"message": "Configurations updated", "data": results}
+
+# GENERIC CATCH-ALL ROUTE MUST BE LAST
+@router.get("/{key}", response_model=schemas.BusinessConfigRead)
+def get_config(key: str, db: Session = Depends(get_db)):
+    """Get specific configuration key"""
+    config = db.query(models.BusinessConfig).get(key)
+    if not config:
+        # Return a dummy config object instead of 404 to suppress errors
+        return models.BusinessConfig(key=key, value="")
+    return config
+
+@router.put("/{key}", response_model=schemas.BusinessConfigRead)
+def set_config(key: str, config_data: schemas.BusinessConfigCreate, db: Session = Depends(get_db)):
+    """Set configuration value"""
+    config = db.query(models.BusinessConfig).get(key)
+    if not config:
+        config = models.BusinessConfig(key=key, value=config_data.value)
+        db.add(config)
+    else:
+        config.value = config_data.value
+    
+    db.commit()
+    db.refresh(config)
+    return config
