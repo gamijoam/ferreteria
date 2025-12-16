@@ -76,6 +76,10 @@ def main():
                                     print(f"   Progreso: {percent}% ({downloaded / (1024*1024):.1f} MB)")
                                     last_percent = percent
                     
+                    # VALIDATE: Check if download is complete
+                    if total_size > 0 and downloaded < total_size:
+                        raise Exception(f"Descarga incompleta: {downloaded}/{total_size} bytes")
+                    
                     print("   ✓ Descarga completa")
                     return True
                     
