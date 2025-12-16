@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QLineEdit, QPushButton, 
     QMessageBox, QLabel, QGroupBox, QComboBox, QFileDialog, QHBoxLayout,
-    QApplication
+    QApplication, QScrollArea, QWidget  # Added QScrollArea and QWidget for scrollable dialogs
 )
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import Qt

@@ -2,7 +2,8 @@ import sys
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, 
     QCheckBox, QComboBox, QPushButton, QTableWidget, QTableWidgetItem, 
-    QHeaderView, QMessageBox, QFormLayout, QGroupBox, QDialog, QDoubleSpinBox, QGridLayout
+    QHeaderView, QMessageBox, QFormLayout, QGroupBox, QDialog, QDoubleSpinBox, QGridLayout,
+    QScrollArea  # Added for scrollable dialogs
 )
 from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtCore import Qt, QLocale
