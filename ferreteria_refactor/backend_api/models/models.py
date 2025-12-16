@@ -12,6 +12,14 @@ class MovementType(enum.Enum):
     ADJUSTMENT_IN = "ADJUSTMENT_IN"
     ADJUSTMENT_OUT = "ADJUSTMENT_OUT"
 
+class UnitType(enum.Enum):
+    """Base unit types for product measurement"""
+    UNIDAD = "UNIDAD"  # Countable units (pieces, items)
+    KG = "KG"          # Kilograms
+    METRO = "METRO"    # Meters
+    LITRO = "LITRO"    # Liters
+    GRAMO = "GRAMO"    # Grams
+
 # ============================================================================
 # MULTI-CURRENCY SYSTEM
 # ============================================================================
@@ -98,11 +106,14 @@ class Product(Base):
     min_stock = Column(Float, default=5.0) # Low stock alert threshold
     is_active = Column(Boolean, default=True) # Logical delete
 
-    # Core Logic for Hardware Store
-    is_box = Column(Boolean, default=False)
+    # Multi-Unit System
+    base_unit = Column(Enum(UnitType), default=UnitType.UNIDAD, nullable=False)  # Base unit of measure
+    
+    # DEPRECATED: Legacy fields (use ProductUnit instead)
+    is_box = Column(Boolean, default=False)  # DEPRECATED: Use ProductUnit table
     location = Column(String, nullable=True) # Shelf/Department location
-    conversion_factor = Column(Integer, default=1) # How many units in the box?
-    unit_type = Column(String, default="Unidad") # Unidad, Metro, Kilo, Litro
+    conversion_factor = Column(Integer, default=1)  # DEPRECATED: Use ProductUnit table
+    unit_type = Column(String, default="Unidad")  # DEPRECATED: Use base_unit enum
 
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
     supplier_id = Column(Integer, ForeignKey("suppliers.id"), nullable=True)
@@ -115,9 +126,44 @@ class Product(Base):
     supplier = relationship("Supplier", back_populates="products")
     default_rate = relationship("ExchangeRate", back_populates="products")
     price_rules = relationship("PriceRule", back_populates="product")
+    units = relationship("ProductUnit", back_populates="product", cascade="all, delete-orphan")
 
     def __repr__(self):
-        return f"<Product(name='{self.name}', is_box={self.is_box}, factor={self.conversion_factor})>"
+        return f"<Product(name='{self.name}', base_unit={self.base_unit.value})>"
+
+class ProductUnit(Base):
+    """
+    Product presentations/units (Box, Bag, Pallet, etc.)
+    Supports N-level presentations: Pallet -> Box -> Package -> Unit
+    Each presentation can have its own barcode and pricing.
+    """
+    __tablename__ = "product_units"
+
+    id = Column(Integer, primary_key=True, index=True)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
+    
+    # Presentation details
+    name = Column(String, nullable=False)  # "Saco 20kg", "Caja x12", "Pallet"
+    conversion_factor = Column(Float, nullable=False)  # How many base units this contains
+    
+    # Barcode for this specific presentation
+    barcode = Column(String, unique=True, index=True, nullable=True)
+    
+    # Pricing (optional, calculated if NULL: base_price * conversion_factor)
+    price = Column(Float, nullable=True)
+    
+    # POS defaults
+    is_default_sale = Column(Boolean, default=False)  # Suggest this unit in POS
+    is_active = Column(Boolean, default=True)
+    
+    # Metadata
+    created_at = Column(DateTime, default=datetime.datetime.now)
+    
+    # Relationships
+    product = relationship("Product", back_populates="units")
+    
+    def __repr__(self):
+        return f"<ProductUnit(name='{self.name}', factor={self.conversion_factor}, barcode='{self.barcode}')>"
 
 class Kardex(Base):
     __tablename__ = "kardex"
