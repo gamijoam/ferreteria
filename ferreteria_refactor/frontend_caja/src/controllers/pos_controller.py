@@ -402,10 +402,24 @@ class POSController:
         item['unit_price'] = price_to_use # Update unit price if rule changed
         item['subtotal'] = price_to_use * new_quantity
         
+        # Update Bs
+        rate_value = item.get('rate_value', 1.0)
+        item['subtotal_bs'] = item['subtotal'] * rate_value
+        
         return True, "Cantidad actualizada"
 
+    def get_cart_totals(self):
+        """Return distinct totals for USD and Bs"""
+        total_usd = sum(item["subtotal"] for item in self.cart)
+        total_bs = sum(item.get("subtotal_bs", 0.0) for item in self.cart)
+        return {
+            "total_usd": total_usd,
+            "total_bs": total_bs
+        }
+
     def get_total(self):
-        return sum(item["subtotal"] for item in self.cart)
+        """Legacy wrapper returning USD total"""
+        return self.get_cart_totals()["total_usd"]
 
     def finalize_sale(self, payments=None, customer_id=None, is_credit=False, currency="USD", exchange_rate=1.0, notes=""):
         """

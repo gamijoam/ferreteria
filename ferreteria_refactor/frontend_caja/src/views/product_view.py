@@ -29,253 +29,207 @@ class ProductFormDialog(QDialog):
             self.populate_form(product)
     
     def setup_ui(self):
-        # Main layout (only 2 elements: scroll area + buttons)
+        # Imports needed locally if not at top, but better to rely on class imports if updated. 
+        # I will update imports in the file replacement if possible, but here I can just use QtWidgets.
+        from PyQt6.QtWidgets import QTabWidget
+        
         main_layout = QVBoxLayout()
         self.setLayout(main_layout)
         
-        # Get base currency configuration
+        # Get base currency
         self.base_currency, self.currency_symbol = self.get_base_currency()
         
-        # ===== ELEMENT 1: SCROLL AREA (Scrollable Content) =====
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll_area.setFrameShape(QScrollArea.Shape.NoFrame)
+        # TAB WIDGET
+        self.tabs = QTabWidget()
+        self.tabs.setStyleSheet("""
+            QTabWidget::pane { border: 1px solid #CCC; background-color: white; border-radius: 4px; }
+            QTabBar::tab { background-color: #f0f0f0; padding: 10px 15px; border-top-left-radius: 4px; border-top-right-radius: 4px; margin-right: 2px; }
+            QTabBar::tab:selected { background-color: white; font-weight: bold; color: #1565C0; border-bottom: 2px solid #1565C0; }
+            QLineEdit, QComboBox, QDoubleSpinBox { padding: 6px; font-size: 10pt; border: 1px solid #ccc; border-radius: 4px; }
+            QLabel { font-size: 10pt; color: #333; }
+        """)
         
-        # Container widget for all form fields
-        scroll_content = QWidget()
-        content_layout = QVBoxLayout()
-        scroll_content.setLayout(content_layout)
+        # --- TAB 1: INFORMACIÓN BÁSICA ---
+        tab_basic = QWidget()
+        form_basic = QFormLayout()
+        form_basic.setSpacing(15)
+        form_basic.setContentsMargins(20, 20, 20, 20)
         
-        # Grid Layout for form fields (2 columns)
-        grid_layout = QGridLayout()
-        grid_layout.setHorizontalSpacing(20)
-        grid_layout.setVerticalSpacing(10)
-        
-        # --- FIELDS ---
+        # Name
         self.name_input = QLineEdit()
-        self.name_input.setPlaceholderText("Nombre del Producto")
+        self.name_input.setPlaceholderText("Ej: Cemento Gris Tipo 1")
+        self.name_input.setStyleSheet("font-size: 11pt; font-weight: bold;")
+        self.name_input.setMinimumHeight(40)
+        form_basic.addRow("📝 Nombre del Producto:", self.name_input)
         
+        # SKU
         self.sku_input = QLineEdit()
-        self.sku_input.setPlaceholderText("Código único")
+        self.sku_input.setPlaceholderText("Código de barras o referencia")
+        form_basic.addRow("🔢 SKU / Código:", self.sku_input)
         
+        # Category
+        self.category_combo = QComboBox()
+        self.load_categories()
+        form_basic.addRow("📂 Categoría:", self.category_combo)
+        
+        # Unit Type (Legacy)
+        self.unit_type_combo = QComboBox()
+        self.unit_type_combo.addItems(["Unidad", "Metro", "Kilo", "Litro", "Servicio"])
+        form_basic.addRow("🏷️ Tipo (Legacy):", self.unit_type_combo)
+        
+        tab_basic.setLayout(form_basic)
+        self.tabs.addTab(tab_basic, "📝 Información Básica")
+        
+        # --- TAB 2: PRECIOS Y COSTOS ---
+        tab_prices = QWidget()
+        layout_prices = QVBoxLayout()
+        layout_prices.setSpacing(20)
+        layout_prices.setContentsMargins(20, 20, 20, 20)
+        
+        # Grid for Cost/Price
+        price_grid = QGridLayout()
+        price_grid.setHorizontalSpacing(30)
+        
+        # Cost
         self.cost_input = QLineEdit()
         self.cost_input.setPlaceholderText("0.00")
         self.cost_input.textChanged.connect(self.calculate_margin)
+        price_grid.addWidget(QLabel("📉 Costo de Compra:"), 0, 0)
+        price_grid.addWidget(self.cost_input, 1, 0)
         
+        # Price
         self.price_input = QLineEdit()
         self.price_input.setPlaceholderText("0.00")
         self.price_input.textChanged.connect(self.calculate_margin)
         self.price_input.textChanged.connect(self.update_converted_price)
+        price_grid.addWidget(QLabel("📈 Precio de Venta:"), 0, 1)
+        price_grid.addWidget(self.price_input, 1, 1)
         
-        self.margin_label = QLabel("Margen: -")
-        self.margin_label.setStyleSheet("font-weight: bold; color: green;")
+        layout_prices.addLayout(price_grid)
         
+        # Margin Bar/Label
+        self.margin_label = QLabel("Margen Calculado: -")
+        self.margin_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.margin_label.setStyleSheet("font-size: 12pt; font-weight: bold; background-color: #f9f9f9; padding: 10px; border-radius: 6px; border: 1px dashed #ccc;")
+        layout_prices.addWidget(self.margin_label)
+        
+        # Tax (IVA) - Mock
+        self.tax_combo = QComboBox()
+        self.tax_combo.addItems(["Exento (0%)", "IVA General (16%)", "IVA Reducido (8%)"])
+        form_tax = QFormLayout()
+        form_tax.addRow("🏛️ Impuesto Aplicable:", self.tax_combo)
+        layout_prices.addLayout(form_tax)
+        
+        # Reference Rates
+        group_rates = QGroupBox("Conversión de Moneda Reference")
+        layout_rates = QFormLayout()
+        self.reference_rate_combo = QComboBox()
+        self.load_exchange_rates()
+        self.reference_rate_combo.currentIndexChanged.connect(self.update_converted_price)
+        
+        self.converted_price_label = QLabel("≈ 0.00")
+        self.converted_price_label.setStyleSheet("color: #1976D2; font-weight: bold;")
+        
+        layout_rates.addRow("Tasa Referencia:", self.reference_rate_combo)
+        layout_rates.addRow("Precio Convertido:", self.converted_price_label)
+        group_rates.setLayout(layout_rates)
+        
+        layout_prices.addWidget(group_rates)
+        layout_prices.addStretch() # Push Up
+        
+        tab_prices.setLayout(layout_prices)
+        self.tabs.addTab(tab_prices, "💰 Precios y Costos")
+        
+        # --- TAB 3: INVENTARIO Y UNIDADES ---
+        tab_inv = QWidget()
+        layout_inv = QVBoxLayout()
+        layout_inv.setContentsMargins(20, 20, 20, 20)
+        
+        # Base Unit
+        form_inv = QFormLayout()
+        self.base_unit_combo = QComboBox()
+        self.base_unit_combo.addItems(["UNIDAD", "KG", "METRO", "LITRO", "GRAMO"])
+        self.base_unit_combo.currentTextChanged.connect(self.update_stock_label)
+        form_inv.addRow("📏 Unidad Base:", self.base_unit_combo)
+        
+        # Stock with Calculator
+        stock_container = QHBoxLayout()
         self.stock_input = QDoubleSpinBox()
         self.stock_input.setRange(0, 1000000)
         self.stock_input.setDecimals(2)
-        self.stock_input.setLocale(QLocale(QLocale.Language.English, QLocale.Country.UnitedStates))
-        
-        self.min_stock_input = QDoubleSpinBox()
-        self.min_stock_input.setRange(0, 1000000)
-        self.min_stock_input.setDecimals(2)
-        self.min_stock_input.setValue(5.0)
-        self.min_stock_input.setLocale(QLocale(QLocale.Language.English, QLocale.Country.UnitedStates))
-        
-        self.unit_type_combo = QComboBox()
-        self.unit_type_combo.addItems(["Unidad", "Metro", "Kilo", "Litro", "Servicio"])
-        
-        self.location_input = QLineEdit()
-        self.location_input.setPlaceholderText("Ubicación en almacén")
-        
-        # Box / Pack Logic
-        self.is_box_check = QCheckBox("Es Caja / Pack")
-        self.is_box_check.toggled.connect(self.toggle_box_fields)
-        
-        self.conversion_factor_input = QLineEdit()
-        self.conversion_factor_input.setPlaceholderText("Unidades por caja")
-        self.conversion_factor_input.setEnabled(False)
-        self.conversion_factor_input.setText("1")
-
-        # --- Adding to Grid (Label, Widget, Row, Col) ---
-        # First Column
-        grid_layout.addWidget(QLabel("Nombre del Producto:*"), 0, 0)
-        grid_layout.addWidget(self.name_input, 1, 0)
-        
-        grid_layout.addWidget(QLabel("SKU / Código:"), 2, 0)
-        grid_layout.addWidget(self.sku_input, 3, 0)
-        
-        # Dynamic currency labels
-        cost_label = QLabel(f"Costo de Compra ({self.currency_symbol}):")
-        cost_label.setToolTip(f"Precio en {self.base_currency}")
-        grid_layout.addWidget(cost_label, 4, 0)
-        grid_layout.addWidget(self.cost_input, 5, 0)
-        
-        # STOCK ROW with Calculator
-        self.stock_label = QLabel("Stock Actual:")
-        grid_layout.addWidget(self.stock_label, 6, 0)
-        
-        stock_layout = QHBoxLayout()
-        stock_layout.addWidget(self.stock_input)
         
         btn_calc = QPushButton("🖩")
-        btn_calc.setToolTip("Calculadora de Stock (Sacos -> Unidades)")
-        btn_calc.setFixedWidth(40)
+        btn_calc.setFixedSize(40, 30)
         btn_calc.clicked.connect(self.open_stock_calculator)
-        stock_layout.addWidget(btn_calc)
         
-        # We need a container widget for the HLayout to put in grid
-        # Or just addLayout to grid? addLayout is supported.
-        grid_layout.addLayout(stock_layout, 7, 0)
+        stock_container.addWidget(self.stock_input)
+        stock_container.addWidget(btn_calc)
         
-        grid_layout.addWidget(QLabel("Ubicación:"), 8, 0)
-        grid_layout.addWidget(self.location_input, 9, 0)
-
-        # Second Column
-        # ... (rest of column 2)
-        grid_layout.addWidget(QLabel("Tipo de Unidad:"), 0, 1)
-        grid_layout.addWidget(self.unit_type_combo, 1, 1)
-
-        price_label = QLabel(f"Precio Venta ({self.currency_symbol}):")
-        price_label.setToolTip(f"Precio en {self.base_currency}")
-        grid_layout.addWidget(price_label, 4, 1)
-        grid_layout.addWidget(self.price_input, 5, 1)
+        self.stock_label = QLabel("Stock Actual:") # Kept reference for update_stock_label
+        form_inv.addRow(self.stock_label, stock_container)
         
-        grid_layout.addWidget(self.margin_label, 6, 1)
+        # Min Stock
+        self.min_stock_input = QDoubleSpinBox()
+        self.min_stock_input.setRange(0, 100000)
+        self.min_stock_input.setValue(5)
+        form_inv.addRow("⚠️ Stock Mínimo:", self.min_stock_input)
         
-        grid_layout.addWidget(QLabel("Stock Mínimo (Alerta):"), 7, 1)
-        grid_layout.addWidget(self.min_stock_input, 8, 1)
-
-        # Add grid to content layout
-        content_layout.addLayout(grid_layout)
+        # Location
+        self.location_input = QLineEdit()
+        self.location_input.setPlaceholderText("Pasillo A, Estante 2...")
+        form_inv.addRow("📍 Ubicación:", self.location_input)
         
-        # Currency Reference Section
-        currency_group = QGroupBox("Conversión de Moneda (Referencia)")
-        currency_layout = QFormLayout()
+        layout_inv.addLayout(form_inv)
         
-        # Reference rate selector
-        self.reference_rate_combo = QComboBox()
-        self.reference_rate_combo.setToolTip("Seleccione una tasa para ver el precio convertido")
-        self.load_exchange_rates()
-        self.reference_rate_combo.currentIndexChanged.connect(self.update_converted_price)
-        currency_layout.addRow("Tasa Referencial:", self.reference_rate_combo)
-        
-        # Converted price display
-        self.converted_price_label = QLabel("")
-        self.converted_price_label.setStyleSheet("""
-            QLabel {
-                font-size: 14px;
-                font-weight: bold;
-                color: #2196F3;
-                padding: 8px;
-                background-color: #E3F2FD;
-                border-radius: 4px;
-                border: 2px solid #2196F3;
-            }
-        """)
-        self.converted_price_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        currency_layout.addRow("", self.converted_price_label)
-        
-        currency_group.setLayout(currency_layout)
-        content_layout.addWidget(currency_group)
-        
-        # ===== INVENTORY LOGISTICS SECTION =====
-        inventory_group = QGroupBox("📦 Inventario y Logística")
-        inventory_layout = QFormLayout()
-        
-        # Category selector
-        self.category_combo = QComboBox()
-        self.category_combo.setToolTip("Categoría del producto")
-        self.load_categories()
-        inventory_layout.addRow("Categoría:", self.category_combo)
-        
-        # Base Unit selector (Enum from backend)
-        self.base_unit_combo = QComboBox()
-        self.base_unit_combo.addItems(["UNIDAD", "KG", "METRO", "LITRO", "GRAMO"])
-        self.base_unit_combo.setToolTip("Unidad base para el inventario")
-        self.base_unit_combo.currentTextChanged.connect(self.update_stock_label)  # CONNECTED
-        inventory_layout.addRow("Unidad Base:", self.base_unit_combo)
-        
-        # Manage Presentations Button
-        self.manage_units_btn = QPushButton("📦 Gestionar Presentaciones")
+        # Manage Allocations/Units Button
+        self.manage_units_btn = QPushButton("📦 Gestionar Presentaciones Extras")
+        self.manage_units_btn.setMinimumHeight(45)
         self.manage_units_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #FF9800;
-                color: white;
-                padding: 10px 20px;
-                font-size: 11pt;
-                font-weight: bold;
-                border-radius: 4px;
-            }
-            QPushButton:hover {
-                background-color: #F57C00;
-            }
+            QPushButton { background-color: #FF9800; color: white; font-weight: bold; font-size: 11pt; border-radius: 6px; }
+            QPushButton:hover { background-color: #F57C00; }
         """)
         self.manage_units_btn.clicked.connect(self.open_unit_management)
-        self.manage_units_btn.setToolTip(
-            "Gestionar presentaciones del producto (Sacos, Cajas, Pallets, etc.)\n"
-            "Nota: Debe guardar el producto primero"
-        )
-        inventory_layout.addRow("", self.manage_units_btn)
+        layout_inv.addWidget(self.manage_units_btn)
         
-        inventory_group.setLayout(inventory_layout)
-        content_layout.addWidget(inventory_group)
+        # Legacy Box Fields (Hidden/Small)
+        legacy_group = QGroupBox("Opciones Avanzadas / Legacy")
+        legacy_group.setCheckable(True)
+        legacy_group.setChecked(False)
+        legacy_layout = QFormLayout()
         
-        # Section for Packs (DEPRECATED - kept for backward compatibility)
-        pack_group = QGroupBox("⚠️ Configuración de Empaque (Obsoleto)")
-        pack_group.setStyleSheet("QGroupBox { color: #999; }")
-        pack_layout = QHBoxLayout()
-        
-        self.is_box_check = QCheckBox("Es Caja / Pack")
+        self.is_box_check = QCheckBox("Es Caja/Pack (Legacy Mode)")
         self.is_box_check.toggled.connect(self.toggle_box_fields)
-        self.is_box_check.setToolTip("OBSOLETO: Use 'Gestionar Presentaciones' en su lugar")
-        
-        self.conversion_factor_input = QLineEdit()
-        self.conversion_factor_input.setPlaceholderText("Unidades por caja")
+        self.conversion_factor_input = QLineEdit("1")
         self.conversion_factor_input.setEnabled(False)
-        self.conversion_factor_input.setText("1")
         
-        pack_layout.addWidget(self.is_box_check)
-        pack_layout.addWidget(QLabel("Factor:"))
-        pack_layout.addWidget(self.conversion_factor_input)
-        pack_group.setLayout(pack_layout)
-        content_layout.addWidget(pack_group)
+        legacy_layout.addRow(self.is_box_check)
+        legacy_layout.addRow("Factor Legacy:", self.conversion_factor_input)
+        legacy_group.setLayout(legacy_layout)
         
-        # Add stretch to push content to top
-        content_layout.addStretch()
+        layout_inv.addWidget(legacy_group)
+        layout_inv.addStretch()
         
-        # Set scroll content
-        scroll_area.setWidget(scroll_content)
-        main_layout.addWidget(scroll_area)
+        tab_inv.setLayout(layout_inv)
+        self.tabs.addTab(tab_inv, "🏗️ Inventario y Unidades")
         
-        # ===== ELEMENT 2: FIXED FOOTER (Buttons) =====
-        btn_layout = QHBoxLayout()
-        btn_layout.addStretch()
+        main_layout.addWidget(self.tabs)
         
-        save_btn = QPushButton("Guardar Producto")
-        save_btn.setStyleSheet("""
-            background-color: #2ecc71; 
-            color: white; 
-            padding: 10px 20px; 
-            font-size: 11pt; 
-            font-weight: bold; 
-            border-radius: 4px;
-        """)
-        save_btn.clicked.connect(self.accept)
+        # Buttons Footer
+        footer = QHBoxLayout()
+        footer.addStretch()
         
         cancel_btn = QPushButton("Cancelar")
-        cancel_btn.setStyleSheet("""
-            background-color: #e74c3c; 
-            color: white; 
-            padding: 10px 20px; 
-            font-size: 11pt; 
-            border-radius: 4px;
-        """)
+        cancel_btn.setFixedSize(120, 40)
         cancel_btn.clicked.connect(self.reject)
         
-        btn_layout.addWidget(cancel_btn)
-        btn_layout.addWidget(save_btn)
-        main_layout.addLayout(btn_layout)
+        save_btn = QPushButton("Guardar Producto")
+        save_btn.setFixedSize(160, 40)
+        save_btn.setStyleSheet("background-color: #2ecc71; color: white; font-weight: bold; border-radius: 4px;")
+        save_btn.clicked.connect(self.accept)
+        
+        footer.addWidget(cancel_btn)
+        footer.addWidget(save_btn)
+        main_layout.addLayout(footer)
     
     def toggle_box_fields(self, checked):
         self.conversion_factor_input.setEnabled(checked)
@@ -329,6 +283,10 @@ class ProductFormDialog(QDialog):
                 if data and data.get('id') == product.default_rate_id:
                     self.reference_rate_combo.setCurrentIndex(i)
                     break
+        
+        # Populate Base Unit (Fix)
+        if hasattr(product, 'base_unit') and product.base_unit:
+            self.base_unit_combo.setCurrentText(product.base_unit)
         
         self.calculate_margin()
     
@@ -434,12 +392,17 @@ class ProductFormDialog(QDialog):
             from src.views.unit_management_dialog import UnitManagementDialog
             
             base_unit = self.base_unit_combo.currentText()
-            
+            try:
+                current_price = float(self.price_input.text() or 0)
+            except:
+                current_price = 0.0
+
             dialog = UnitManagementDialog(
                 parent=self,
                 product_id=self.product_id,
                 controller=self.controller,
-                base_unit_name=base_unit
+                base_unit_name=base_unit,
+                base_price=current_price
             )
             dialog.exec()
             
@@ -487,68 +450,157 @@ class ProductFormDialog(QDialog):
             self.stock_label.setText("Stock Actual:")
 
     def open_stock_calculator(self):
-        """Open simple calculator for packs"""
+        """Open conversational stock assistant"""
         base_unit = self.base_unit_combo.currentText()
-        dialog = StockCalculatorDialog(self, base_unit)
+        dialog = StockCalculatorDialog(self, self.controller, self.product_id, base_unit)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             total = dialog.get_total()
+            current_val = self.stock_input.value()
+            # Ask if add or replace? Usually calculators replace or add. 
+            # "Se agregarán..." implies adding to logic, but here we set the input value.
+            # The user prompt says "Confirmar y Actualizar Stock" -> likely updating the field.
+            # I will set the value. If they want to add to existing, they can do math. 
+            # But "Se agregarán X al inventario" implies X is the increment?
+            # If the user counts 10 sacks, that's their stock. They usually want to set Total Stock = 10 sacks.
+            # So I will set the text field to the calculated total.
             self.stock_input.setValue(total)
 
 
 class StockCalculatorDialog(QDialog):
-    def __init__(self, parent=None, base_unit="UNIDAD"):
+    def __init__(self, parent=None, controller=None, product_id=None, base_unit="UNIDAD"):
         super().__init__(parent)
-        self.setWindowTitle("Calculadora de Stock")
-        self.resize(300, 200)
-        self.setup_ui(base_unit)
-
-    def setup_ui(self, base_unit):
+        self.controller = controller
+        self.product_id = product_id
+        self.base_unit = base_unit
+        self.factor = 1.0
+        
+        self.setWindowTitle("Asistente de Ingreso de Stock")
+        self.resize(450, 400)
+        self.setStyleSheet("""
+            QDialog { background-color: white; }
+            QLabel { color: #333; font-family: 'Segoe UI', Arial; }
+            QComboBox { 
+                padding: 10px; font-size: 12pt; border: 2px solid #ddd; border-radius: 6px; 
+                background-color: #f9f9f9;
+            }
+            QDoubleSpinBox { 
+                padding: 10px; font-size: 16pt; font-weight: bold; 
+                border: 2px solid #1976D2; border-radius: 6px; 
+            }
+            QPushButton {
+                background-color: #1976D2; color: white; border-radius: 6px;
+                padding: 12px; font-size: 11pt; font-weight: bold;
+            }
+            QPushButton:hover { background-color: #1565C0; }
+        """)
+        
+        self.setup_ui()
+        self.load_units()
+        
+    def setup_ui(self):
         layout = QVBoxLayout()
+        layout.setSpacing(20)
+        layout.setContentsMargins(30, 30, 30, 30)
         self.setLayout(layout)
         
-        form_layout = QFormLayout()
+        # Header
+        title = QLabel("📦 Asistente de Conteo")
+        title.setStyleSheet("font-size: 18pt; font-weight: bold; color: #1976D2;")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(title)
         
-        self.packs_input = QDoubleSpinBox()
-        self.packs_input.setRange(0, 10000)
-        self.packs_input.setDecimals(1)
-        self.packs_input.setValue(1)
-        form_layout.addRow("Cantidad de Empaques:", self.packs_input)
+        # Step 1
+        lbl_q1 = QLabel("1. ¿Qué estás contando?")
+        lbl_q1.setStyleSheet("font-size: 12pt; font-weight: bold;")
+        layout.addWidget(lbl_q1)
         
-        self.factor_input = QDoubleSpinBox()
-        self.factor_input.setRange(0.001, 10000)
-        self.factor_input.setDecimals(3)
-        self.factor_input.setValue(1)
-        form_layout.addRow(f"Contenido ({base_unit}) por Empaque:", self.factor_input)
+        self.unit_combo = QComboBox()
+        self.unit_combo.currentIndexChanged.connect(self.calculate)
+        layout.addWidget(self.unit_combo)
         
-        layout.addLayout(form_layout)
+        # Step 2
+        lbl_q2 = QLabel("2. ¿Cuántos tienes físicamente?")
+        lbl_q2.setStyleSheet("font-size: 12pt; font-weight: bold;")
+        layout.addWidget(lbl_q2)
         
-        # Result Preview
-        self.result_label = QLabel("0.00")
-        self.result_label.setFont(QFont("Arial", 14, QFont.Weight.Bold))
-        self.result_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.result_label.setStyleSheet("color: green; padding: 10px;")
-        layout.addWidget(self.result_label)
+        self.qty_input = QDoubleSpinBox()
+        self.qty_input.setRange(0, 999999)
+        self.qty_input.setDecimals(2)
+        self.qty_input.setValue(1)
+        self.qty_input.valueChanged.connect(self.calculate)
+        layout.addWidget(self.qty_input)
         
-        # Connect
-        self.packs_input.valueChanged.connect(self.calculate)
-        self.factor_input.valueChanged.connect(self.calculate)
+        # Result Visual
+        self.result_container = QGroupBox()
+        self.result_container.setStyleSheet("background-color: #E3F2FD; border: none; border-radius: 8px;")
+        res_layout = QVBoxLayout()
         
-        # Triggers
+        self.math_label = QLabel("0 Unidades x 1 = 0 Total")
+        self.math_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.math_label.setStyleSheet("font-size: 11pt; color: #555;")
+        
+        self.total_label = QLabel("Total: 0.00")
+        self.total_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.total_label.setStyleSheet("font-size: 16pt; font-weight: bold; color: #2E7D32;")
+        
+        self.summary_label = QLabel(f"Se establecerá este inventario en {self.base_unit}")
+        self.summary_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.summary_label.setStyleSheet("color: #1976D2; font-style: italic;")
+        
+        res_layout.addWidget(self.math_label)
+        res_layout.addWidget(self.total_label)
+        res_layout.addWidget(self.summary_label)
+        self.result_container.setLayout(res_layout)
+        
+        layout.addWidget(self.result_container)
+        layout.addStretch()
+        
+        # Button
+        self.btn_confirm = QPushButton("Confirmar y Actualizar Stock")
+        self.btn_confirm.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_confirm.clicked.connect(self.accept)
+        layout.addWidget(self.btn_confirm)
+
+    def load_units(self):
+        """Load presentations + base unit"""
+        self.unit_combo.clear()
+        
+        # Base Unit
+        self.unit_combo.addItem(f"🔹 {self.base_unit} (Sueltos)", 1.0)
+        
+        # Load from DB if product exists
+        if self.controller and self.product_id:
+            try:
+                units = self.controller.get_product_units(self.product_id)
+                for unit in units:
+                    name = unit.get('name', 'Unidad')
+                    factor = unit.get('conversion_factor', 1.0)
+                    self.unit_combo.addItem(f"📦 {name} (x{factor:g} {self.base_unit})", factor)
+            except Exception as e:
+                print(f"Error loading units for calc: {e}")
+        
+        # Trigger calc
         self.calculate()
-        
-        # Buttons
-        btn_layout = QHBoxLayout()
-        btn_ok = QPushButton("Aplicar Stock")
-        btn_ok.clicked.connect(self.accept)
-        btn_layout.addWidget(btn_ok)
-        layout.addLayout(btn_layout)
 
     def calculate(self):
-        total = self.packs_input.value() * self.factor_input.value()
-        self.result_label.setText(f"Total: {total:,.2f}")
+        try:
+            qty = self.qty_input.value()
+            factor = self.unit_combo.currentData() or 1.0
+            unit_name = self.unit_combo.currentText()
+            
+            total = qty * factor
+            
+            self.math_label.setText(f"{qty:g} {unit_name.split('(')[0].strip()} × {factor:g}")
+            self.total_label.setText(f"{total:,.2f} {self.base_unit}")
+            self.summary_label.setText(f"Se ingresarán {total:,.2f} {self.base_unit} al sistema")
+            
+        except Exception:
+            pass
 
     def get_total(self):
-        return self.packs_input.value() * self.factor_input.value()
+        qty = self.qty_input.value()
+        factor = self.unit_combo.currentData() or 1.0
+        return qty * factor
 
 
 class ProductWindow(QWidget):

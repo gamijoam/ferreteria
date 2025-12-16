@@ -19,6 +19,7 @@ class ProductBase(BaseModel):
     location: Optional[str] = None
     default_rate_id: Optional[int] = None
     unit_type: Optional[str] = "Unidad"
+    base_unit: Optional[str] = "UNIDAD"
 
 class ProductCreate(ProductBase):
     pass
@@ -40,6 +41,7 @@ class ProductUpdate(BaseModel):
     location: Optional[str] = None
     default_rate_id: Optional[int] = None
     unit_type: Optional[str] = None
+    base_unit: Optional[str] = None
     is_active: Optional[bool] = None
 
     class Config:

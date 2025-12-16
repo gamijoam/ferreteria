@@ -446,7 +446,7 @@ class POSWindow(QWidget):
             self.table.setItem(i, 6, subtotal_usd_item)
             
             # Column 7: Subtotal (Bs) (Not editable)
-            subtotal_bs = subtotal_usd * rate_value
+            subtotal_bs = item.get("subtotal_bs", 0.0)
             subtotal_bs_item = QTableWidgetItem(f"Bs {subtotal_bs:,.2f}")
             subtotal_bs_item.setFlags(subtotal_bs_item.flags() ^ Qt.ItemFlag.ItemIsEditable)
             self.table.setItem(i, 7, subtotal_bs_item)
@@ -470,10 +470,11 @@ class POSWindow(QWidget):
             btn_del.clicked.connect(lambda checked, idx=i: self.remove_item(idx))
             self.table.setCellWidget(i, 8, btn_del)
             
-            total_usd += subtotal_usd
-            total_bs += subtotal_bs
-        
         # Update total label with LARGE Bs display and small USD display
+        totals = self.controller.get_cart_totals()
+        total_bs = totals['total_bs']
+        total_usd = totals['total_usd']
+        
         self.lbl_total.setText(f"TOTAL: Bs {total_bs:,.2f}  (${total_usd:,.2f})")
         self.lbl_total.setStyleSheet("color: #1976D2; font-size: 24px; font-weight: bold;")
         
@@ -485,7 +486,7 @@ class POSWindow(QWidget):
         self.refresh_table()
 
     def on_cell_changed(self, row, column):
-        # Column 2 is Quantity (changed from 1)
+        # Column 2 is Quantity
         if column == 2:
             try:
                 new_qty_str = self.table.item(row, column).text()
@@ -500,17 +501,47 @@ class POSWindow(QWidget):
                 # Update Controller
                 success, msg = self.controller.update_quantity(row, new_qty)
                 
-                if not success:
-                    QMessageBox.warning(self, "Stock Insuficiente", msg)
-                    # Revert change (refresh table from controller state)
-                    self.refresh_table()
+                if success:
+                    # Efficient UI Update without full refresh
+                    try:
+                        self.table.blockSignals(True)
+                        
+                        # Get updated item data
+                        item = self.controller.cart[row]
+                        
+                        # Update Unit Price (Column 3) - Might change due to tiers
+                        price_usd = item.get("unit_price", 0)
+                        self.table.item(row, 3).setText(f"${price_usd:,.2f}")
+                        
+                        # Update Unit Price Bs (Column 5)
+                        rate_value = item.get("rate_value", 1.0)
+                        price_bs = price_usd * rate_value
+                        self.table.item(row, 5).setText(f"Bs {price_bs:,.2f}")
+                        
+                        # Update Subtotal USD (Column 6)
+                        subtotal_usd = item["subtotal"]
+                        self.table.item(row, 6).setText(f"${subtotal_usd:,.2f}")
+                        
+                        # Update Subtotal Bs (Column 7)
+                        subtotal_bs = item.get("subtotal_bs", 0.0)
+                        self.table.item(row, 7).setText(f"Bs {subtotal_bs:,.2f}")
+                        
+                    finally:
+                        self.table.blockSignals(False)
+                    
+                    # Update Totals Label
+                    totals = self.controller.get_cart_totals()
+                    total_bs = totals['total_bs']
+                    total_usd = totals['total_usd']
+                    self.lbl_total.setText(f"TOTAL: Bs {total_bs:,.2f}  (${total_usd:,.2f})")
+                    self.lbl_total.setStyleSheet("color: #1976D2; font-size: 24px; font-weight: bold;")
+                    
                 else:
-                    # Refresh to update subtotal and total
-                    self.refresh_table()
+                    QMessageBox.warning(self, "Stock Insuficiente", msg)
+                    self.refresh_table() # Revert to previous valid value
                     
             except ValueError:
-                QMessageBox.warning(self, "Error", "Ingrese una cantidad válida")
-                self.refresh_table()
+                self.refresh_table() # Revert
         
         self.focus_input()
 

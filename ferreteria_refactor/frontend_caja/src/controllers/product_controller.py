@@ -132,3 +132,4 @@ class MockProduct:
         self.supplier_id = data.get('supplier_id')
         self.is_active = data.get('is_active', True)
         self.default_rate_id = data.get('default_rate_id')
+        self.base_unit = data.get('base_unit', 'UNIDAD')
