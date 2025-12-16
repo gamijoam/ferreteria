@@ -4,6 +4,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
 import DashboardLayout from './layouts/DashboardLayout';
 import Products from './pages/Products';
+import Inventory from './pages/Inventory';
 
 const DashboardPlaceholder = () => (
   <div className="text-center p-10">
@@ -23,6 +24,7 @@ function App() {
             <Route element={<DashboardLayout />}>
               <Route path="/" element={<DashboardPlaceholder />} />
               <Route path="/products" element={<Products />} />
+              <Route path="/inventory" element={<Inventory />} />
             </Route>
           </Route>
         </Routes>
