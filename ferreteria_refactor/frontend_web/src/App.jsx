@@ -4,6 +4,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
 import DashboardLayout from './layouts/DashboardLayout';
 import Products from './pages/Products';
+import Categories from './pages/Categories';
 import Inventory from './pages/Inventory';
 import POS from './pages/POS';
 import CashClose from './pages/CashClose';
@@ -33,6 +34,7 @@ function App() {
                   <Route element={<DashboardLayout />}>
                     <Route path="/" element={<DashboardPlaceholder />} />
                     <Route path="/products" element={<Products />} />
+                    <Route path="/categories" element={<Categories />} />
                     <Route path="/inventory" element={<Inventory />} />
                     <Route path="/pos" element={<POS />} />
                     <Route path="/cash-close" element={<CashClose />} />

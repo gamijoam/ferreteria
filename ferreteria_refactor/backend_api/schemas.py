@@ -469,3 +469,23 @@ class KardexRead(BaseModel):
     
     class Config:
         from_attributes = True
+
+# Category Schemas
+class CategoryBase(BaseModel):
+    name: str
+    description: Optional[str] = None
+    parent_id: Optional[int] = None
+
+class CategoryCreate(CategoryBase):
+    pass
+
+class CategoryUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    parent_id: Optional[int] = None
+
+class CategoryResponse(CategoryBase):
+    id: int
+    
+    class Config:
+        from_attributes = True

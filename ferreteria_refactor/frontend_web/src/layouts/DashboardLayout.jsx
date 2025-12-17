@@ -8,7 +8,8 @@ import {
     Archive,
     Settings as SettingsIcon,
     LogOut,
-    User
+    User,
+    FolderTree
 } from 'lucide-react';
 
 const DashboardLayout = () => {
@@ -36,6 +37,10 @@ const DashboardLayout = () => {
                     <Link to="/products" className="flex items-center space-x-3 p-3 rounded hover:bg-slate-700 transition-colors">
                         <Package size={20} />
                         <span>Productos</span>
+                    </Link>
+                    <Link to="/categories" className="flex items-center space-x-3 p-3 rounded hover:bg-slate-700 transition-colors">
+                        <FolderTree size={20} />
+                        <span>Categorías</span>
                     </Link>
                     <Link to="/pos" className="flex items-center space-x-3 p-3 rounded hover:bg-slate-700 transition-colors">
                         <ShoppingCart size={20} />

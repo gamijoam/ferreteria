@@ -32,31 +32,51 @@ const POS = () => {
 
     // Data State
     const [catalog, setCatalog] = useState([]);
+    const [categories, setCategories] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
 
     // Refs
     const searchInputRef = useRef(null);
 
-    // Fetch Catalog
+    // Fetch Catalog and Categories
     useEffect(() => {
-        const fetchCatalog = async () => {
+        const fetchData = async () => {
             try {
-                const response = await apiClient.get('/products/');
-                console.log('POS Catalog loaded:', response.data);
-                console.log('First product units:', response.data[0]?.units);
-                setCatalog(response.data);
+                const [productsRes, categoriesRes] = await Promise.all([
+                    apiClient.get('/products/'),
+                    apiClient.get('/categories')
+                ]);
+                console.log('POS Catalog loaded:', productsRes.data);
+                setCatalog(productsRes.data);
+                setCategories(categoriesRes.data);
             } catch (error) {
-                console.error("Error fetching catalog:", error);
+                console.error("Error fetching data:", error);
             } finally {
                 setIsLoading(false);
             }
         };
-        fetchCatalog();
+        fetchData();
     }, []);
 
-    const filteredCatalog = catalog.filter(p =>
-        p.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    // Filter by search and category
+    const filteredCatalog = catalog.filter(p => {
+        const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
+
+        if (!selectedCategory) return matchesSearch;
+
+        // Check if product belongs to selected category or its children
+        if (p.category_id === selectedCategory) return matchesSearch;
+
+        // Check if product belongs to a subcategory of selected category
+        const productCategory = categories.find(c => c.id === p.category_id);
+        if (productCategory?.parent_id === selectedCategory) return matchesSearch;
+
+        return false;
+    });
+
+    // Get root categories and subcategories
+    const rootCategories = categories.filter(cat => !cat.parent_id);
+    const getSubcategories = (parentId) => categories.filter(cat => cat.parent_id === parentId);
 
     const handleProductClick = (product) => {
         // Multi-Unit Logic
@@ -131,6 +151,53 @@ const POS = () => {
                         onChange={(e) => setSearchTerm(e.target.value)}
                         autoFocus
                     />
+                </div>
+
+                {/* Category Filters */}
+                <div className="mb-4">
+                    {/* Parent Categories */}
+                    <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-300">
+                        <button
+                            onClick={() => setSelectedCategory(null)}
+                            className={`px-4 py-2 rounded-full font-medium whitespace-nowrap transition-all ${!selectedCategory
+                                    ? 'bg-blue-600 text-white shadow-md'
+                                    : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
+                                }`}
+                        >
+                            📦 Todos
+                        </button>
+                        {rootCategories.map(category => (
+                            <button
+                                key={category.id}
+                                onClick={() => setSelectedCategory(category.id)}
+                                className={`px-4 py-2 rounded-full font-medium whitespace-nowrap transition-all ${selectedCategory === category.id
+                                        ? 'bg-blue-600 text-white shadow-md'
+                                        : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
+                                    }`}
+                            >
+                                {category.name}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Subcategories (if parent selected) */}
+                    {selectedCategory && getSubcategories(selectedCategory).length > 0 && (
+                        <div className="flex items-center gap-2 overflow-x-auto mt-2 pb-2 scrollbar-thin scrollbar-thumb-gray-300">
+                            <span className="text-xs text-gray-500 font-medium whitespace-nowrap">Subcategorías:</span>
+                            {getSubcategories(selectedCategory).map(subcategory => (
+                                <button
+                                    key={subcategory.id}
+                                    onClick={() => setSelectedCategory(subcategory.id)}
+                                    className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all ${selectedCategory === subcategory.id
+                                            ? 'bg-blue-500 text-white shadow'
+                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-300'
+                                        }`}
+                                >
+                                    └─ {subcategory.name}
+                                </button>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
                 {/* Grid */}

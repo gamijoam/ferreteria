@@ -1,16 +1,18 @@
 import { useState, useEffect } from 'react';
 import { X, Plus, Trash2, Package, DollarSign, Barcode, Tag, Layers, AlertTriangle } from 'lucide-react';
 import { useConfig } from '../../context/ConfigContext';
+import apiClient from '../../config/axios';
 
 const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
     const { getActiveCurrencies, convertPrice, currencies } = useConfig();
     const anchorCurrency = currencies.find(c => c.is_anchor) || { symbol: '$' };
 
     const [activeTab, setActiveTab] = useState('general');
+    const [categories, setCategories] = useState([]);
     const [formData, setFormData] = useState({
         name: '',
         sku: '',
-        category: '',
+        category_id: null,
         cost: 0,
         price: 0,
         stock: 0,
@@ -24,6 +26,9 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
     // Reset or Populate on simple change
     useEffect(() => {
         if (isOpen) {
+            // Fetch categories
+            fetchCategories();
+
             if (initialData) {
                 // Map backend units to frontend format
                 const mappedUnits = (initialData.units || []).map(u => {
@@ -52,7 +57,7 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
                 setFormData({
                     name: initialData.name || '',
                     sku: initialData.sku || '',
-                    category: initialData.category_id || '',
+                    category_id: initialData.category_id || null,
                     cost: initialData.cost_price || 0,
                     price: initialData.price || 0,
                     stock: initialData.stock || 0,
@@ -67,7 +72,7 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
             } else {
                 // Reset for new product
                 setFormData({
-                    name: '', sku: '', category: '',
+                    name: '', sku: '', category_id: null,
                     cost: 0, price: 0, stock: 0, min_stock: 5, location: '',
                     margin: 0, unit_type: 'UNID', units: []
                 });
@@ -95,6 +100,15 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
             }
             return updated;
         });
+    };
+
+    const fetchCategories = async () => {
+        try {
+            const response = await apiClient.get('/categories');
+            setCategories(response.data);
+        } catch (error) {
+            console.error('Error fetching categories:', error);
+        }
     };
 
     // ... Unit Management (keep existing helper functions)
@@ -126,7 +140,7 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
         const payload = {
             name: formData.name,
             sku: formData.sku,
-            category_id: parseInt(formData.category) || null,
+            category_id: parseInt(formData.category_id) || null,
             cost_price: parseFloat(formData.cost),
             price: parseFloat(formData.price),
             stock: parseFloat(formData.stock), // Now explicitly sending stock
@@ -223,14 +237,28 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
                                     <label className="block text-sm font-semibold text-gray-700 mb-1">Categoría</label>
                                     <div className="relative">
                                         <Tag className="absolute left-3 top-3 text-gray-400" size={18} />
-                                        <input
-                                            type="text"
-                                            name="category"
-                                            value={formData.category}
+                                        <select
+                                            name="category_id"
+                                            value={formData.category_id || ''}
                                             onChange={handleInputChange}
                                             className="w-full pl-10 border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2.5"
-                                            placeholder="Materiales, Herramientas..."
-                                        />
+                                        >
+                                            <option value="">-- Sin categoría --</option>
+                                            {categories.filter(cat => !cat.parent_id).map(parent => (
+                                                <optgroup key={parent.id} label={parent.name}>
+                                                    <option value={parent.id}>{parent.name}</option>
+                                                    {categories.filter(child => child.parent_id === parent.id).map(child => (
+                                                        <option key={child.id} value={child.id}>
+                                                            └─ {child.name}
+                                                        </option>
+                                                    ))}
+                                                </optgroup>
+                                            ))}
+                                            {/* Standalone categories without children */}
+                                            {categories.filter(cat => !cat.parent_id && !categories.some(c => c.parent_id === cat.id)).length === 0 && categories.filter(cat => !cat.parent_id).map(cat => (
+                                                <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                            ))}
+                                        </select>
                                     </div>
                                 </div>
                                 <div className="col-span-2">

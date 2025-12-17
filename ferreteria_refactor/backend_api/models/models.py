@@ -18,11 +18,14 @@ class Category(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, index=True, nullable=False)
     description = Column(Text, nullable=True)
+    parent_id = Column(Integer, ForeignKey('categories.id'), nullable=True)  # For subcategories
 
+    # Relationships
+    children = relationship("Category", backref="parent", remote_side=[id])
     products = relationship("Product", back_populates="category")
 
     def __repr__(self):
-        return f"<Category(name='{self.name}')>"
+        return f"<Category(name='{self.name}', parent_id={self.parent_id})>"
 
 class Supplier(Base):
     __tablename__ = "suppliers"

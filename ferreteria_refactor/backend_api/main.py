@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .models import models
 from .database.db import engine
-from .routers import products, customers, quotes, cash, suppliers, inventory, returns, reports, purchases, users, config, auth
+from .routers import products, customers, quotes, cash, suppliers, inventory, returns, reports, purchases, users, config, auth, categories
 
 # Create tables
 models.Base.metadata.create_all(bind=engine)
@@ -42,7 +42,7 @@ app.include_router(purchases.router, prefix="/api/v1")
 app.include_router(users.router, prefix="/api/v1")
 app.include_router(config.router, prefix="/api/v1")
 app.include_router(auth.router, prefix="/api/v1")  # Auth endpoints
-app.include_router(auth.router, prefix="/api/v1")
+app.include_router(categories.router, prefix="/api/v1")  # Categories endpoints
 
 @app.on_event("startup")
 def startup_event():
