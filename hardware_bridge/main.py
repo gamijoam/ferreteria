@@ -52,7 +52,7 @@ def format_virtual_ticket(data: TicketData):
     
     for item in data.items:
         # Line 1: Name
-        lines.append(f"{item.name:<width}")
+        lines.append(f"{item.name:<{width}}")
         # Line 2: Details
         q_str = f"{item.quantity} {item.unit}"
         lines.append(f"{q_str:<10} x {item.price:<10.2f} {item.total:>24.2f}")

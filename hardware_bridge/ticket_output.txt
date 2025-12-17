@@ -1,0 +1,30 @@
+------------------------------------------------
+                TICKET DE VENTA                 
+------------------------------------------------
+          FERRETERIA EL NUEVO PROGRESO          
+               RIF: J-12345678-9                
+           Av. Principal Las Acacias            
+          Fecha: 16/12/2025, 20:06:14           
+------------------------------------------------
+
+CANT   DESCRIPCION                         TOTAL
+------------------------------------------------
+Destornillador Phillips                         
+1.0 UNID   x 3.50                           3.50
+Arena Lavada                                    
+1.0 M3     x 1.00                           1.00
+Tubería PVC 1/2                                 
+1.0 Tubo   x 4.00                           4.00
+------------------------------------------------
+
+SUBTOTAL USD                               8.50
+TOTAL BS                                 382.50
+METODO PAGO                            CASH_USD
+RECIBIDO                                  20.00
+------------------------------------------------
+
+            ¡Gracias por su compra!             
+       Conserve este ticket para cambios        
+   NO SE ACEPTAN DEVOLUCIONES DESPUES DE 24H    
+
+
