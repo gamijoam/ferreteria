@@ -71,3 +71,43 @@ class ConfigController:
             configs['business_rif'] = info_dict['rif']
             
         return self.service.set_configs_batch(configs)
+
+    def get_currencies(self):
+        """Get all currencies from the system"""
+        try:
+            currencies = self.service.get_currencies()
+            # Convert dict response to objects with attributes
+            if isinstance(currencies, list):
+                return [type('Currency', (), c) for c in currencies]
+            return []
+        except Exception as e:
+            print(f"Error getting currencies: {e}")
+            # Return default currencies as fallback
+            return [
+                type('Currency', (), {
+                    'symbol': 'USD',
+                    'name': 'Dólar',
+                    'is_active': True,
+                    'rate': 1.0
+                }),
+                type('Currency', (), {
+                    'symbol': 'Bs',
+                    'name': 'Bolívar',
+                    'is_active': True,
+                    'rate': 50.0
+                })
+            ]
+
+    def get_exchange_rate(self, currency_code=None):
+        """Get exchange rate for a specific currency or default VES rate"""
+        if currency_code and currency_code != "USD":
+            try:
+                currencies = self.get_currencies()
+                for c in currencies:
+                    if c.symbol == currency_code:
+                        return c.rate
+            except:
+                pass
+        
+        # Fallback to old method for VES/Bs
+        return self.service.get_exchange_rate()

@@ -12,6 +12,228 @@ router = APIRouter(
     tags=["reports"]
 )
 
+@router.get("/dashboard/financials")
+def get_dashboard_financials(
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Financial metrics for dashboard - real money collected by currency
+    
+    Returns:
+    - sales_by_currency: List of totals grouped by currency (USD, COP, VES, etc.)
+    - total_sales_base_usd: Sum of all sales converted to USD base
+    - profit_estimated: Estimated profit (sales - costs)
+    """
+    # Default to today if no dates provided
+    if not start_date:
+        start_date = date.today()
+    if not end_date:
+        end_date = date.today()
+    
+    start_dt = datetime.combine(start_date, datetime.min.time())
+    end_dt = datetime.combine(end_date, datetime.max.time())
+    
+    # Get all sale IDs that have returns (voided sales)
+    voided_sale_ids = db.query(models.Return.sale_id).filter(
+        models.Return.date >= start_dt,
+        models.Return.date <= end_dt
+    ).distinct().all()
+    voided_sale_ids = [sid[0] for sid in voided_sale_ids]
+    
+    # Query SalePayment grouped by currency, excluding voided sales
+    query = db.query(
+        models.SalePayment.currency,
+        func.sum(models.SalePayment.amount).label('total_collected'),
+        func.count(models.SalePayment.id).label('payment_count')
+    ).join(models.Sale).filter(
+        models.Sale.date >= start_dt,
+        models.Sale.date <= end_dt
+    )
+    
+    # Exclude voided sales
+    if voided_sale_ids:
+        query = query.filter(models.Sale.id.notin_(voided_sale_ids))
+    
+    # Group by currency
+    results = query.group_by(models.SalePayment.currency).all()
+    
+    # Format sales by currency
+    sales_by_currency = []
+    total_sales_base_usd = 0.0
+    
+    for currency, total_collected, count in results:
+        sales_by_currency.append({
+            "currency": currency or "USD",
+            "total_collected": round(total_collected, 2),
+            "count": count
+        })
+        
+        # Convert to USD for base total
+        # If currency is USD, add directly; otherwise use exchange rate
+        if currency == "USD":
+            total_sales_base_usd += total_collected
+        else:
+            # Get average exchange rate for the period
+            avg_rate = db.query(func.avg(models.SalePayment.exchange_rate)).filter(
+                models.SalePayment.currency == currency
+            ).join(models.Sale).filter(
+                models.Sale.date >= start_dt,
+                models.Sale.date <= end_dt
+            ).scalar() or 1.0
+            
+            # Convert to USD
+            total_sales_base_usd += total_collected / avg_rate
+    
+    # Calculate profit estimation (Sales - Costs)
+    # Get all sale details for the period (excluding voided sales)
+    sale_details_query = db.query(models.SaleDetail).join(models.Sale).filter(
+        models.Sale.date >= start_dt,
+        models.Sale.date <= end_dt
+    )
+    
+    if voided_sale_ids:
+        sale_details_query = sale_details_query.filter(models.Sale.id.notin_(voided_sale_ids))
+    
+    sale_details = sale_details_query.all()
+    
+    total_cost = 0.0
+    total_revenue = 0.0
+    
+    for detail in sale_details:
+        total_revenue += detail.subtotal
+        if detail.product and detail.product.cost_price:
+            total_cost += detail.product.cost_price * detail.quantity
+    
+    profit_estimated = total_revenue - total_cost
+    
+    return {
+        "sales_by_currency": sales_by_currency,
+        "total_sales_base_usd": round(total_sales_base_usd, 2),
+        "profit_estimated": round(profit_estimated, 2)
+    }
+
+@router.get("/dashboard/cashflow")
+def get_dashboard_cashflow(db: Session = Depends(get_db)):
+    """
+    Calculate physical cash balance by currency in open cash sessions
+    
+    Returns real money that should be in the cash drawer:
+    - Initial cash from open sessions
+    - + Sales income (from SalePayment)
+    - + Deposits
+    - - Expenses
+    - - Withdrawals  
+    - - Returns/Refunds
+    """
+    # Get all active currencies from config
+    active_currencies = db.query(models.Currency).filter(models.Currency.is_active == True).all()
+    currency_codes = [c.symbol for c in active_currencies] if active_currencies else ['USD', 'Bs']
+    
+    # Get open cash sessions
+    open_sessions = db.query(models.CashSession).filter(models.CashSession.status == "OPEN").all()
+    
+    if not open_sessions:
+        # No open sessions, return zeros
+        return {
+            "balances": [{"currency": code, "initial": 0, "sales": 0, "expenses": 0, "net_balance": 0} for code in currency_codes],
+            "alerts": ["No hay sesiones de caja abiertas"]
+        }
+    
+    session_ids = [s.id for s in open_sessions]
+    balances = {}
+    alerts = []
+    
+    # Initialize balances for each currency
+    for currency in currency_codes:
+        balances[currency] = {
+            "currency": currency,
+            "initial": 0.0,
+            "sales": 0.0,
+            "expenses": 0.0,
+            "net_balance": 0.0
+        }
+    
+    # 1. Get initial cash from open sessions
+    for session in open_sessions:
+        # Check if session has multi-currency support
+        if session.currencies:
+            for curr in session.currencies:
+                if curr.currency_symbol in balances:
+                    balances[curr.currency_symbol]["initial"] += curr.initial_amount
+        else:
+            # Fallback to old dual-currency model
+            balances["USD"]["initial"] += session.initial_cash or 0
+            if "Bs" in balances:
+                balances["Bs"]["initial"] += session.initial_cash_bs or 0
+    
+    # 2. Get sales income from SalePayment (exclude voided sales)
+    voided_sale_ids = db.query(models.Return.sale_id).distinct().all()
+    voided_sale_ids = [sid[0] for sid in voided_sale_ids]
+    
+    sales_query = db.query(
+        models.SalePayment.currency,
+        func.sum(models.SalePayment.amount).label('total')
+    ).join(models.Sale).filter(
+        models.Sale.date >= open_sessions[0].start_time  # Since first session opened
+    )
+    
+    if voided_sale_ids:
+        sales_query = sales_query.filter(models.Sale.id.notin_(voided_sale_ids))
+    
+    sales_by_currency = sales_query.group_by(models.SalePayment.currency).all()
+    
+    for currency, total in sales_by_currency:
+        if currency in balances:
+            balances[currency]["sales"] += total
+    
+    # 3. Get cash movements (expenses, deposits, withdrawals, returns)
+    movements = db.query(models.CashMovement).filter(
+        models.CashMovement.session_id.in_(session_ids)
+    ).all()
+    
+    for movement in movements:
+        currency = movement.currency or "USD"
+        if currency not in balances:
+            continue
+            
+        if movement.type == "DEPOSIT":
+            # Deposits are income
+            balances[currency]["sales"] += movement.amount
+        elif movement.type in ["EXPENSE", "WITHDRAWAL"]:
+            # Expenses and withdrawals reduce cash
+            balances[currency]["expenses"] -= movement.amount
+        elif movement.type == "RETURN":
+            # Returns are refunds (reduce cash)
+            balances[currency]["expenses"] -= movement.amount
+    
+    # 4. Calculate net balance and check for alerts
+    for currency_code, data in balances.items():
+        data["net_balance"] = data["initial"] + data["sales"] + data["expenses"]
+        
+        # Alert if negative balance
+        if data["net_balance"] < 0:
+            alerts.append(f"⚠️ Caja en {currency_code} tiene saldo negativo: {data['net_balance']:.2f} (Revisar)")
+        
+        # Round values
+        data["initial"] = round(data["initial"], 2)
+        data["sales"] = round(data["sales"], 2)
+        data["expenses"] = round(data["expenses"], 2)
+        data["net_balance"] = round(data["net_balance"], 2)
+    
+    # Convert to list and filter out currencies with no activity
+    balance_list = [data for data in balances.values() if data["initial"] != 0 or data["sales"] != 0 or data["expenses"] != 0]
+    
+    # If no activity, show at least USD
+    if not balance_list:
+        balance_list = [balances["USD"]]
+    
+    return {
+        "balances": balance_list,
+        "alerts": alerts if alerts else []
+    }
+
 @router.get("/sales/detailed")
 def get_detailed_sales_report(
     start_date: date,

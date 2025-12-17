@@ -137,6 +137,8 @@ class Sale(Base):
     customer_id = Column(Integer, ForeignKey("customers.id"), nullable=True)
     is_credit = Column(Boolean, default=False)
     paid = Column(Boolean, default=True) # False for credit sales
+    due_date = Column(DateTime, nullable=True)  # Payment deadline for credit sales
+    balance_pending = Column(Float, nullable=True)  # Remaining balance for partial payments
     
     # Sale Notes
     notes = Column(Text, nullable=True)  # Special observations or instructions
@@ -282,6 +284,7 @@ class ReturnDetail(Base):
     return_id = Column(Integer, ForeignKey("returns.id"), nullable=False)
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
     quantity = Column(Float, nullable=False) # Units returned
+    unit_price = Column(Float, default=0.0)  # Price at time of return
 
     return_obj = relationship("Return", back_populates="details")
     product = relationship("Product")
@@ -299,6 +302,8 @@ class Customer(Base):
     email = Column(String, nullable=True)
     address = Column(Text, nullable=True)
     credit_limit = Column(Float, default=0.0)
+    payment_term_days = Column(Integer, default=15)  # Default payment term in days
+    is_blocked = Column(Boolean, default=False)  # Manual credit block flag
 
     sales = relationship("Sale", back_populates="customer")
     payments = relationship("Payment", back_populates="customer")

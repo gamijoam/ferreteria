@@ -1,1 +1,3 @@
-revisar si las facturas se vencen o no
+al pagar el credito con tal moneda no esta tomando en cuenta la tasa , porque al cerrar la caja 
+si ejemplo el credito es de 20$ y coloco que se paga en bs solo en la suma 20bs y no debe ser asi. debe respetar la tasa
+y cuando cierro la caja si tengo 100$ en credito y ya se pagaron sigue saliendo en caja que hay pendiente 100$ en credito pero ya se pagaron

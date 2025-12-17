@@ -92,8 +92,60 @@ def delete_price_rule(rule_id: int, db: Session = Depends(get_db)):
 
 @router.post("/sales/")
 def create_sale(sale_data: schemas.SaleCreate, db: Session = Depends(get_db)):
+    from datetime import datetime, timedelta
+    from sqlalchemy import func
+    
+    # Credit Validation for Credit Sales
+    if sale_data.is_credit and sale_data.customer_id:
+        customer = db.query(models.Customer).filter(models.Customer.id == sale_data.customer_id).first()
+        if not customer:
+            raise HTTPException(status_code=404, detail="Customer not found")
+        
+        # 1. Check if customer is blocked
+        if customer.is_blocked:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cliente '{customer.name}' está bloqueado por mora. No se pueden realizar ventas a crédito."
+            )
+        
+        # 2. Check for overdue invoices
+        overdue_count = db.query(models.Sale).filter(
+            models.Sale.customer_id == sale_data.customer_id,
+            models.Sale.is_credit == True,
+            models.Sale.paid == False,
+            models.Sale.due_date < datetime.now()
+        ).count()
+        
+        if overdue_count > 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cliente tiene {overdue_count} factura(s) vencida(s). Debe ponerse al día antes de nuevas ventas a crédito."
+            )
+        
+        # 3. Check credit limit
+        current_debt = db.query(func.sum(models.Sale.balance_pending)).filter(
+            models.Sale.customer_id == sale_data.customer_id,
+            models.Sale.is_credit == True,
+            models.Sale.paid == False
+        ).scalar() or 0.0
+        
+        if (current_debt + sale_data.total_amount) > customer.credit_limit:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Excede límite de crédito. Deuda actual: ${current_debt:.2f}, Límite: ${customer.credit_limit:.2f}, Disponible: ${(customer.credit_limit - current_debt):.2f}"
+            )
+    
     # 1. Create Sale Header
     total_bs = sale_data.total_amount * sale_data.exchange_rate
+    
+    # Calculate due date for credit sales
+    due_date = None
+    balance_pending = None
+    if sale_data.is_credit and sale_data.customer_id:
+        customer = db.query(models.Customer).filter(models.Customer.id == sale_data.customer_id).first()
+        if customer:
+            due_date = datetime.now() + timedelta(days=customer.payment_term_days)
+            balance_pending = sale_data.total_amount
     
     new_sale = models.Sale(
         total_amount=sale_data.total_amount,
@@ -104,7 +156,9 @@ def create_sale(sale_data: schemas.SaleCreate, db: Session = Depends(get_db)):
         currency=sale_data.currency,
         exchange_rate_used=sale_data.exchange_rate,
         total_amount_bs=total_bs,
-        notes=sale_data.notes
+        notes=sale_data.notes,
+        due_date=due_date,
+        balance_pending=balance_pending
     )
     db.add(new_sale)
     db.flush() # Get ID
@@ -186,6 +240,59 @@ def create_sale(sale_data: schemas.SaleCreate, db: Session = Depends(get_db)):
 
     db.commit()
     return {"status": "success", "sale_id": new_sale.id}
+
+@router.post("/sales/payments")
+def register_sale_payment(
+    payment_data: schemas.SalePaymentCreate,
+    db: Session = Depends(get_db)
+):
+    """Register a payment (abono) for a credit sale"""
+    # Verify sale exists
+    sale = db.query(models.Sale).filter(models.Sale.id == payment_data.sale_id).first()
+    if not sale:
+        raise HTTPException(status_code=404, detail="Sale not found")
+    
+    # Create SalePayment record
+    payment = models.SalePayment(
+        sale_id=payment_data.sale_id,
+        amount=payment_data.amount,
+        currency=payment_data.currency,
+        payment_method=payment_data.payment_method,
+        exchange_rate=payment_data.exchange_rate
+    )
+    db.add(payment)
+    db.commit()
+    
+    return {"status": "success", "payment_id": payment.id}
+
+@router.put("/sales/{sale_id}")
+def update_sale(
+    sale_id: int,
+    balance_pending: float = None,
+    paid: bool = None,
+    db: Session = Depends(get_db)
+):
+    """Update sale balance and paid status"""
+    print(f"🔄 UPDATE SALE {sale_id}: balance_pending={balance_pending}, paid={paid}")
+    
+    sale = db.query(models.Sale).filter(models.Sale.id == sale_id).first()
+    if not sale:
+        raise HTTPException(status_code=404, detail="Sale not found")
+    
+    print(f"   Before: paid={sale.paid}, balance={sale.balance_pending}")
+    
+    if balance_pending is not None:
+        sale.balance_pending = balance_pending
+    
+    if paid is not None:
+        sale.paid = paid
+    
+    db.commit()
+    db.refresh(sale)
+    
+    print(f"   After: paid={sale.paid}, balance={sale.balance_pending}")
+    
+    return {"status": "success", "sale": sale}
 
 @router.post("/bulk", response_model=schemas.BulkImportResult)
 def bulk_create_products(products: List[schemas.ProductCreate], db: Session = Depends(get_db)):

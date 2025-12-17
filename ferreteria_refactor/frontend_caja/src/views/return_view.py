@@ -7,6 +7,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 from src.database.db import SessionLocal
 from src.controllers.return_controller import ReturnController
+from src.controllers.config_controller import ConfigController
 from frontend_caja.services.cash_service import CashService
 
 class ReturnDialog(QDialog):
@@ -18,6 +19,7 @@ class ReturnDialog(QDialog):
         
         self.db = SessionLocal()
         self.controller = ReturnController(self.db)
+        self.config_controller = ConfigController(self.db)  # ✅ NEW: Config controller
         self.cash_service = CashService()
         self.current_sale = None
         
@@ -25,6 +27,7 @@ class ReturnDialog(QDialog):
         self.setLayout(self.layout)
         
         self.setup_ui()
+        self.load_active_currencies()  # ✅ NEW: Load currencies dynamically
         self.load_initial_sales()
 
     # ... (setup_ui, load_methods unchanged) ...
@@ -90,8 +93,7 @@ class ReturnDialog(QDialog):
         # Currency Selector
         action_layout.addWidget(QLabel("Moneda de Reembolso:"))
         self.currency_combo = QComboBox()
-        self.currency_combo.addItems(["USD", "Bs"])
-        self.currency_combo.setCurrentIndex(1)  # Default to Bs
+        # ✅ Currencies will be loaded dynamically in load_active_currencies()
         self.currency_combo.setFont(QFont("Arial", 12))
         action_layout.addWidget(self.currency_combo)
         
@@ -114,6 +116,33 @@ class ReturnDialog(QDialog):
         right_widget = QWidget()
         right_widget.setLayout(right_panel)
         self.layout.addWidget(right_widget, 65) # 65% width
+
+    def load_active_currencies(self):
+        """Load active currencies dynamically from config"""
+        try:
+            currencies = self.config_controller.get_currencies()
+            active_currencies = [c for c in currencies if c.is_active]
+            
+            self.currency_combo.clear()
+            
+            for currency in active_currencies:
+                # Display format: "USD - Dólar" or "VES - Bolívar"
+                display_text = f"{currency.symbol} - {currency.name}"
+                # Store currency code as data
+                self.currency_combo.addItem(display_text, currency.symbol)
+            
+            # Try to set default to local currency (Bs/VES) if exists
+            for i in range(self.currency_combo.count()):
+                code = self.currency_combo.itemData(i)
+                if code in ["Bs", "VES", "COP"]:
+                    self.currency_combo.setCurrentIndex(i)
+                    break
+                    
+        except Exception as e:
+            print(f"Error loading currencies: {e}")
+            # Fallback to hardcoded values
+            self.currency_combo.addItem("USD - Dólar", "USD")
+            self.currency_combo.addItem("Bs - Bolívar", "Bs")
 
     def load_initial_sales(self):
         sales = self.controller.get_recent_sales()
@@ -222,19 +251,25 @@ class ReturnDialog(QDialog):
                 except ValueError:
                     continue
             
-            # Get current rate
-            from src.controllers.config_controller import ConfigController
-            config_ctrl = ConfigController(self.db)
-            rate = config_ctrl.get_exchange_rate()
+            # Get current rate for selected currency
+            currency_code = self.currency_combo.currentData()  # ✅ Get code from data
+            if not currency_code:
+                currency_code = refund_currency  # Fallback
             
-            ret = self.controller.process_return(self.current_sale.id, items_to_return, reason, refund_currency, rate)
-            
-            msg = f"Venta ANULADA correctamente.\\n\\nReembolso Total: ${ret.total_refunded:,.2f} (USD Base)"
-            if refund_currency == "Bs":
-                refund_bs = ret.total_refunded * rate
-                msg += f"\\n\\nSe registró una salida de caja de: Bs {refund_bs:,.2f}"
+            # Get exchange rate for this specific currency
+            if currency_code == "USD":
+                rate = 1.0
             else:
-                msg += f"\\n\\nSe registró una salida de caja de: ${ret.total_refunded:,.2f}"
+                rate = self.config_controller.get_exchange_rate(currency_code)
+            
+            ret = self.controller.process_return(self.current_sale.id, items_to_return, reason, currency_code, rate)
+            
+            msg = f"Venta ANULADA correctamente.\n\nReembolso Total: ${ret.total_refunded:,.2f} (USD Base)"
+            if currency_code != "USD":
+                refund_local = ret.total_refunded * rate
+                msg += f"\n\nSe registró una salida de caja de: {currency_code} {refund_local:,.2f}"
+            else:
+                msg += f"\n\nSe registró una salida de caja de: ${ret.total_refunded:,.2f}"
                 
             QMessageBox.information(self, "Venta Anulada", msg)
             self.accept()
@@ -271,22 +306,26 @@ class ReturnDialog(QDialog):
             return
 
         try:
-            # Get currency and rate
-            currency = self.currency_combo.currentText()
+            # Get currency code from combo (stored in data)
+            currency_code = self.currency_combo.currentData()
+            if not currency_code:
+                # Fallback: parse from text
+                currency_code = self.currency_combo.currentText().split(" - ")[0]
             
-            # Get current rate
-            from src.controllers.config_controller import ConfigController
-            config_ctrl = ConfigController(self.db)
-            rate = config_ctrl.get_exchange_rate()
-            
-            ret = self.controller.process_return(self.current_sale.id, items_to_return, reason, currency, rate)
-            
-            msg = f"Devolución procesada correctamente.\\n\\nReembolso Total: ${ret.total_refunded:,.2f} (USD Base)"
-            if currency == "Bs":
-                refund_bs = ret.total_refunded * rate
-                msg += f"\\n\\nSe registró una salida de caja de: Bs {refund_bs:,.2f}"
+            # Get exchange rate for this specific currency
+            if currency_code == "USD":
+                rate = 1.0
             else:
-                msg += f"\\n\\nSe registró una salida de caja de: ${ret.total_refunded:,.2f}"
+                rate = self.config_controller.get_exchange_rate(currency_code)
+            
+            ret = self.controller.process_return(self.current_sale.id, items_to_return, reason, currency_code, rate)
+            
+            msg = f"Devolución procesada correctamente.\n\nReembolso Total: ${ret.total_refunded:,.2f} (USD Base)"
+            if currency_code != "USD":
+                refund_local = ret.total_refunded * rate
+                msg += f"\n\nSe registró una salida de caja de: {currency_code} {refund_local:,.2f}"
+            else:
+                msg += f"\n\nSe registró una salida de caja de: ${ret.total_refunded:,.2f}"
                 
             QMessageBox.information(self, "Éxito", msg)
             self.accept()

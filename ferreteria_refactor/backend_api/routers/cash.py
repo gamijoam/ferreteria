@@ -226,6 +226,27 @@ def close_session(session_id: int, close_data: schemas.CashSessionClose, db: Ses
         expected_bs = totals["expected_bs"]
         expected_by_currency = totals.get("expected_by_currency", {})
 
+        # ========================================
+        # NEW: Calculate Total Sales vs Cash Collected
+        # ========================================
+        start_time = session.start_time
+        end_time = datetime.datetime.now()
+        
+        # Total Sales (Facturado) - ALL sales including credit
+        total_sales_invoiced = db.query(func.sum(models.Sale.total_amount)).filter(
+            models.Sale.date >= start_time,
+            models.Sale.date <= end_time
+        ).scalar() or 0.0
+        
+        # Total Cash Collected (Recaudado) - Only from SalePayments
+        total_cash_collected = db.query(func.sum(models.SalePayment.amount)).join(
+            models.Sale
+        ).filter(
+            models.Sale.date >= start_time,
+            models.Sale.date <= end_time,
+            models.SalePayment.currency == "USD"  # Only USD for main total
+        ).scalar() or 0.0
+
         # Calculate Diffs (legacy)
         diff_usd = close_data.final_cash_reported - expected_usd
         diff_bs = close_data.final_cash_reported_bs - expected_bs
@@ -277,7 +298,10 @@ def close_session(session_id: int, close_data: schemas.CashSessionClose, db: Ses
             "diff_bs": diff_bs,
             "expected_by_currency": expected_by_currency,
             "diff_by_currency": diff_by_currency,
-            "details": totals["details"]
+            "details": totals["details"],
+            # NEW: Separate totals for invoiced vs collected
+            "total_sales_invoiced": round(total_sales_invoiced, 2),
+            "total_cash_collected": round(total_cash_collected, 2)
         }
     except Exception as e:
         print(f"Error closing session: {e}")

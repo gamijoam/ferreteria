@@ -58,6 +58,16 @@ const PurchaseDetail = () => {
         today.setHours(0, 0, 0, 0);
         const dueDate = new Date(purchase.due_date);
         dueDate.setHours(0, 0, 0, 0);
+
+        // Debug logging
+        console.log('=== OVERDUE CHECK ===');
+        console.log('Due Date (original):', purchase.due_date);
+        console.log('Due Date (midnight):', dueDate.toISOString());
+        console.log('Today (midnight):', today.toISOString());
+        console.log('Payment Status:', purchase.payment_status);
+        console.log('Is Overdue:', dueDate < today);
+        console.log('====================');
+
         return dueDate < today;
     })();
 

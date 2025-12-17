@@ -1,71 +1,194 @@
-import { Outlet, Link, useNavigate } from 'react-router-dom';
+import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
+import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useConfig } from '../context/ConfigContext';
 import {
     LayoutDashboard,
     Package,
     ShoppingCart,
-    Archive,
     Settings as SettingsIcon,
     LogOut,
-    User,
     FolderTree,
     ShoppingBag,
+    DollarSign,
+    Truck,
     Wallet,
-    Truck
+    RotateCcw,
+    Archive,
+    User,
+    History,
+    ChevronDown,
+    ChevronRight,
+    Users,
+    FileText
 } from 'lucide-react';
 
 const DashboardLayout = () => {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
+
+    // Collapsible menu states
+    const [openSections, setOpenSections] = useState({
+        inventory: true,
+        sales: true,
+        finance: true,
+        operations: false
+    });
 
     const handleLogout = () => {
         logout();
         navigate('/login');
     };
 
+    const toggleSection = (section) => {
+        setOpenSections(prev => ({
+            ...prev,
+            [section]: !prev[section]
+        }));
+    };
+
+    const isActive = (path) => location.pathname === path;
+
     return (
         <div className="flex h-screen bg-gray-100">
             {/* Sidebar */}
-            <aside className="w-64 bg-slate-800 text-white flex flex-col">
+            <aside className="w-64 bg-slate-800 text-white flex flex-col overflow-y-auto">
                 <div className="p-4 border-b border-slate-700">
                     <h1 className="text-xl font-bold">Ferretería Pro</h1>
                 </div>
 
-                <nav className="flex-1 p-4 space-y-2">
-                    <Link to="/" className="flex items-center space-x-3 p-3 rounded hover:bg-slate-700 transition-colors">
+                <nav className="flex-1 p-4 space-y-1">
+                    {/* Dashboard */}
+                    <Link
+                        to="/"
+                        className={`flex items-center space-x-3 p-3 rounded transition-colors ${isActive('/') ? 'bg-blue-600' : 'hover:bg-slate-700'
+                            }`}
+                    >
                         <LayoutDashboard size={20} />
                         <span>Dashboard</span>
                     </Link>
-                    <Link to="/products" className="flex items-center space-x-3 p-3 rounded hover:bg-slate-700 transition-colors">
-                        <Package size={20} />
-                        <span>Productos</span>
-                    </Link>
-                    <Link to="/categories" className="flex items-center space-x-3 p-3 rounded hover:bg-slate-700 transition-colors">
-                        <FolderTree size={20} />
-                        <span>Categorías</span>
-                    </Link>
-                    <Link to="/purchases" className="flex items-center space-x-3 p-3 rounded hover:bg-slate-700 transition-colors">
-                        <ShoppingBag size={20} />
-                        <span>Compras</span>
-                    </Link>
-                    <Link to="/suppliers" className="flex items-center space-x-3 p-3 rounded hover:bg-slate-700 transition-colors">
-                        <Truck size={20} />
-                        <span>Proveedores</span>
-                    </Link>
-                    <Link to="/accounts-payable" className="flex items-center space-x-3 p-3 rounded hover:bg-slate-700 transition-colors">
-                        <Wallet size={20} />
-                        <span>Cuentas por Pagar</span>
-                    </Link>
-                    <Link to="/pos" className="flex items-center space-x-3 p-3 rounded hover:bg-slate-700 transition-colors">
-                        <ShoppingCart size={20} />
-                        <span>Ventas (POS)</span>
-                    </Link>
-                    <Link to="/inventory" className="flex items-center px-4 py-3 text-gray-300 hover:bg-slate-700 hover:text-white transition-colors">
-                        <Archive className="mr-3" size={20} /> Inventario
-                    </Link>
-                    <Link to="/settings" className="flex items-center px-4 py-3 text-gray-300 hover:bg-slate-700 hover:text-white transition-colors">
-                        <SettingsIcon className="mr-3" size={20} /> Configuración
+
+                    {/* Inventario y Productos */}
+                    <div>
+                        <button
+                            onClick={() => toggleSection('inventory')}
+                            className="flex items-center justify-between w-full p-3 rounded hover:bg-slate-700 transition-colors"
+                        >
+                            <div className="flex items-center space-x-3">
+                                <Package size={20} />
+                                <span className="font-medium">Inventario</span>
+                            </div>
+                            {openSections.inventory ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                        </button>
+                        {openSections.inventory && (
+                            <div className="ml-4 mt-1 space-y-1">
+                                <Link to="/products" className={`flex items-center space-x-3 p-2 pl-4 rounded text-sm transition-colors ${isActive('/products') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
+                                    <Package size={16} />
+                                    <span>Productos</span>
+                                </Link>
+                                <Link to="/categories" className={`flex items-center space-x-3 p-2 pl-4 rounded text-sm transition-colors ${isActive('/categories') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
+                                    <FolderTree size={16} />
+                                    <span>Categorías</span>
+                                </Link>
+                                <Link to="/inventory" className={`flex items-center space-x-3 p-2 pl-4 rounded text-sm transition-colors ${isActive('/inventory') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
+                                    <Archive size={16} />
+                                    <span>Kardex</span>
+                                </Link>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Ventas */}
+                    <div>
+                        <button
+                            onClick={() => toggleSection('sales')}
+                            className="flex items-center justify-between w-full p-3 rounded hover:bg-slate-700 transition-colors"
+                        >
+                            <div className="flex items-center space-x-3">
+                                <ShoppingCart size={20} />
+                                <span className="font-medium">Ventas</span>
+                            </div>
+                            {openSections.sales ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                        </button>
+                        {openSections.sales && (
+                            <div className="ml-4 mt-1 space-y-1">
+                                <Link to="/pos" className={`flex items-center space-x-3 p-2 pl-4 rounded text-sm transition-colors ${isActive('/pos') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
+                                    <ShoppingCart size={16} />
+                                    <span>Punto de Venta</span>
+                                </Link>
+                                <Link to="/sales-history" className={`flex items-center space-x-3 p-2 pl-4 rounded text-sm transition-colors ${isActive('/sales-history') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
+                                    <History size={16} />
+                                    <span>Historial</span>
+                                </Link>
+                                <Link to="/returns" className={`flex items-center space-x-3 p-2 pl-4 rounded text-sm transition-colors ${isActive('/returns') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
+                                    <RotateCcw size={16} />
+                                    <span>Devoluciones</span>
+                                </Link>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Finanzas */}
+                    <div>
+                        <button
+                            onClick={() => toggleSection('finance')}
+                            className="flex items-center justify-between w-full p-3 rounded hover:bg-slate-700 transition-colors"
+                        >
+                            <div className="flex items-center space-x-3">
+                                <DollarSign size={20} />
+                                <span className="font-medium">Finanzas</span>
+                            </div>
+                            {openSections.finance ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                        </button>
+                        {openSections.finance && (
+                            <div className="ml-4 mt-1 space-y-1">
+                                <Link to="/customers" className={`flex items-center space-x-3 p-2 pl-4 rounded text-sm transition-colors ${isActive('/customers') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
+                                    <Users size={16} />
+                                    <span>Clientes</span>
+                                </Link>
+                                <Link to="/accounts-receivable" className={`flex items-center space-x-3 p-2 pl-4 rounded text-sm transition-colors ${isActive('/accounts-receivable') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
+                                    <FileText size={16} />
+                                    <span>Cuentas por Cobrar</span>
+                                </Link>
+                                <Link to="/suppliers" className={`flex items-center space-x-3 p-2 pl-4 rounded text-sm transition-colors ${isActive('/suppliers') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
+                                    <Truck size={16} />
+                                    <span>Proveedores</span>
+                                </Link>
+                                <Link to="/accounts-payable" className={`flex items-center space-x-3 p-2 pl-4 rounded text-sm transition-colors ${isActive('/accounts-payable') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
+                                    <Wallet size={16} />
+                                    <span>Cuentas por Pagar</span>
+                                </Link>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Operaciones */}
+                    <div>
+                        <button
+                            onClick={() => toggleSection('operations')}
+                            className="flex items-center justify-between w-full p-3 rounded hover:bg-slate-700 transition-colors"
+                        >
+                            <div className="flex items-center space-x-3">
+                                <ShoppingBag size={20} />
+                                <span className="font-medium">Operaciones</span>
+                            </div>
+                            {openSections.operations ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                        </button>
+                        {openSections.operations && (
+                            <div className="ml-4 mt-1 space-y-1">
+                                <Link to="/purchases" className={`flex items-center space-x-3 p-2 pl-4 rounded text-sm transition-colors ${isActive('/purchases') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
+                                    <ShoppingBag size={16} />
+                                    <span>Compras</span>
+                                </Link>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Settings */}
+                    <Link to="/settings" className={`flex items-center space-x-3 p-3 rounded transition-colors ${isActive('/settings') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
+                        <SettingsIcon size={20} />
+                        <span>Configuración</span>
                     </Link>
                 </nav>
 

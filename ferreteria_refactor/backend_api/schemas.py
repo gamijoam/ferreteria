@@ -1,6 +1,12 @@
 from pydantic import BaseModel
 from typing import Optional, List, Dict
 from datetime import datetime
+from enum import Enum
+
+# Item Condition Enum for Returns
+class ItemCondition(str, Enum):
+    GOOD = "GOOD"
+    DAMAGED = "DAMAGED"
 
 class ProductBase(BaseModel):
     name: str
@@ -108,6 +114,24 @@ class SaleCreate(BaseModel):
     notes: Optional[str] = None
     is_credit: bool = False
 
+# Sale Payment Schema
+class SalePaymentCreate(BaseModel):
+    sale_id: int
+    amount: float
+    currency: str = "USD"
+    payment_method: str = "Efectivo"
+    exchange_rate: float = 1.0
+
+class SalePaymentRead(BaseModel):
+    id: int
+    amount: float
+    currency: str
+    payment_method: str
+    exchange_rate: float
+    
+    class Config:
+        from_attributes = True
+
 class SaleRead(BaseModel):
     id: int
     date: datetime
@@ -115,6 +139,11 @@ class SaleRead(BaseModel):
     payment_method: str
     customer_id: Optional[int]
     customer: Optional['CustomerRead'] = None
+    payments: List[SalePaymentRead] = []  # ✅ Include payments
+    due_date: Optional[datetime] = None
+    balance_pending: Optional[float] = None
+    is_credit: bool = False  # ✅ CRITICAL: Missing field added
+    paid: bool = True  # ✅ CRITICAL: Missing field added
     
     class Config:
         from_attributes = True
@@ -125,6 +154,9 @@ class CustomerBase(BaseModel):
     phone: Optional[str] = None
     email: Optional[str] = None
     address: Optional[str] = None
+    credit_limit: float = 0.0
+    payment_term_days: int = 15
+    is_blocked: bool = False
 
 class CustomerCreate(CustomerBase):
     pass
@@ -308,6 +340,8 @@ class SupplierRead(SupplierBase):
 
 class ReturnItemCreate(BaseModel):
     product_id: int
+    quantity: float
+    condition: ItemCondition = ItemCondition.GOOD  # Default to GOOD condition
     product: Optional[ProductRead] = None
 
     class Config:

@@ -14,7 +14,8 @@ const printerService = {
                 "FERRETERIA EL NUEVO PROGRESO",
                 "RIF: J-12345678-9",
                 "Av. Principal Las Acacias",
-                `Fecha: ${new Date().toLocaleString()}`
+                `Fecha: ${new Date(saleData.date).toLocaleString('es-ES')}`,
+                `CLIENTE: ${saleData.customer?.name || "CLIENTE GENERAL"}`
             ],
             items: saleData.cart.map(item => ({
                 name: item.name,
@@ -26,8 +27,8 @@ const printerService = {
             totals: {
                 "SUBTOTAL USD": saleData.totalUSD,
                 "TOTAL BS": saleData.totalBs,
-                "METODO PAGO": saleData.paymentData.method.toUpperCase(),
-                "RECIBIDO": Number(saleData.paymentData.amountReceived || 0)
+                "METODO PAGO": (saleData.paymentData?.method || saleData.payment_method || "EFECTIVO").toUpperCase(),
+                "RECIBIDO": Number(saleData.paymentData?.amountReceived || 0)
             },
             footer: [
                 "¡Gracias por su compra!",

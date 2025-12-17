@@ -3,6 +3,7 @@ import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
 import DashboardLayout from './layouts/DashboardLayout';
+import Dashboard from './pages/Dashboard';
 import Products from './pages/Products';
 import Categories from './pages/Categories';
 import Inventory from './pages/Inventory';
@@ -14,16 +15,13 @@ import CreatePurchase from './pages/Purchases/CreatePurchase';
 import PurchaseDetail from './pages/Purchases/PurchaseDetail';
 import AccountsPayable from './pages/Suppliers/AccountsPayable';
 import Suppliers from './pages/Suppliers';
+import ReturnsManager from './pages/Returns/ReturnsManager';
+import SalesHistory from './pages/SalesHistory';
+import CustomerManager from './pages/Customers/CustomerManager';
+import AccountsReceivable from './pages/Credit/AccountsReceivable';
 import { CartProvider } from './context/CartContext';
 import { CashProvider } from './context/CashContext';
 import { ConfigProvider } from './context/ConfigContext';
-
-const DashboardPlaceholder = () => (
-  <div className="text-center p-10">
-    <h1 className="text-3xl font-bold text-gray-800 mb-4">Bienvenido al Sistema Web</h1>
-    <p className="text-gray-600">Selecciona una opción del menú lateral para comenzar.</p>
-  </div>
-);
 
 function App() {
   return (
@@ -37,7 +35,7 @@ function App() {
 
                 <Route element={<ProtectedRoute />}>
                   <Route element={<DashboardLayout />}>
-                    <Route path="/" element={<DashboardPlaceholder />} />
+                    <Route path="/" element={<Dashboard />} />
                     <Route path="/products" element={<Products />} />
                     <Route path="/categories" element={<Categories />} />
                     <Route path="/inventory" element={<Inventory />} />
@@ -46,6 +44,10 @@ function App() {
                     <Route path="/purchases/:id" element={<PurchaseDetail />} />
                     <Route path="/suppliers" element={<Suppliers />} />
                     <Route path="/accounts-payable" element={<AccountsPayable />} />
+                    <Route path="/customers" element={<CustomerManager />} />
+                    <Route path="/accounts-receivable" element={<AccountsReceivable />} />
+                    <Route path="/returns" element={<ReturnsManager />} />
+                    <Route path="/sales-history" element={<SalesHistory />} />
                     <Route path="/pos" element={<POS />} />
                     <Route path="/cash-close" element={<CashClose />} />
                     <Route path="/settings" element={<Settings />} />

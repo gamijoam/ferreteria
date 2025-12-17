@@ -54,3 +54,11 @@ class ConfigService:
         except Exception as e:
             print(f"Error fetching exchange rate: {e}")
             return 1.0
+
+    def get_currencies(self):
+        """Get all active currencies"""
+        try:
+            return self.client.get(f"{self.endpoint}/currencies")
+        except Exception as e:
+            print(f"Error fetching currencies: {e}")
+            return []

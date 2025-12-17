@@ -4,23 +4,20 @@
           FERRETERIA EL NUEVO PROGRESO          
                RIF: J-12345678-9                
            Av. Principal Las Acacias            
-          Fecha: 16/12/2025, 20:06:14           
+              Fecha: Invalid Date               
+            CLIENTE: CLIENTE GENERAL            
 ------------------------------------------------
 
 CANT   DESCRIPCION                         TOTAL
 ------------------------------------------------
-Destornillador Phillips                         
-1.0 UNID   x 3.50                           3.50
-Arena Lavada                                    
-1.0 M3     x 1.00                           1.00
-Tubería PVC 1/2                                 
-1.0 Tubo   x 4.00                           4.00
+TALADRO                                         
+1.0 UNID   x 20.00                         20.00
 ------------------------------------------------
 
-SUBTOTAL USD                               8.50
-TOTAL BS                                 382.50
-METODO PAGO                            CASH_USD
-RECIBIDO                                  20.00
+SUBTOTAL USD                              20.00
+TOTAL BS                                 900.00
+METODO PAGO                            EFECTIVO
+RECIBIDO                                   0.00
 ------------------------------------------------
 
             ¡Gracias por su compra!             
