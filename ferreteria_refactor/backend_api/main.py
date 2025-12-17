@@ -53,7 +53,6 @@ def startup_event():
         init_admin_user(db)
         init_currencies(db)
     except Exception as e:
-    except Exception as e:
         print(f"Error initializing admin user: {e}")
     finally:
         db.close()
