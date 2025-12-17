@@ -259,6 +259,40 @@ const Settings = () => {
                         </div>
                     )}
 
+                    {/* ANCHOR CURRENCY BANNER */}
+                    <div className="mx-6 mt-6 mb-4 p-5 bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-200 rounded-2xl shadow-sm">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <div className="bg-emerald-500 p-3 rounded-xl shadow-md">
+                                    <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-black text-emerald-900 flex items-center gap-2">
+                                        <span className="bg-emerald-600 text-white px-3 py-1 rounded-lg text-sm font-bold shadow">ANCLA</span>
+                                        Moneda Base del Sistema
+                                    </h3>
+                                    <p className="text-emerald-700 font-medium mt-1">
+                                        Todas las tasas están ancladas a: <span className="font-black text-emerald-900">USD (Dólar Americano)</span>
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <div className="bg-white px-6 py-3 rounded-xl shadow-md border-2 border-emerald-300">
+                                    <div className="text-5xl font-black text-emerald-600">$</div>
+                                    <div className="text-xs text-emerald-700 font-bold mt-1">1.00 USD</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="mt-4 pt-4 border-t border-emerald-200">
+                            <p className="text-xs text-emerald-600 flex items-center gap-2">
+                                <AlertCircle size={14} />
+                                <span>Todos los precios de productos se almacenan en USD. Las tasas de cambio convierten automáticamente a otras monedas.</span>
+                            </p>
+                        </div>
+                    </div>
+
                     <div className="grid grid-cols-12 h-full min-h-[500px]">
                         {/* LEFT: Currency List */}
                         <div className="col-span-12 md:col-span-3 border-r bg-gray-50/30 overflow-y-auto border-b md:border-b-0">
@@ -278,8 +312,8 @@ const Settings = () => {
                                         key={curr.code}
                                         onClick={() => setSelectedCurrency(curr.code)}
                                         className={`w-full text-left p-3 rounded-xl transition-all border ${selectedCurrency === curr.code
-                                                ? 'bg-blue-600 text-white shadow-md border-blue-600 transform scale-[1.02]'
-                                                : 'bg-white hover:bg-blue-50 text-gray-800 border-gray-100 hover:border-blue-200'
+                                            ? 'bg-blue-600 text-white shadow-md border-blue-600 transform scale-[1.02]'
+                                            : 'bg-white hover:bg-blue-50 text-gray-800 border-gray-100 hover:border-blue-200'
                                             }`}
                                     >
                                         <div className="flex justify-between items-center">
@@ -348,8 +382,8 @@ const Settings = () => {
                                                                 <div className="text-[10px] text-gray-400 font-mono tracking-tighter">REF: #{rate.id.toString().padStart(4, '0')}</div>
                                                             </td>
                                                             <td className="p-4">
-                                                                <div className="relative w-40">
-                                                                    <span className="absolute left-3 top-2.5 text-gray-400 text-sm font-bold">{rate.currency_symbol}</span>
+                                                                <div className="relative w-48">
+                                                                    <span className="absolute left-3 top-2.5 text-emerald-600 text-sm font-bold">1 USD =</span>
                                                                     <input
                                                                         type="number"
                                                                         step="0.01"
@@ -360,16 +394,17 @@ const Settings = () => {
                                                                                 handleUpdateRate(rate.id, 'rate', val);
                                                                             }
                                                                         }}
-                                                                        className="pl-9 border-gray-100 bg-gray-50/50 rounded-xl px-3 py-2.5 w-full font-mono font-bold text-gray-700 focus:bg-white focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
+                                                                        className="pl-24 pr-12 border-gray-100 bg-gray-50/50 rounded-xl px-3 py-2.5 w-full font-mono font-bold text-gray-700 focus:bg-white focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none transition-all"
                                                                     />
+                                                                    <span className="absolute right-3 top-2.5 text-blue-600 text-sm font-bold">{rate.currency_symbol}</span>
                                                                 </div>
                                                             </td>
                                                             <td className="p-4 text-center">
                                                                 <button
                                                                     onClick={() => !rate.is_default && handleUpdateRate(rate.id, 'is_default', true)}
                                                                     className={`p-2.5 rounded-xl transition-all ${rate.is_default
-                                                                            ? 'bg-amber-100 text-amber-600 shadow-md shadow-amber-100 border border-amber-200'
-                                                                            : 'bg-gray-50 text-gray-300 hover:text-amber-400 border border-gray-100'
+                                                                        ? 'bg-amber-100 text-amber-600 shadow-md shadow-amber-100 border border-amber-200'
+                                                                        : 'bg-gray-50 text-gray-300 hover:text-amber-400 border border-gray-100'
                                                                         }`}
                                                                 >
                                                                     <Star size={20} fill={rate.is_default ? 'currentColor' : 'none'} />

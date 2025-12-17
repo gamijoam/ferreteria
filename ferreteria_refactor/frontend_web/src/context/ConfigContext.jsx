@@ -79,7 +79,32 @@ export const ConfigProvider = ({ children }) => {
     };
 
     const getActiveCurrencies = () => {
-        return Array.isArray(currencies) ? currencies.filter(c => c.is_active && !c.is_anchor) : [];
+        if (!Array.isArray(currencies)) return [];
+
+        // Filter active non-anchor currencies
+        const activeCurrencies = currencies.filter(c => c.is_active && !c.is_anchor);
+
+        // Deduplicate by currency_code (group multiple rates for same physical currency)
+        const uniqueByCurrencyCode = {};
+        activeCurrencies.forEach(curr => {
+            const code = curr.currency_code || curr.symbol;
+            // If we haven't seen this currency code yet, or if this one is the default rate, use it
+            if (!uniqueByCurrencyCode[code] || curr.is_default) {
+                uniqueByCurrencyCode[code] = {
+                    id: curr.id,
+                    name: curr.name || code,
+                    symbol: curr.currency_symbol || curr.symbol,
+                    currency_code: code,
+                    currency_symbol: curr.currency_symbol || curr.symbol,
+                    rate: curr.rate,
+                    is_active: curr.is_active,
+                    is_default: curr.is_default
+                };
+            }
+        });
+
+        // Return array of unique currencies
+        return Object.values(uniqueByCurrencyCode);
     };
 
     const convertPrice = (priceInAnchor, targetSymbol) => {
