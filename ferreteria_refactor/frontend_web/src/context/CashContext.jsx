@@ -1,5 +1,5 @@
 import { createContext, useState, useContext, useEffect } from 'react';
-import cashService from '../services/cashService';
+import apiClient from '../config/axios';
 
 const CashContext = createContext();
 
@@ -10,19 +10,13 @@ export const CashProvider = ({ children }) => {
 
     const checkStatus = async () => {
         try {
-            // Mocking API response for dev if backend not ready
-            // const data = await cashService.getStatus();
-
-            // MOCK LOGIC for Proto: Check localStorage or default to false
-            const mockOpen = localStorage.getItem('cash_session_open') === 'true';
-            setIsSessionOpen(mockOpen);
-            if (mockOpen) setSession({ id: 1, initial_cash: 100 }); // Mock session
-
-            // Real implementation:
-            // setIsSessionOpen(data.is_open);
-            // setSession(data.session);
+            const response = await apiClient.get('/cash/active');
+            setIsSessionOpen(true);
+            setSession(response.data);
         } catch (error) {
-            console.error("Failed to check cash status", error);
+            // No active session
+            setIsSessionOpen(false);
+            setSession(null);
         } finally {
             setLoading(false);
         }
@@ -32,20 +26,31 @@ export const CashProvider = ({ children }) => {
         checkStatus();
     }, []);
 
-    const openSession = async (amount) => {
-        // await cashService.openSession({ initial_cash: amount });
-        localStorage.setItem('cash_session_open', 'true');
-        setIsSessionOpen(true);
-        setSession({ id: Date.now(), initial_cash: amount });
-        return true;
+    const openSession = async (sessionData) => {
+        try {
+            const response = await apiClient.post('/cash/open', sessionData);
+            setIsSessionOpen(true);
+            setSession(response.data);
+            return true;
+        } catch (error) {
+            console.error('Error opening session:', error);
+            alert('Error al abrir caja: ' + (error.response?.data?.detail || error.message));
+            return false;
+        }
     };
 
-    const closeSession = async (finalCount) => {
-        // await cashService.closeSession({ final_count: finalCount });
-        localStorage.removeItem('cash_session_open');
-        setIsSessionOpen(false);
-        setSession(null);
-        return true;
+    const closeSession = async (closeData) => {
+        try {
+            if (!session) return false;
+            await apiClient.post(`/cash/${session.id}/close`, closeData);
+            setIsSessionOpen(false);
+            setSession(null);
+            return true;
+        } catch (error) {
+            console.error('Error closing session:', error);
+            alert('Error al cerrar caja: ' + (error.response?.data?.detail || error.message));
+            return false;
+        }
     };
 
     return (

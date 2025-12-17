@@ -41,6 +41,7 @@ app.include_router(reports.router, prefix="/api/v1")
 app.include_router(purchases.router, prefix="/api/v1")
 app.include_router(users.router, prefix="/api/v1")
 app.include_router(config.router, prefix="/api/v1")
+app.include_router(auth.router, prefix="/api/v1")  # Auth endpoints
 app.include_router(auth.router, prefix="/api/v1")
 
 @app.on_event("startup")

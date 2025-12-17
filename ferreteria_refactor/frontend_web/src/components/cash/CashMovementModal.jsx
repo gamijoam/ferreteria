@@ -1,87 +1,154 @@
-import { useState } from 'react';
-import { X, DollarSign } from 'lucide-react';
-import cashService from '../../services/cashService';
+import { useState, useEffect } from 'react';
+import { X, DollarSign, TrendingDown, TrendingUp } from 'lucide-react';
+import { useConfig } from '../../context/ConfigContext';
+import apiClient from '../../config/axios';
 
 const CashMovementModal = ({ isOpen, onClose, onSuccess }) => {
-    const [type, setType] = useState('EXPENSE'); // EXPENSE or WITHDRAWAL
+    const { getActiveCurrencies } = useConfig();
+    const [type, setType] = useState('OUT'); // OUT (expense/withdrawal) or IN (deposit)
     const [amount, setAmount] = useState('');
-    const [reason, setReason] = useState('');
+    const [currency, setCurrency] = useState('USD');
+    const [description, setDescription] = useState('');
+    const [currencies, setCurrencies] = useState([]);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (isOpen) {
+            // Get active currencies including USD base
+            const activeCurr = [
+                { symbol: 'USD', name: 'Dólar' },
+                ...getActiveCurrencies()
+            ];
+            setCurrencies(activeCurr);
+
+            // Reset form
+            setAmount('');
+            setDescription('');
+            setCurrency('USD');
+            setType('OUT');
+        }
+    }, [isOpen]);
 
     if (!isOpen) return null;
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setLoading(true);
+
         try {
-            // await cashService.addMovement({ type, amount, reason });
-            alert("Movimiento Registrado");
+            const movementData = {
+                type: type,
+                amount: parseFloat(amount),
+                currency: currency,
+                description: description
+            };
+
+            await apiClient.post('/cash/movements', movementData);
+
+            alert("Movimiento Registrado Exitosamente");
             onSuccess && onSuccess();
             onClose();
         } catch (err) {
-            console.error(err);
+            console.error('Error registering movement:', err);
+            alert('Error al registrar movimiento: ' + (err.response?.data?.detail || err.message));
+        } finally {
+            setLoading(false);
         }
     };
 
     return (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-sm overflow-hidden">
-                <div className="flex justify-between items-center p-4 border-b">
-                    <h3 className="font-bold text-gray-800">Registrar Movimiento</h3>
-                    <button onClick={onClose}><X size={20} className="text-gray-500" /></button>
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden">
+                <div className="flex justify-between items-center p-4 border-b bg-gray-50">
+                    <h3 className="font-bold text-gray-800 text-lg">Registrar Movimiento de Caja</h3>
+                    <button onClick={onClose}><X size={20} className="text-gray-500 hover:text-gray-700" /></button>
                 </div>
 
                 <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                    {/* Type Selection */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
-                        <div className="grid grid-cols-2 gap-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de Movimiento</label>
+                        <div className="grid grid-cols-2 gap-3">
                             <button
                                 type="button"
-                                onClick={() => setType('EXPENSE')}
-                                className={`py-2 rounded border text-sm font-medium ${type === 'EXPENSE' ? 'bg-orange-100 border-orange-500 text-orange-700' : 'bg-gray-50 border-gray-200'}`}
+                                onClick={() => setType('OUT')}
+                                className={`py-3 rounded-lg border-2 text-sm font-medium transition-all flex items-center justify-center ${type === 'OUT'
+                                        ? 'bg-red-50 border-red-500 text-red-700'
+                                        : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-gray-300'
+                                    }`}
                             >
-                                Gasto
+                                <TrendingDown size={18} className="mr-2" />
+                                Salida (Gasto/Retiro)
                             </button>
                             <button
                                 type="button"
-                                onClick={() => setType('WITHDRAWAL')}
-                                className={`py-2 rounded border text-sm font-medium ${type === 'WITHDRAWAL' ? 'bg-red-100 border-red-500 text-red-700' : 'bg-gray-50 border-gray-200'}`}
+                                onClick={() => setType('IN')}
+                                className={`py-3 rounded-lg border-2 text-sm font-medium transition-all flex items-center justify-center ${type === 'IN'
+                                        ? 'bg-green-50 border-green-500 text-green-700'
+                                        : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-gray-300'
+                                    }`}
                             >
-                                Retiro
+                                <TrendingUp size={18} className="mr-2" />
+                                Entrada (Depósito)
                             </button>
                         </div>
                     </div>
 
+                    {/* Currency Selection */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Monto ($)</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Moneda</label>
+                        <select
+                            value={currency}
+                            onChange={(e) => setCurrency(e.target.value)}
+                            className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                        >
+                            {currencies.map(curr => (
+                                <option key={curr.symbol} value={curr.symbol}>
+                                    {curr.name} ({curr.symbol})
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* Amount */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Monto ({currency})
+                        </label>
                         <div className="relative">
                             <DollarSign size={16} className="absolute left-3 top-3 text-gray-400" />
                             <input
                                 type="number"
+                                step="0.01"
                                 value={amount}
                                 onChange={(e) => setAmount(e.target.value)}
-                                className="w-full pl-9 p-2 border rounded focus:ring-1 focus:ring-blue-500 outline-none"
+                                className="w-full pl-9 p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                                 placeholder="0.00"
                                 required
                             />
                         </div>
                     </div>
 
+                    {/* Description */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Motivo</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
                         <textarea
-                            value={reason}
-                            onChange={(e) => setReason(e.target.value)}
-                            className="w-full p-2 border rounded focus:ring-1 focus:ring-blue-500 outline-none"
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                             rows="3"
-                            placeholder="Ej: Pago de almuerzo..."
+                            placeholder={type === 'OUT' ? 'Ej: Pago de almuerzo, compra de suministros...' : 'Ej: Depósito adicional, ingreso extra...'}
                             required
                         ></textarea>
                     </div>
 
                     <button
                         type="submit"
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded shadow"
+                        disabled={loading}
+                        className={`w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow transition-colors ${loading ? 'opacity-50 cursor-not-allowed' : ''
+                            }`}
                     >
-                        Guardar
+                        {loading ? 'Guardando...' : 'Guardar Movimiento'}
                     </button>
                 </form>
             </div>

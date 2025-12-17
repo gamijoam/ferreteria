@@ -22,13 +22,25 @@ def open_session(session_data: schemas.CashSessionCreate, db: Session = Depends(
     if existing:
         raise HTTPException(status_code=400, detail="Ya existe una sesión de caja abierta")
     
+    # Create session
     new_session = models.CashSession(
-        user_id=1,  # Default user, since schema doesn't have user_id
+        user_id=1,  # Default user
         initial_cash=session_data.initial_cash,
         initial_cash_bs=session_data.initial_cash_bs,
         status="OPEN"
     )
     db.add(new_session)
+    db.flush()  # Get session ID
+    
+    # Create currency records for each currency in the request
+    for curr_data in session_data.currencies:
+        currency_record = models.CashSessionCurrency(
+            session_id=new_session.id,
+            currency_symbol=curr_data.currency_symbol,
+            initial_amount=curr_data.initial_amount
+        )
+        db.add(currency_record)
+    
     db.commit()
     db.refresh(new_session)
     return new_session
@@ -78,11 +90,11 @@ def get_session_history(skip: int = 0, limit: int = 20, db: Session = Depends(ge
     return sessions
 
 def calculate_session_totals(session, db):
-    """Helper to calculate session totals based on time range"""
+    """Helper to calculate session totals per currency, separating cash from transfers"""
     start_time = session.start_time
     end_time = session.end_time if session.end_time else datetime.datetime.now()
     
-    # 1. Sales by Method
+    # Get all sale payments in this time range
     sales_query = db.query(
         models.SalePayment.payment_method,
         models.SalePayment.currency,
@@ -92,60 +104,88 @@ def calculate_session_totals(session, db):
         models.Sale.date <= end_time
     ).group_by(models.SalePayment.payment_method, models.SalePayment.currency).all()
     
-    sales_by_method = {}
-    sales_total_usd_eq = 0.0
+    # Organize sales by currency and method
+    cash_by_currency = {}  # {currency: amount} - only Efectivo
+    transfers_by_currency = {}  # {currency: {method: amount}} - all other methods
+    sales_by_method = {}  # For legacy display
     
-    # Mocking exchange rate
-    try:
-        current_exchange_rate = db.query(models.PriceRule).filter(models.PriceRule.name == "exchange_rate").first()
-        rate = float(current_exchange_rate.value) if current_exchange_rate and current_exchange_rate.value else 40.0
-    except Exception:
-        rate = 40.0 
-
-    sales_usd_cash = 0.0
-    sales_bs_cash = 0.0
-
     for method, currency, amount in sales_query:
         method_str = str(method) if method else "Desconocido"
         currency_str = str(currency) if currency else "USD"
-        key = f"{method_str} ({currency_str})"
-        
         val = float(amount) if amount else 0.0
+        
+        # Track for legacy display
+        key = f"{method_str} ({currency_str})"
         sales_by_method[key] = val
         
-        if currency_str == "USD":
-            sales_total_usd_eq += val
-            if "Efectivo" in method_str:
-                sales_usd_cash += val
-        elif currency_str == "Bs":
-            sales_total_usd_eq += (val / rate) if rate else 0
-            if "Efectivo" in method_str:
-                sales_bs_cash += val
-
-    # 2. Movements
+        # Separate cash from transfers
+        if "Efectivo" in method_str:
+            cash_by_currency[currency_str] = cash_by_currency.get(currency_str, 0) + val
+        else:
+            if currency_str not in transfers_by_currency:
+                transfers_by_currency[currency_str] = {}
+            transfers_by_currency[currency_str][method_str] = transfers_by_currency[currency_str].get(method_str, 0) + val
+    
+    # Get movements by currency
     movements = db.query(models.CashMovement).filter(models.CashMovement.session_id == session.id).all()
     
-    expenses_usd = sum(m.amount for m in movements if m.type in ["OUT", "EXPENSE"] and m.currency == "USD")
-    expenses_bs = sum(m.amount for m in movements if m.type in ["OUT", "EXPENSE"] and m.currency == "Bs")
-    deposits_usd = sum(m.amount for m in movements if m.type in ["IN", "DEPOSIT"] and m.currency == "USD")
-    deposits_bs = sum(m.amount for m in movements if m.type in ["IN", "DEPOSIT"] and m.currency == "Bs")
-
-    # 3. Expected Cash
+    movements_by_currency = {}
+    for m in movements:
+        curr = m.currency or "USD"
+        if curr not in movements_by_currency:
+            movements_by_currency[curr] = {"deposits": 0, "expenses": 0}
+        
+        if m.type in ["IN", "DEPOSIT"]:
+            movements_by_currency[curr]["deposits"] += m.amount
+        elif m.type in ["OUT", "EXPENSE"]:
+            movements_by_currency[curr]["expenses"] += m.amount
+    
+    # Calculate expected per currency
+    expected_by_currency = {}
+    
+    # Get session currencies
+    session_currencies = db.query(models.CashSessionCurrency).filter(
+        models.CashSessionCurrency.session_id == session.id
+    ).all()
+    
+    for sess_curr in session_currencies:
+        symbol = sess_curr.currency_symbol
+        initial = sess_curr.initial_amount
+        sales_cash = cash_by_currency.get(symbol, 0)
+        deposits = movements_by_currency.get(symbol, {}).get("deposits", 0)
+        expenses = movements_by_currency.get(symbol, {}).get("expenses", 0)
+        
+        expected = initial + sales_cash + deposits - expenses
+        expected_by_currency[symbol] = expected
+    
+    # Legacy USD/Bs calculation for backward compatibility
+    sales_usd_cash = cash_by_currency.get("USD", 0)
+    sales_bs_cash = cash_by_currency.get("Bs", 0)
+    expenses_usd = movements_by_currency.get("USD", {}).get("expenses", 0)
+    expenses_bs = movements_by_currency.get("Bs", {}).get("expenses", 0)
+    deposits_usd = movements_by_currency.get("USD", {}).get("deposits", 0)
+    deposits_bs = movements_by_currency.get("Bs", {}).get("deposits", 0)
+    
     expected_usd = session.initial_cash + sales_usd_cash + deposits_usd - expenses_usd
     expected_bs = session.initial_cash_bs + sales_bs_cash + deposits_bs - expenses_bs
     
     return {
         "expected_usd": expected_usd,
         "expected_bs": expected_bs,
+        "expected_by_currency": expected_by_currency,
+        "cash_by_currency": cash_by_currency,
+        "transfers_by_currency": transfers_by_currency,
         "details": {
             "initial_usd": session.initial_cash,
             "initial_bs": session.initial_cash_bs,
-            "sales_total": sales_total_usd_eq,
+            "sales_total": sum(cash_by_currency.values()),  # Total cash sales
             "sales_by_method": sales_by_method,
             "expenses_usd": expenses_usd,
             "expenses_bs": expenses_bs,
             "deposits_usd": deposits_usd,
-            "deposits_bs": deposits_bs
+            "deposits_bs": deposits_bs,
+            "cash_by_currency": cash_by_currency,
+            "transfers_by_currency": transfers_by_currency
         }
     }
 
@@ -164,8 +204,10 @@ def get_session_details(session_id: int, db: Session = Depends(get_db)):
         "details": totals["details"],
         "expected_usd": totals["expected_usd"],
         "expected_bs": totals["expected_bs"],
+        "expected_by_currency": totals.get("expected_by_currency", {}),
         "diff_usd": session.difference or 0.0,
-        "diff_bs": session.difference_bs or 0.0
+        "diff_bs": session.difference_bs or 0.0,
+        "diff_by_currency": {}  # Will be calculated on close
     }
 
 @router.post("/{session_id}/close", response_model=schemas.CashSessionCloseResponse)
@@ -182,10 +224,37 @@ def close_session(session_id: int, close_data: schemas.CashSessionClose, db: Ses
         totals = calculate_session_totals(session, db)
         expected_usd = totals["expected_usd"]
         expected_bs = totals["expected_bs"]
+        expected_by_currency = totals.get("expected_by_currency", {})
 
-        # Calculate Diffs
+        # Calculate Diffs (legacy)
         diff_usd = close_data.final_cash_reported - expected_usd
         diff_bs = close_data.final_cash_reported_bs - expected_bs
+        
+        # Calculate and save per-currency differences
+        diff_by_currency = {}
+        print(f"🔍 DEBUG - Currencies received in close_data: {close_data.currencies}")
+        print(f"🔍 DEBUG - Expected by currency: {expected_by_currency}")
+        
+        for curr_data in close_data.currencies:
+            symbol = curr_data.get("symbol")
+            reported = curr_data.get("amount", 0)
+            expected = expected_by_currency.get(symbol, 0)
+            diff = reported - expected
+            diff_by_currency[symbol] = diff
+            
+            print(f"💰 {symbol}: Reported={reported}, Expected={expected}, Diff={diff}")
+            
+            # Update CashSessionCurrency record
+            sess_curr = db.query(models.CashSessionCurrency).filter(
+                models.CashSessionCurrency.session_id == session_id,
+                models.CashSessionCurrency.currency_symbol == symbol
+            ).first()
+            
+            if sess_curr:
+                print(f"   📊 Session Currency: Initial={sess_curr.initial_amount}")
+                sess_curr.final_reported = reported
+                sess_curr.final_expected = expected
+                sess_curr.difference = diff
 
         # Update Session
         session.end_time = datetime.datetime.now()
@@ -206,6 +275,8 @@ def close_session(session_id: int, close_data: schemas.CashSessionClose, db: Ses
             "expected_bs": expected_bs,
             "diff_usd": diff_usd,
             "diff_bs": diff_bs,
+            "expected_by_currency": expected_by_currency,
+            "diff_by_currency": diff_by_currency,
             "details": totals["details"]
         }
     except Exception as e:

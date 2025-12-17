@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import Optional, List, Dict
 from datetime import datetime
 
 class ProductBase(BaseModel):
@@ -222,13 +222,31 @@ class CashMovementRead(CashMovementCreate):
     class Config:
         from_attributes = True
 
+# Cash Session Schemas
+class CashSessionCurrencyCreate(BaseModel):
+    currency_symbol: str
+    initial_amount: float
+
+class CashSessionCurrencyRead(BaseModel):
+    id: int
+    currency_symbol: str
+    initial_amount: float
+    final_reported: Optional[float] = None
+    final_expected: Optional[float] = None
+    difference: Optional[float] = None
+    
+    class Config:
+        from_attributes = True
+
 class CashSessionCreate(BaseModel):
-    initial_cash: float
+    initial_cash: float = 0.0
     initial_cash_bs: float = 0.0
+    currencies: List[CashSessionCurrencyCreate] = []
 
 class CashSessionClose(BaseModel):
     final_cash_reported: float
     final_cash_reported_bs: float
+    currencies: List[Dict] = []  # [{"symbol": "USD", "amount": 100}, ...]
 
 class CashSessionRead(BaseModel):
     id: int
@@ -237,9 +255,11 @@ class CashSessionRead(BaseModel):
     initial_cash: float
     initial_cash_bs: float
     final_cash_reported: Optional[float]
+    final_cash_reported_bs: Optional[float]
     final_cash_expected: Optional[float]
     status: str
     movements: List[CashMovementRead] = []
+    currencies: List[CashSessionCurrencyRead] = []
 
     class Config:
         from_attributes = True
@@ -253,6 +273,9 @@ class CashCloseDetails(BaseModel):
     expenses_bs: float
     deposits_usd: float
     deposits_bs: float
+    # New: per-currency breakdown
+    cash_by_currency: Optional[Dict[str, float]] = {}
+    transfers_by_currency: Optional[Dict[str, Dict[str, float]]] = {}  # {currency: {method: amount}}
 
 class CashSessionCloseResponse(BaseModel):
     session: CashSessionRead
@@ -261,6 +284,9 @@ class CashSessionCloseResponse(BaseModel):
     expected_bs: float
     diff_usd: float
     diff_bs: float
+    # New: per-currency expected/diff
+    expected_by_currency: Optional[Dict[str, float]] = {}
+    diff_by_currency: Optional[Dict[str, float]] = {}
 
 class SupplierBase(BaseModel):
     name: str

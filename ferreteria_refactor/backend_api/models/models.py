@@ -187,10 +187,28 @@ class CashSession(Base):
     status = Column(String, default="OPEN") # OPEN, CLOSED
 
     movements = relationship("CashMovement", back_populates="session")
+    currencies = relationship("CashSessionCurrency", back_populates="session", cascade="all, delete-orphan")
     user = relationship("User", foreign_keys=[user_id])
 
     def __repr__(self):
         return f"<CashSession(id={self.id}, status='{self.status}')>"
+
+class CashSessionCurrency(Base):
+    __tablename__ = "cash_session_currencies"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(Integer, ForeignKey("cash_sessions.id"), nullable=False)
+    currency_symbol = Column(String, nullable=False)
+    initial_amount = Column(Float, default=0.0)
+    final_reported = Column(Float, nullable=True)
+    final_expected = Column(Float, nullable=True)
+    difference = Column(Float, nullable=True)
+    
+    session = relationship("CashSession", back_populates="currencies")
+    
+    def __repr__(self):
+        return f"<CashSessionCurrency(session={self.session_id}, currency='{self.currency_symbol}')>"
+
 
 class CashMovement(Base):
     __tablename__ = "cash_movements"
