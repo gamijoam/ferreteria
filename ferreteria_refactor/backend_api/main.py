@@ -47,9 +47,12 @@ app.include_router(auth.router, prefix="/api/v1")
 def startup_event():
     from .database.db import SessionLocal
     from .routers.auth import init_admin_user
+    from .routers.config import init_currencies
     db = SessionLocal()
     try:
         init_admin_user(db)
+        init_currencies(db)
+    except Exception as e:
     except Exception as e:
         print(f"Error initializing admin user: {e}")
     finally:

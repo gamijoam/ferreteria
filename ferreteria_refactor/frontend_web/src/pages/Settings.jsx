@@ -119,19 +119,19 @@ const Settings = () => {
                 </div>
             )}
 
-            {/* Currencies Tab */}
+            {/* Currencies Tab (Refactored Catalog) */}
             {activeTab === 'currencies' && (
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 animate-in fade-in slide-in-from-right-4 duration-300">
                     <div className="flex justify-between items-center mb-6">
                         <div>
-                            <h2 className="text-xl font-bold text-gray-800">Monedas Activas</h2>
-                            <p className="text-gray-500 text-sm">Gestiona las tasas de cambio para facturación y reportes.</p>
+                            <h2 className="text-xl font-bold text-gray-800">Catálogo de Monedas</h2>
+                            <p className="text-gray-500 text-sm">Activa las monedas que aceptas y actualiza sus tasas.</p>
                         </div>
                         <button
-                            onClick={() => { setEditingCurrency(null); setCurrencyForm({ name: '', symbol: '', rate: '', is_anchor: false, is_active: true }); setIsCurrencyModalOpen(true); }}
-                            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium flex items-center"
+                            onClick={refreshConfig}
+                            className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg font-medium flex items-center"
                         >
-                            <Plus size={20} className="mr-2" /> Nueva Moneda
+                            <RefreshCw size={18} className="mr-2" /> Actualizar
                         </button>
                     </div>
 
@@ -140,27 +140,60 @@ const Settings = () => {
                             <thead className="bg-gray-50 text-gray-600 text-xs uppercase font-bold">
                                 <tr>
                                     <th className="p-4">Moneda</th>
-                                    <th className="p-4">Símbolo</th>
+                                    <th className="p-4">Estado</th>
+                                    <th className="p-4 text-center">Tipo</th>
                                     <th className="p-4">Tasa de Cambio</th>
-                                    <th className="p-4 text-center">Referencia (Anchor)</th>
-                                    <th className="p-4 text-center">Acciones</th>
+                                    <th className="p-4 text-right">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y">
                                 {Array.isArray(currencies) && currencies.map(curr => (
-                                    <tr key={curr.id} className="hover:bg-gray-50">
-                                        <td className="p-4 font-medium text-gray-800">{curr.name}</td>
-                                        <td className="p-4 text-gray-600">{curr.symbol}</td>
-                                        <td className="p-4 font-mono font-bold text-blue-600">{curr.rate.toFixed(4)}</td>
+                                    <tr key={curr.id} className={`hover:bg-gray-50 ${!curr.is_active ? 'opacity-60 bg-gray-50' : ''}`}>
+                                        <td className="p-4">
+                                            <div className="font-bold text-gray-800">{curr.name}</div>
+                                            <div className="text-xs text-gray-500 font-mono">{curr.symbol}</div>
+                                        </td>
+                                        <td className="p-4">
+                                            <button
+                                                onClick={async () => {
+                                                    await configService.updateCurrency(curr.id, { is_active: !curr.is_active });
+                                                    refreshConfig();
+                                                }}
+                                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${curr.is_active ? 'bg-green-500' : 'bg-gray-300'}`}
+                                            >
+                                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${curr.is_active ? 'translate-x-6' : 'translate-x-1'}`} />
+                                            </button>
+                                        </td>
                                         <td className="p-4 text-center">
                                             {curr.is_anchor ? (
-                                                <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded font-bold">PRINCIPAL</span>
-                                            ) : <span className="text-gray-400">-</span>}
+                                                <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded font-bold border border-blue-200">BASE (USD)</span>
+                                            ) : (
+                                                <span className="text-xs text-gray-500">Secundaria</span>
+                                            )}
                                         </td>
-                                        <td className="p-4 flex justify-center space-x-2">
-                                            <button onClick={() => openEditCurrency(curr)} className="p-2 text-blue-600 hover:bg-blue-50 rounded"><Edit size={18} /></button>
-                                            {!curr.is_anchor && (
-                                                <button onClick={() => handleDeleteCurrency(curr.id)} className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 size={18} /></button>
+                                        <td className="p-4">
+                                            <div className="flex items-center">
+                                                <input
+                                                    type="number"
+                                                    defaultValue={curr.rate}
+                                                    disabled={!curr.is_active || curr.is_anchor}
+                                                    onBlur={async (e) => {
+                                                        const newRate = parseFloat(e.target.value);
+                                                        if (newRate !== curr.rate && !curr.is_anchor) {
+                                                            await configService.updateCurrency(curr.id, { rate: newRate });
+                                                            refreshConfig();
+                                                        }
+                                                    }}
+                                                    className="border border-gray-300 rounded px-2 py-1 w-32 font-mono text-right focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none disabled:bg-gray-100 disabled:text-gray-400"
+                                                />
+                                            </div>
+                                        </td>
+                                        <td className="p-4 text-right">
+                                            {!curr.is_anchor && curr.is_active && (
+                                                <span className="text-xs text-green-600 font-medium">Editable</span>
+                                            )}
+                                            {curr.is_anchor && (
+                                                <span className="text-xs text-gray-400">Fija</span>
                                             )}
                                         </td>
                                     </tr>

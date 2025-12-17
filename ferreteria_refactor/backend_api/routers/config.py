@@ -122,3 +122,25 @@ def delete_currency(currency_id: int, db: Session = Depends(get_db)):
     db.delete(db_currency)
     db.commit()
     return {"message": "Currency deleted"}
+
+def init_currencies(db: Session):
+    """Seed default currencies if table is empty"""
+    if db.query(models.Currency).first():
+        return
+    
+    currencies = [
+        {"name": "Dólar Americano", "symbol": "USD", "rate": 1.00, "is_anchor": True, "is_active": True},
+        {"name": "Bolívar Venezolano", "symbol": "VES", "rate": 50.00, "is_anchor": False, "is_active": True},
+        {"name": "Peso Colombiano", "symbol": "COP", "rate": 4200.00, "is_anchor": False, "is_active": False},
+        {"name": "Peso Argentino", "symbol": "ARS", "rate": 1000.00, "is_anchor": False, "is_active": False},
+        {"name": "Peso Mexicano", "symbol": "MXN", "rate": 17.00, "is_anchor": False, "is_active": False},
+        {"name": "Euro", "symbol": "EUR", "rate": 0.92, "is_anchor": False, "is_active": False},
+        {"name": "Sol Peruano", "symbol": "PEN", "rate": 3.70, "is_anchor": False, "is_active": False},
+    ]
+    
+    for curr in currencies:
+        db_curr = models.Currency(**curr)
+        db.add(db_curr)
+    
+    db.commit()
+    print("✅ Currencies seeded successfully")

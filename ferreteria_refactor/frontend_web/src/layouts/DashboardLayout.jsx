@@ -1,5 +1,6 @@
 import { Outlet, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useConfig } from '../context/ConfigContext';
 import {
     LayoutDashboard,
     Package,
@@ -64,7 +65,15 @@ const DashboardLayout = () => {
                 {/* Header */}
                 <header className="bg-white shadow-sm h-16 flex items-center justify-between px-6">
                     <h2 className="text-xl font-semibold text-gray-800">Panel de Control</h2>
-                    <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-6">
+                        {/* Quick Rate Widget */}
+                        <div className="flex items-center bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
+                            <div className="text-xs font-bold text-blue-800 mr-2">TASA BCV</div>
+                            <div className="text-sm font-mono font-bold text-blue-600">
+                                {useConfig().getExchangeRate('VES').toFixed(2)} Bs
+                            </div>
+                        </div>
+
                         <div className="flex items-center space-x-2 text-gray-700">
                             <User size={20} />
                             <span>{user?.username || 'Usuario'}</span>
