@@ -1,19 +1,33 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Search, Package } from 'lucide-react';
 import ProductForm from '../components/products/ProductForm';
 import { useConfig } from '../context/ConfigContext';
 
+import apiClient from '../config/axios';
+
 const Products = () => {
     const { getActiveCurrencies, convertPrice } = useConfig();
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [searchTerm, setSearchTerm] = useState('');
+    const [selectedProduct, setSelectedProduct] = useState(null); // For editing
 
-    // Mock data
-    const products = [
-        { id: 1, name: 'Cemento Gris Portland', sku: 'CEM-001', price: 8.50, stock: 450, unit: 'KG' },
-        { id: 2, name: 'Destornillador Estrella 4"', sku: 'HER-023', price: 3.25, stock: 12, unit: 'UNID' },
-        { id: 3, name: 'Tubería PVC 1/2"', sku: 'PLOM-055', price: 4.00, stock: 80, unit: 'MTR' },
-    ];
+    const [searchTerm, setSearchTerm] = useState('');
+    const [products, setProducts] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    const fetchProducts = async () => {
+        try {
+            const response = await apiClient.get('/products/');
+            setProducts(response.data);
+        } catch (error) {
+            console.error("Error fetching products:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchProducts();
+    }, []);
 
     return (
         <div className="container mx-auto">
@@ -97,7 +111,15 @@ const Products = () => {
                                     </span>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 cursor-pointer hover:underline">
-                                    Editar
+                                    <span
+                                        onClick={() => {
+                                            setSelectedProduct(product);
+                                            setIsModalOpen(true);
+                                        }}
+                                        className="text-blue-600 hover:text-blue-800 font-medium cursor-pointer"
+                                    >
+                                        Editar
+                                    </span>
                                 </td>
                             </tr>
                         ))}
@@ -107,8 +129,30 @@ const Products = () => {
 
             <ProductForm
                 isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                onSubmit={() => { }}
+                onClose={() => {
+                    setIsModalOpen(false);
+                    setSelectedProduct(null); // Clear selection on close
+                }}
+                initialData={selectedProduct} // Pass data for editing
+                onSubmit={async (productData) => {
+                    try {
+                        if (selectedProduct) {
+                            // Edit Mode
+                            await apiClient.put(`/products/${selectedProduct.id}`, productData);
+                            alert("Producto actualizado exitosamente");
+                        } else {
+                            // Create Mode
+                            await apiClient.post('/products/', productData);
+                            alert("Producto creado exitosamente");
+                        }
+                        await fetchProducts(); // Refresh list
+                        setIsModalOpen(false);
+                        setSelectedProduct(null);
+                    } catch (error) {
+                        console.error("Error saving product:", error);
+                        alert("Error al guardar producto");
+                    }
+                }}
             />
         </div>
     );

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { DollarSign, CreditCard, Banknote, CheckCircle, Calculator } from 'lucide-react';
 import { useConfig } from '../../context/ConfigContext';
 
-const PaymentModal = ({ isOpen, onClose, totalUSD, onConfirm }) => {
+const PaymentModal = ({ isOpen, onClose, totalUSD, cart, onConfirm }) => {
     const { getActiveCurrencies, convertPrice, getExchangeRate } = useConfig();
     const currencies = [{ id: 'base', symbol: 'USD', name: 'Dólar', rate: 1, is_anchor: true }, ...getActiveCurrencies()];
 
@@ -50,18 +50,52 @@ const PaymentModal = ({ isOpen, onClose, totalUSD, onConfirm }) => {
     const handleConfirm = async () => {
         if (!isComplete && Math.abs(remainingUSD) > 0.01) return;
         setProcessing(true);
-        // Simulate API delay
-        await new Promise(r => setTimeout(r, 1000));
 
-        // Pass summarized payment data
-        onConfirm({
-            payments,
-            totalPaidUSD,
-            changeUSD: changeUSD > 0 ? changeUSD : 0
-        });
+        try {
+            // Import apiClient
+            const { default: apiClient } = await import('../../config/axios');
 
-        setProcessing(false);
-        onClose();
+            // Prepare sale data in new format
+            const saleData = {
+                total_amount: totalUSD,
+                currency: "USD",
+                exchange_rate: getExchangeRate('Bs') || 1,
+                payment_method: payments[0]?.method || "Efectivo",
+                payments: payments.map(p => ({
+                    amount: parseFloat(p.amount) || 0,
+                    currency: p.currency,
+                    payment_method: p.method,
+                    exchange_rate: getExchangeRate(p.currency) || 1
+                })),
+                items: cart.map(item => ({
+                    product_id: item.product_id,
+                    quantity: item.quantity,
+                    unit_price_usd: item.unit_price_usd || item.price_unit_usd,
+                    conversion_factor: item.conversion_factor || 1,
+                    discount: 0,
+                    discount_type: "NONE"
+                })),
+                is_credit: false,
+                notes: ""
+            };
+
+            // Send to backend
+            await apiClient.post('/products/sales/', saleData);
+
+            // Pass payment data for receipt
+            onConfirm({
+                payments,
+                totalPaidUSD,
+                changeUSD: changeUSD > 0 ? changeUSD : 0
+            });
+
+            setProcessing(false);
+            onClose();
+        } catch (error) {
+            console.error('Error creating sale:', error);
+            alert('Error al procesar la venta: ' + (error.response?.data?.detail || error.message));
+            setProcessing(false);
+        }
     };
 
     return (

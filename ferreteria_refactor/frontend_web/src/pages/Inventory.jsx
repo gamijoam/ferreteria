@@ -1,19 +1,24 @@
 import { useState, useEffect } from 'react';
 import { Archive, ArrowDownCircle, ArrowUpCircle, Filter, Search } from 'lucide-react';
 import AdjustmentModal from '../components/inventory/AdjustmentModal';
+import apiClient from '../config/axios';
 
 const Inventory = () => {
     const [kardex, setKardex] = useState([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
 
-    // Mock data for Kardex
+    // Fetch Kardex
+    const fetchKardex = async () => {
+        try {
+            const response = await apiClient.get('/inventory/kardex');
+            setKardex(response.data);
+        } catch (error) {
+            console.error("Error fetching kardex:", error);
+        }
+    };
+
     useEffect(() => {
-        // In real app, fetch from inventoryService.getKardex()
-        setKardex([
-            { id: 101, date: '2025-12-16 10:30', product: 'Cemento Gris Portland', type: 'SALE', quantity_base: 2, balance: 448, note: 'Venta #1023' },
-            { id: 100, date: '2025-12-16 09:15', product: 'Cemento Gris Portland', type: 'ADJUSTMENT_IN', quantity_base: 50, balance: 450, note: 'Ajuste inicial' },
-            { id: 99, date: '2025-12-15 16:45', product: 'Tubería PVC', type: 'SALE', quantity_base: 5, balance: 75, note: 'Venta #1020' },
-        ]);
+        fetchKardex();
     }, []);
 
     const getMovementStyle = (type) => {
@@ -88,26 +93,30 @@ const Inventory = () => {
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
                             {kardex.map(item => {
-                                const style = getMovementStyle(item.type);
+                                const style = getMovementStyle(item.movement_type);
                                 return (
                                     <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{item.date}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                                            {new Date(item.date).toLocaleString()}
+                                        </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className="font-medium text-gray-900">{item.product}</span>
+                                            <span className="font-medium text-gray-900">
+                                                {item.product ? item.product.name : `ID: ${item.product_id}`}
+                                            </span>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${style.bg} ${style.color}`}>
                                                 {style.icon}
-                                                {getLabel(item.type)}
+                                                {getLabel(item.movement_type)}
                                             </span>
                                         </td>
                                         <td className={`px-6 py-4 whitespace-nowrap text-sm text-right font-bold ${style.color}`}>
-                                            {['SALE', 'ADJUSTMENT_OUT', 'DAMAGED', 'INTERNAL_USE'].includes(item.type) ? '-' : '+'}{item.quantity_base}
+                                            {['SALE', 'ADJUSTMENT_OUT', 'DAMAGED', 'INTERNAL_USE'].includes(item.movement_type) ? '-' : '+'}{item.quantity}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-gray-900">
-                                            {item.balance}
+                                            {item.balance_after}
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 italic truncate max-w-xs">{item.note}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 italic truncate max-w-xs">{item.description}</td>
                                     </tr>
                                 );
                             })}
@@ -124,7 +133,10 @@ const Inventory = () => {
             <AdjustmentModal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
-                onSuccess={() => console.log('Refresh Kardex')}
+                onSuccess={() => {
+                    console.log('Refresh Kardex');
+                    fetchKardex();
+                }}
             />
         </div>
     );

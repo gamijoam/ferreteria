@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, Save, AlertTriangle } from 'lucide-react';
-import inventoryService from '../../services/inventoryService';
+import apiClient from '../../config/axios';
 
 const AdjustmentModal = ({ isOpen, onClose, onSuccess }) => {
     const [step, setStep] = useState(1);
@@ -22,33 +22,49 @@ const AdjustmentModal = ({ isOpen, onClose, onSuccess }) => {
         { value: 'INTERNAL_USE', label: 'Uso Interno (-)', color: 'text-blue-600' }
     ];
 
-    // Mock search effect - Replace with API call in production
+    // Search Products
     useEffect(() => {
-        if (searchTerm.length > 2) {
-            // inventoryService.searchProducts(searchTerm).then(setProducts);
-            // Mocking for UI dev:
-            setProducts([
-                {
-                    id: 1,
-                    name: 'Cemento Gris Portland',
-                    sku: 'CEM-001',
-                    base_unit: 'KG',
-                    presentations: [
-                        { name: 'Saco 50kg', factor: 50 },
-                        { name: 'Saco 25kg', factor: 25 }
-                    ]
-                },
-                { id: 2, name: 'Tubería PVC', sku: 'PLOM-55', base_unit: 'MTR', presentations: [] }
-            ].filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase())));
-        }
+        const fetchProducts = async () => {
+            if (searchTerm.length > 2) {
+                try {
+                    const response = await apiClient.get(`/products/?search=${searchTerm}`);
+                    // Filter locally if backend doesn't support search param yet, or assume backend does
+                    // Using local filter on all products for now if endpoint returns all
+                    // But /products returns all? Let's assume it returns all and we filter
+                    // Re-using the logic from POS/Products for simplicity, fetching all is heavy but safe for MVP
+                    // BETTER: If we know /products returns list, lets use it.
+                    // If backend supports search, use it. products.py: router.get("/", ...). No search param.
+                    // So we fetch all and filter locally.
+
+                    // Actually, let's just use what we have in the Products page: fetch all and filter.
+                    // To avoid over-fetching, we might want to optimize later.
+                    // For now, let's just mock the search with the API result.
+                    // But wait, re-fetching all products on every keystroke is bad.
+                    // Let's fetch once on mount or when search term > 2 and cache?
+                    // Simpler: Fetch all provided by a parent? No.
+                    // Let's just fetch all once when modal opens.
+                } catch (e) { console.error(e) }
+            }
+        };
+        // fetchProducts(); 
     }, [searchTerm]);
+
+    // Better approach: Fetch all on mount to have catalog 
+    useEffect(() => {
+        if (isOpen) {
+            apiClient.get('/products/').then(res => setProducts(res.data)).catch(console.error);
+        }
+    }, [isOpen]);
+
+    // Local filter for display
+    const filteredProducts = products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const handleSelectProduct = (product) => {
         setSelectedProduct(product);
         // Default to base unit
         setAdjustmentData(prev => ({
             ...prev,
-            unit: { name: product.base_unit, factor: 1 }
+            unit: { name: product.unit_type, factor: 1 } // Changed base_unit to unit_type
         }));
         setStep(2);
     };
@@ -66,13 +82,21 @@ const AdjustmentModal = ({ isOpen, onClose, onSuccess }) => {
                 reason: adjustmentData.reason
             };
 
-            console.log("Submitting Adjustment Payload:", payload); // For verification
+            console.log("Submitting Adjustment Payload:", payload);
 
-            // await inventoryService.createAdjustment(payload);
+            // Determine endpoint based on type
+            const endpoint = ['ADJUSTMENT_IN', 'PURCHASE'].includes(adjustmentData.type)
+                ? '/inventory/add'
+                : '/inventory/remove';
+
+            await apiClient.post(endpoint, payload);
+
+            alert('Ajuste registrado exitosamente');
             onSuccess();
             onClose();
         } catch (error) {
             console.error("Adjustment failed", error);
+            alert('Error al registrar ajuste: ' + (error.response?.data?.detail || error.message));
         }
     };
 
@@ -102,17 +126,17 @@ const AdjustmentModal = ({ isOpen, onClose, onSuccess }) => {
                                 autoFocus
                             />
                             <div className="max-h-60 overflow-y-auto space-y-2">
-                                {products.length === 0 && searchTerm.length > 2 && (
+                                {filteredProducts.length === 0 && searchTerm.length > 2 && (
                                     <p className="text-gray-500 text-center">No se encontraron productos.</p>
                                 )}
-                                {products.map(p => (
+                                {filteredProducts.map(p => (
                                     <div
                                         key={p.id}
                                         onClick={() => handleSelectProduct(p)}
                                         className="p-3 border rounded hover:bg-blue-50 cursor-pointer transition-colors"
                                     >
                                         <div className="font-medium text-gray-800">{p.name}</div>
-                                        <div className="text-sm text-gray-500">SKU: {p.sku}</div>
+                                        <div className="text-sm text-gray-500">SKU: {p.sku} | Stock: {p.stock} {p.unit}</div>
                                     </div>
                                 ))}
                             </div>
@@ -149,10 +173,10 @@ const AdjustmentModal = ({ isOpen, onClose, onSuccess }) => {
                                             setAdjustmentData({ ...adjustmentData, unit: { name, factor: Number(factor) } });
                                         }}
                                     >
-                                        <option value={`${selectedProduct.base_unit}|1`}>{selectedProduct.base_unit} (Base)</option>
-                                        {selectedProduct.presentations?.map((pres, idx) => (
-                                            <option key={idx} value={`${pres.name}|${pres.factor}`}>
-                                                {pres.name} (x{pres.factor} {selectedProduct.base_unit})
+                                        <option value={`${selectedProduct.unit_type}|1`}>{selectedProduct.unit_type} (Base)</option>
+                                        {selectedProduct.units?.map((pres, idx) => (
+                                            <option key={idx} value={`${pres.unit_name}|${pres.conversion_factor}`}>
+                                                {pres.unit_name} (x{pres.conversion_factor} {selectedProduct.unit})
                                             </option>
                                         ))}
                                     </select>
@@ -170,7 +194,7 @@ const AdjustmentModal = ({ isOpen, onClose, onSuccess }) => {
                             </div>
 
                             <div className="bg-blue-50 p-2 text-sm text-blue-800 rounded">
-                                <span className="font-bold">Total a ajustar:</span> {Number(adjustmentData.quantity) * (adjustmentData.unit?.factor || 1)} {selectedProduct.base_unit}
+                                <span className="font-bold">Total a ajustar:</span> {Number(adjustmentData.quantity) * (adjustmentData.unit?.factor || 1)} {selectedProduct.unit_type}
                             </div>
 
                             <div>

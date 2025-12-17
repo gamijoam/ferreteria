@@ -13,31 +13,21 @@ router = APIRouter(
 
 @router.post("/add")
 def add_stock(adjustment: schemas.StockAdjustmentCreate, db: Session = Depends(get_db)):
-    """Add stock (Purchase)"""
+    """Add stock (Purchase/Entry)"""
     product = db.query(models.Product).filter(models.Product.id == adjustment.product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
-    # Calculation
-    total_units = adjustment.quantity
-    description = adjustment.description
-    
-    if adjustment.is_box_input and product.is_box:
-        total_units = adjustment.quantity * product.conversion_factor
-        description += f" (Entrada: {adjustment.quantity} Cajas x {product.conversion_factor})"
-    else:
-        description += f" (Entrada: {adjustment.quantity} Unidades)"
-
-    # Update Stock
-    product.stock += total_units
+    # Update Stock (quantity already in base units from frontend)
+    product.stock += adjustment.quantity
     
     # Create Kardex
     kardex_entry = models.Kardex(
         product_id=product.id,
-        movement_type="PURCHASE", # Or adjustment.movement_type if generic
-        quantity=total_units,
+        movement_type=adjustment.type,
+        quantity=adjustment.quantity,
         balance_after=product.stock,
-        description=description,
+        description=adjustment.reason,
         date=datetime.now()
     )
     
@@ -45,9 +35,6 @@ def add_stock(adjustment: schemas.StockAdjustmentCreate, db: Session = Depends(g
     db.commit()
     db.refresh(product)
     
-    # Return updated product? Or success message. 
-    # Let's return the product to update UI cache.
-    # We need to map to ProductRead, so ensure router handles it.
     return {"status": "success", "new_stock": product.stock, "product_id": product.id}
 
 @router.post("/remove")
@@ -60,17 +47,16 @@ def remove_stock(adjustment: schemas.StockAdjustmentCreate, db: Session = Depend
     if product.stock < adjustment.quantity:
         raise HTTPException(status_code=400, detail=f"Insufficient stock. Current: {product.stock}")
 
-    # Update Stock
-    product.stock -= adjustment.quantity # Assumes adjustment.quantity is already in UNITS if logic follows controller
-    # Controller remove_stock took quantity (float).
+    # Update Stock (quantity already in base units)
+    product.stock -= adjustment.quantity
     
     # Create Kardex
     kardex_entry = models.Kardex(
         product_id=product.id,
-        movement_type="ADJUSTMENT_OUT",
-        quantity=adjustment.quantity,
+        movement_type=adjustment.type,
+        quantity=-adjustment.quantity,  # Negative for outgoing
         balance_after=product.stock,
-        description=adjustment.description,
+        description=adjustment.reason,
         date=datetime.now()
     )
     

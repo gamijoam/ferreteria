@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List
 from ..database.db import get_db
 from ..models import models
@@ -11,7 +11,7 @@ router = APIRouter(prefix="/products", tags=["products"])
 
 @router.get("/", response_model=List[schemas.ProductRead])
 def read_products(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    products = db.query(models.Product).filter(models.Product.is_active == True).offset(skip).limit(limit).all()
+    products = db.query(models.Product).options(joinedload(models.Product.units)).filter(models.Product.is_active == True).offset(skip).limit(limit).all()
     return products
 
 @router.post("/", response_model=schemas.ProductRead, dependencies=[Depends(has_role([UserRole.ADMIN, UserRole.WAREHOUSE]))])
@@ -67,10 +67,6 @@ def update_product(product_id: int, product_update: schemas.ProductUpdate, db: S
     db.refresh(db_product)
     return db_product
 
-    db.commit()
-    db.refresh(db_product)
-    return db_product
-
 @router.get("/{product_id}/rules", response_model=List[schemas.PriceRuleRead])
 def read_price_rules(product_id: int, db: Session = Depends(get_db)):
     rules = db.query(models.PriceRule).filter(models.PriceRule.product_id == product_id).order_by(models.PriceRule.min_quantity).all()
@@ -120,30 +116,34 @@ def create_sale(sale_data: schemas.SaleCreate, db: Session = Depends(get_db)):
         if not product:
             raise HTTPException(status_code=404, detail=f"Product {item.product_id} not found")
         
-        # Calculate Units to Deduct
-        units_to_deduct = item.quantity
-        price_used = product.price
-        if item.is_box:
-            units_to_deduct = item.quantity * product.conversion_factor
-            price_used = product.price * product.conversion_factor # Assuming price is per unit, check logic
+        # Calculate base units to deduct using conversion_factor
+        # item.quantity = how many of THIS unit (e.g., 2 Kilos)
+        # item.conversion_factor = how many base units per unit (e.g., 1 Kilo = 1kg)
+        # units_to_deduct = 2 * 1 = 2kg from stock
+        units_to_deduct = item.quantity * item.conversion_factor
         
         # Check Stock
         if product.stock < units_to_deduct:
              raise HTTPException(status_code=400, detail=f"Insufficient stock for {product.name}")
 
-        # Create Detail
-        # Recalculate subtotal based on backend pricing to be safe? 
-        # For now, trust the implicit math: price * qty
-        # Note: Discount logic should modify 'subtotal' if we want to be precise, skipping complex calc for now
-        subtotal = price_used * item.quantity 
+        # Calculate subtotal (before discount)
+        subtotal = item.unit_price_usd * item.quantity
         
+        # Apply discount if any
+        if item.discount > 0:
+            if item.discount_type == "PERCENT":
+                subtotal = subtotal * (1 - item.discount / 100)
+            elif item.discount_type == "FIXED":
+                subtotal = subtotal - item.discount
+        
+        # Create Sale Detail
         detail = models.SaleDetail(
             sale_id=new_sale.id,
             product_id=product.id,
-            quantity=units_to_deduct, # Deduct base units
-            unit_price=product.price, # Store base unit price
+            quantity=units_to_deduct,  # Store base units deducted
+            unit_price=item.unit_price_usd,  # Store the price per unit sold
             subtotal=subtotal,
-            is_box_sale=item.is_box,
+            is_box_sale=False,  # Deprecated, keeping for compatibility
             discount=item.discount,
             discount_type=item.discount_type
         )
@@ -151,6 +151,16 @@ def create_sale(sale_data: schemas.SaleCreate, db: Session = Depends(get_db)):
 
         # Update Stock
         product.stock -= units_to_deduct
+        
+        # Register Kardex Movement
+        kardex_entry = models.Kardex(
+            product_id=product.id,
+            movement_type="SALE",
+            quantity=-units_to_deduct,  # Negative for outgoing
+            balance_after=product.stock,
+            description=f"Sale #{new_sale.id}: Sold {item.quantity} units at ${item.unit_price_usd} each"
+        )
+        db.add(kardex_entry)
 
     # 3. Process Payments (New Multi-Payment Logic)
     if sale_data.payments:
@@ -165,7 +175,6 @@ def create_sale(sale_data: schemas.SaleCreate, db: Session = Depends(get_db)):
             db.add(new_payment)
     else:
         # Fallback for legacy calls or single payment
-        # Create a single payment entry based on the sale header info
         fallback_payment = models.SalePayment(
             sale_id=new_sale.id,
             amount=sale_data.total_amount,

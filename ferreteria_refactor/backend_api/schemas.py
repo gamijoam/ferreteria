@@ -12,6 +12,7 @@ class ProductBase(BaseModel):
     description: Optional[str] = None
     cost_price: Optional[float] = 0.0
     min_stock: Optional[float] = 5.0
+    unit_type: Optional[str] = "Unidad" # Added to match model
     is_box: bool = False
     conversion_factor: int = 1
     category_id: Optional[int] = None
@@ -53,7 +54,9 @@ class ProductUpdate(BaseModel):
     category_id: Optional[int] = None
     supplier_id: Optional[int] = None
     location: Optional[str] = None
+    unit_type: Optional[str] = None
     is_active: Optional[bool] = None
+    units: Optional[List[ProductUnitCreate]] = None
 
     class Config:
         from_attributes = True
@@ -82,10 +85,11 @@ class ProductRead(ProductBase):
 
 class SaleDetailCreate(BaseModel):
     product_id: int
-    quantity: float
-    is_box: bool = False
+    quantity: float  # Quantity of THIS unit (e.g., 2 Kilos, 3 Sacos)
+    unit_price_usd: float  # Price per unit sold (e.g., $4 per Kilo)
+    conversion_factor: float = 1.0  # How many base units this represents (e.g., 1 Kilo = 1kg base)
     discount: float = 0.0
-    discount_type: str = "NONE" # NONE, PERCENT, FIXED
+    discount_type: str = "NONE"  # NONE, PERCENT, FIXED
 
 class SalePaymentCreate(BaseModel):
     amount: float
@@ -417,5 +421,25 @@ class CurrencyUpdate(BaseModel):
 class CurrencyRead(CurrencyBase):
     id: int
 
+    class Config:
+        from_attributes = True
+
+# Inventory/Kardex Schemas
+class StockAdjustmentCreate(BaseModel):
+    product_id: int
+    type: str  # ADJUSTMENT_IN, ADJUSTMENT_OUT, DAMAGED, INTERNAL_USE
+    quantity: float  # Already in base units
+    reason: str
+
+class KardexRead(BaseModel):
+    id: int
+    product_id: int
+    date: datetime
+    movement_type: str
+    quantity: float
+    balance_after: float
+    description: Optional[str] = None
+    product: Optional['ProductRead'] = None
+    
     class Config:
         from_attributes = True

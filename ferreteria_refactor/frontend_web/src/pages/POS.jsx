@@ -1,4 +1,3 @@
-```
 import { useState, useRef, useEffect } from 'react';
 import { Search, ShoppingCart, Trash2, Plus, Minus, CreditCard, RotateCcw } from 'lucide-react';
 import { useCart } from '../context/CartContext';
@@ -12,8 +11,12 @@ import CashOpeningModal from '../components/cash/CashOpeningModal';
 import CashMovementModal from '../components/cash/CashMovementModal';
 import SaleSuccessModal from '../components/pos/SaleSuccessModal';
 
+import apiClient from '../config/axios'; // Ensure import
+
+// ... imports
+
 const POS = () => {
-    const { cart, addToCart, removeFromCart, updateQuantity, clearCart, totalUSD, totalBs, setCart } = useCart();
+    const { cart, addToCart, removeFromCart, updateQuantity, clearCart, totalUSD, totalBs } = useCart();
     const { isSessionOpen, openSession } = useCash();
     const { getActiveCurrencies, convertPrice, currencies } = useConfig();
     const anchorCurrency = currencies.find(c => c.is_anchor) || { symbol: '$' };
@@ -27,46 +30,29 @@ const POS = () => {
     const [isMovementOpen, setIsMovementOpen] = useState(false);
     const [lastSaleData, setLastSaleData] = useState(null); // { cart, totalUSD, paymentData }
 
+    // Data State
+    const [catalog, setCatalog] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+
     // Refs
     const searchInputRef = useRef(null);
 
-    // Mock Catalog Data (Normally fetched)
-    const [catalog, setCatalog] = useState([
-        {
-            id: 1,
-            name: 'Cemento Gris Portland',
-            price: 5.00, // Base Price 1kg (Example)
-            unit: 'KG',
-            stock: 500,
-            exchange_rate: 45,
-            units: [ // Changed from presentations to units
-                { id: 'p1', name: 'Saco 50kg', price: 50.00, factor: 50 }, // Bulk price
-                { id: 'p2', name: 'Saco 25kg', price: 26.00, factor: 25 }
-            ]
-        },
-        {
-            id: 2,
-            name: 'Destornillador Phillips',
-            price: 3.50,
-            unit: 'UNID',
-            stock: 20,
-            exchange_rate: 45
-        },
-        {
-            id: 3,
-            name: 'Arena Lavada',
-            price: 1.00,
-            unit: 'M3',
-            stock: 100,
-            exchange_rate: 45,
-            units: [ // Changed from presentations to units
-                { id: 'p3', name: 'Camión 7m3', price: 120.00, factor: 7 }
-            ]
-        },
-        { id: 4, name: 'Tubería PVC 1/2', price: 4.00, unit: 'Tubo', exchange_rate: 45 },
-        { id: 5, name: 'Disco Corte Metal', price: 1.25, unit: 'UNID', exchange_rate: 45 },
-        { id: 6, name: 'Guantes Industriales', price: 2.50, unit: 'Par', exchange_rate: 45 },
-    ]);
+    // Fetch Catalog
+    useEffect(() => {
+        const fetchCatalog = async () => {
+            try {
+                const response = await apiClient.get('/products/');
+                console.log('POS Catalog loaded:', response.data);
+                console.log('First product units:', response.data[0]?.units);
+                setCatalog(response.data);
+            } catch (error) {
+                console.error("Error fetching catalog:", error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        fetchCatalog();
+    }, []);
 
     const filteredCatalog = catalog.filter(p =>
         p.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -78,71 +64,36 @@ const POS = () => {
             setSelectedProductForUnits(product);
             return;
         }
-        
+
         // Classic Logic (Base Unit)
         addBaseProductToCart(product);
     };
 
     const addBaseProductToCart = (product) => {
-        setCart(currentCart => {
-            const existingItem = currentCart.find(item => item.id === product.id && item.unit_id === null); // Check unit_id null
-            
-            if (existingItem) {
-                return currentCart.map(item =>
-                    (item.id === product.id && item.unit_id === null)
-                        ? { ...item, quantity: item.quantity + 1, quantity_to_deduct: (item.quantity + 1) * 1 }
-                        : item
-                );
-            }
-
-            return [...currentCart, {
-                ...product,
-                quantity: 1,
-                // Multi-unit fields (Base)
-                unit_id: null,
-                unit_name: product.unit || 'Unidad',
-                conversion_factor: 1,
-                quantity_to_deduct: 1,
-                price_unit_usd: product.price
-            }];
-        });
+        const baseUnit = {
+            name: product.unit_type || 'Unidad',
+            price_usd: product.price,
+            factor: 1,
+            is_base: true
+        };
+        addToCart(product, baseUnit);
     };
+
+
 
     const handleUnitSelect = (unitOption) => {
         if (!selectedProductForUnits) return;
         const product = selectedProductForUnits;
 
-        setCart(currentCart => {
-            // Check if this specific combo (Product + Unit) exists
-            const existingItem = currentCart.find(item => item.id === product.id && item.unit_id === unitOption.id);
-            
-            if (existingItem) {
-                return currentCart.map(item =>
-                    (item.id === product.id && item.unit_id === unitOption.id)
-                        ? { 
-                            ...item, 
-                            quantity: item.quantity + 1,
-                            quantity_to_deduct: (item.quantity + 1) * unitOption.factor
-                          }
-                        : item
-                );
-            }
+        const unit = {
+            name: unitOption.name,
+            price_usd: unitOption.price, // Use the price calculated by UnitSelectionModal
+            factor: unitOption.factor,
+            is_base: unitOption.is_base || false
+        };
 
-            return [...currentCart, {
-                ...product, // ID, Name, etc from parent
-                quantity: 1,
-                // Overwrite price with unit price
-                price: unitOption.price, 
-                // Multi-unit fields
-                unit_id: unitOption.id,
-                unit_name: unitOption.name,
-                conversion_factor: unitOption.factor,
-                quantity_to_deduct: 1 * unitOption.factor,
-                price_unit_usd: unitOption.price
-            }];
-        });
-        
-        setSelectedProductForUnits(null); // Close modal
+        addToCart(product, unit);
+        setSelectedProductForUnits(null);
     };
 
     const handleCheckout = (paymentData) => {
@@ -256,14 +207,14 @@ const POS = () => {
                                 <div className="font-medium text-gray-800 leading-snug">{item.name}</div>
                                 <div className="text-xs text-gray-500 flex gap-2">
                                     <span className="bg-blue-100 text-blue-700 px-1.5 rounded">
-                                        {item.unit_name} {item.unit_id && `(x${ item.conversion_factor })`}
+                                        {item.unit_name} {item.unit_id ? <span>(x{item.conversion_factor})</span> : null}
                                     </span>
-                                    <span>${item.price_unit_usd.toFixed(2)}</span>
+                                    <span>${(item.price_unit_usd || 0).toFixed(2)}</span>
                                 </div>
                             </div>
                             <div className="flex flex-col items-end">
                                 <span className="text-lg font-bold text-gray-800">x{item.quantity}</span>
-                                <span className="font-bold text-blue-600">${item.subtotal_usd.toFixed(2)}</span>
+                                <span className="font-bold text-blue-600">${(item.subtotal_usd || 0).toFixed(2)}</span>
                             </div>
                         </div>
                     ))}
@@ -300,10 +251,10 @@ const POS = () => {
 
             {/* Modals */}
             <UnitSelectionModal
-                isOpen={!!selectedProductForAdd}
-                product={selectedProductForAdd}
-                onClose={() => setSelectedProductForAdd(null)}
-                onSelect={(unit) => addToCart(selectedProductForAdd, unit)}
+                isOpen={!!selectedProductForUnits}
+                product={selectedProductForUnits}
+                onClose={() => setSelectedProductForUnits(null)}
+                onSelect={handleUnitSelect}
             />
 
             <EditItemModal
@@ -318,6 +269,7 @@ const POS = () => {
                 isOpen={isPaymentOpen}
                 totalUSD={totalUSD}
                 totalBs={totalBs}
+                cart={cart}
                 onClose={() => setIsPaymentOpen(false)}
                 onConfirm={handleCheckout}
             />
@@ -333,16 +285,9 @@ const POS = () => {
                 onClose={handleSuccessClose}
             />
 
-            {!isSessionOpen && (
+            {/* Cash Opening Modal if session closed */}{!isSessionOpen && (
                 <CashOpeningModal onOpen={openSession} />
             )}
-            {/* Modals */}
-            <UnitSelectionModal 
-                isOpen={!!selectedProductForUnits}
-                onClose={() => setSelectedProductForUnits(null)}
-                product={selectedProductForUnits}
-                onSelect={handleUnitSelect}
-            />
         </div>
     );
 };
