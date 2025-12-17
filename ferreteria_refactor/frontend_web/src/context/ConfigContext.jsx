@@ -16,7 +16,19 @@ export const ConfigProvider = ({ children }) => {
             try {
                 const bizData = await configService.getBusinessInfo();
                 setBusiness(bizData);
-                let currData = await configService.getCurrencies();
+
+                // NEW: Use exchange-rates endpoint instead of currencies
+                let currData = [];
+                try {
+                    const ratesRes = await apiClient.get('/config/exchange-rates', {
+                        params: { is_active: true }
+                    });
+                    currData = ratesRes.data || [];
+                } catch (e) {
+                    console.warn("Exchange rates endpoint failed, trying legacy currencies:", e);
+                    // Fallback to old currencies endpoint
+                    currData = await configService.getCurrencies();
+                }
 
                 // Fallback to debug endpoint if empty (Safety Net)
                 if (!Array.isArray(currData) || currData.length === 0) {
@@ -42,8 +54,8 @@ export const ConfigProvider = ({ children }) => {
                     phone: '0412-1234567'
                 });
                 setCurrencies([
-                    { id: 1, name: 'Dólar', symbol: '$', rate: 1.00, is_anchor: true, is_active: true },
-                    { id: 2, name: 'Bolívar', symbol: 'Bs', rate: 45.00, is_anchor: false, is_active: true }
+                    { id: 1, name: 'Dólar', symbol: '$', currency_code: 'USD', currency_symbol: '$', rate: 1.00, is_anchor: true, is_active: true, is_default: true },
+                    { id: 2, name: 'Bolívar', symbol: 'Bs', currency_code: 'VES', currency_symbol: 'Bs', rate: 45.00, is_anchor: false, is_active: true, is_default: true }
                 ]);
             }
         } catch (err) {
@@ -54,8 +66,9 @@ export const ConfigProvider = ({ children }) => {
     };
 
     useEffect(() => {
+        const token = localStorage.getItem('token');
         fetchConfig();
-    }, []);
+    }, [localStorage.getItem('token')]);
 
     const refreshConfig = () => fetchConfig();
 

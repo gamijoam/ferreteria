@@ -67,6 +67,61 @@ def update_product(product_id: int, product_update: schemas.ProductUpdate, db: S
     db.refresh(db_product)
     return db_product
 
+
+# ========================================
+# PRICE CALCULATION UTILITY
+# ========================================
+
+@router.post("/calculate-price")
+def calculate_price(
+    price_usd: float,
+    exchange_rate_id: int = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Calculate prices in all currencies using a specific exchange rate.
+    If exchange_rate_id is provided, use that rate.
+    Otherwise, use default rates for each currency.
+    """
+    if exchange_rate_id:
+        # Use specific rate
+        rate = db.query(models.ExchangeRate).get(exchange_rate_id)
+        if not rate or not rate.is_active:
+            raise HTTPException(status_code=404, detail="Exchange rate not found or inactive")
+        
+        return {
+            "price_usd": price_usd,
+            "exchange_rate": {
+                "id": rate.id,
+                "name": rate.name,
+                "currency_code": rate.currency_code,
+                "rate": rate.rate
+            },
+            "converted_price": price_usd * rate.rate,
+            "currency_symbol": rate.currency_symbol
+        }
+    else:
+        # Calculate for all active default rates
+        default_rates = db.query(models.ExchangeRate).filter(
+            models.ExchangeRate.is_default == True,
+            models.ExchangeRate.is_active == True
+        ).all()
+        
+        results = []
+        for rate in default_rates:
+            results.append({
+                "currency_code": rate.currency_code,
+                "currency_symbol": rate.currency_symbol,
+                "rate_name": rate.name,
+                "exchange_rate": rate.rate,
+                "converted_price": price_usd * rate.rate
+            })
+        
+        return {
+            "price_usd": price_usd,
+            "conversions": results
+        }
+
 @router.get("/{product_id}/rules", response_model=List[schemas.PriceRuleRead])
 def read_price_rules(product_id: int, db: Session = Depends(get_db)):
     rules = db.query(models.PriceRule).filter(models.PriceRule.product_id == product_id).order_by(models.PriceRule.min_quantity).all()

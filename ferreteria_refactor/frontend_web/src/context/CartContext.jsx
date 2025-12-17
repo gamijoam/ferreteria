@@ -1,13 +1,91 @@
-import { createContext, useState, useContext, useMemo } from 'react';
+import { createContext, useState, useContext, useMemo, useEffect } from 'react';
+import apiClient from '../config/axios';
 
 const CartContext = createContext();
 
 export const CartProvider = ({ children }) => {
     const [cart, setCart] = useState([]);
+    const [exchangeRates, setExchangeRates] = useState([]);
 
-    // Add Item Logic logic with multi-unit support
+    // Fetch exchange rates on mount
+    useEffect(() => {
+        const fetchExchangeRates = async () => {
+            try {
+                const response = await apiClient.get('/config/exchange-rates', {
+                    params: { is_active: true }
+                });
+                setExchangeRates(response.data);
+            } catch (error) {
+                console.error('Error fetching exchange rates:', error);
+            }
+        };
+        fetchExchangeRates();
+    }, []);
+
+    /**
+     * Get effective exchange rate for a product/unit combination
+     * Hierarchy: Unit.exchange_rate_id → Product.exchange_rate_id → Default rate for currency
+     */
+    const getEffectiveExchangeRate = (product, unit, targetCurrencyCode = 'VES') => {
+        // 1. Check if unit has specific rate
+        if (unit.exchange_rate_id) {
+            const rate = exchangeRates.find(r => r.id === unit.exchange_rate_id);
+            if (rate && rate.is_active) {
+                return {
+                    rate: rate.rate,
+                    rateName: rate.name,
+                    rateId: rate.id,
+                    source: 'unit',
+                    isSpecial: !rate.is_default
+                };
+            }
+        }
+
+        // 2. Check if product has specific rate
+        if (product.exchange_rate_id) {
+            const rate = exchangeRates.find(r => r.id === product.exchange_rate_id);
+            if (rate && rate.is_active) {
+                return {
+                    rate: rate.rate,
+                    rateName: rate.name,
+                    rateId: rate.id,
+                    source: 'product',
+                    isSpecial: !rate.is_default
+                };
+            }
+        }
+
+        // 3. Fallback to default rate for target currency
+        const defaultRate = exchangeRates.find(r =>
+            r.currency_code === targetCurrencyCode &&
+            r.is_default &&
+            r.is_active
+        );
+
+        if (defaultRate) {
+            return {
+                rate: defaultRate.rate,
+                rateName: defaultRate.name,
+                rateId: defaultRate.id,
+                source: 'default',
+                isSpecial: false
+            };
+        }
+
+        // Ultimate fallback (should not happen if DB is seeded properly)
+        console.warn('No exchange rate found, using hardcoded fallback');
+        return {
+            rate: 45.00,
+            rateName: 'Fallback',
+            rateId: null,
+            source: 'fallback',
+            isSpecial: false
+        };
+    };
+
+    // Add Item Logic with multi-unit support and exchange rate hierarchy
     const addToCart = (product, unit) => {
-        // unit: { name, price_usd, factor, is_base }
+        // unit: { name, price_usd, factor, is_base, exchange_rate_id? }
         const itemId = `${product.id}_${unit.name.replace(/\s+/g, '_')}`;
 
         setCart(prevCart => {
@@ -17,8 +95,8 @@ export const CartProvider = ({ children }) => {
                 // Update quantity if exists
                 return updateItemQuantityInList(prevCart, itemId, existingItem.quantity + 1);
             } else {
-                // Add new item
-                const exchangeRate = product.exchange_rate || 45.00; // Fallback or global
+                // Get effective exchange rate using hierarchy
+                const rateInfo = getEffectiveExchangeRate(product, unit);
                 const subtotalUsd = unit.price_usd * 1;
 
                 const newItem = {
@@ -29,9 +107,12 @@ export const CartProvider = ({ children }) => {
                     quantity: 1,
                     unit_price_usd: unit.price_usd,
                     conversion_factor: unit.factor,
-                    exchange_rate: exchangeRate,
+                    exchange_rate: rateInfo.rate,
+                    exchange_rate_name: rateInfo.rateName,
+                    exchange_rate_source: rateInfo.source,
+                    is_special_rate: rateInfo.isSpecial,  // NEW: Flag for visual indicator
                     subtotal_usd: subtotalUsd,
-                    subtotal_bs: subtotalUsd * exchangeRate
+                    subtotal_bs: subtotalUsd * rateInfo.rate
                 };
                 return [...prevCart, newItem];
             }
@@ -84,7 +165,8 @@ export const CartProvider = ({ children }) => {
             updateQuantity,
             clearCart,
             totalUSD: totals.usd,
-            totalBs: totals.bs
+            totalBs: totals.bs,
+            exchangeRates  // Expose for other components if needed
         }}>
             {children}
         </CartContext.Provider>

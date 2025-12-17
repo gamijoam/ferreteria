@@ -25,12 +25,39 @@ class ProductBase(BaseModel):
     supplier_id: Optional[int] = None
     location: Optional[str] = None
 
+# Exchange Rate Schemas
+class ExchangeRateBase(BaseModel):
+    name: str
+    currency_code: str
+    currency_symbol: str
+    rate: float
+    is_default: bool = False
+    is_active: bool = True
+
+class ExchangeRateCreate(ExchangeRateBase):
+    pass
+
+class ExchangeRateUpdate(BaseModel):
+    name: Optional[str] = None
+    rate: Optional[float] = None
+    is_default: Optional[bool] = None
+    is_active: Optional[bool] = None
+
+class ExchangeRateRead(ExchangeRateBase):
+    id: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    
+    class Config:
+        from_attributes = True
+
 class ProductUnitBase(BaseModel):
     unit_name: str
     conversion_factor: float
     barcode: Optional[str] = None
     price_usd: Optional[float] = None
     is_default: bool = False
+    exchange_rate_id: Optional[int] = None  # NEW: Specific rate for this unit
 
 class ProductUnitCreate(ProductUnitBase):
     pass
@@ -38,6 +65,7 @@ class ProductUnitCreate(ProductUnitBase):
 class ProductUnitRead(ProductUnitBase):
     id: int
     product_id: int
+    exchange_rate: Optional[ExchangeRateRead] = None  # NEW: Include rate details
 
     class Config:
         from_attributes = True

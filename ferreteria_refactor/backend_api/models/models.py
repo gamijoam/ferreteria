@@ -56,6 +56,30 @@ class Supplier(Base):
     def __repr__(self):
         return f"<Supplier(name='{self.name}')>"
 
+class ExchangeRate(Base):
+    """
+    Exchange Rate Model - Supports multiple rates per currency
+    Examples: BCV, Paralelo, Preferencial for VES
+    """
+    __tablename__ = "exchange_rates"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)  # "BCV", "Paralelo", "Preferencial"
+    currency_code = Column(String, nullable=False)  # "VES", "COP", "PEN"
+    currency_symbol = Column(String, nullable=False)  # "Bs", "COP", "S/"
+    rate = Column(Float, nullable=False)  # Exchange rate to USD
+    is_default = Column(Boolean, default=False)  # Default rate for this currency
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.datetime.now)
+    updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
+    
+    # Relationships
+    products = relationship("Product", back_populates="exchange_rate")
+    product_units = relationship("ProductUnit", back_populates="exchange_rate")
+    
+    def __repr__(self):
+        return f"<ExchangeRate(name='{self.name}', code='{self.currency_code}', rate={self.rate})>"
+
 class Product(Base):
     __tablename__ = "products"
 
@@ -79,9 +103,11 @@ class Product(Base):
 
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
     supplier_id = Column(Integer, ForeignKey("suppliers.id"), nullable=True)
+    exchange_rate_id = Column(Integer, ForeignKey("exchange_rates.id"), nullable=True)  # Product-level default rate
 
     category = relationship("Category", back_populates="products")
     supplier = relationship("Supplier", back_populates="products")
+    exchange_rate = relationship("ExchangeRate", back_populates="products")
     price_rules = relationship("PriceRule", back_populates="product")
     units = relationship("ProductUnit", back_populates="product", cascade="all, delete-orphan")
 
@@ -98,8 +124,10 @@ class ProductUnit(Base):
     barcode = Column(String, nullable=True) # Código específico de la presentación
     price_usd = Column(Float, nullable=True) # Precio específico (opcional)
     is_default = Column(Boolean, default=False)
+    exchange_rate_id = Column(Integer, ForeignKey("exchange_rates.id"), nullable=True)  # Unit-specific rate
 
     product = relationship("Product", back_populates="units")
+    exchange_rate = relationship("ExchangeRate", back_populates="product_units")
 
     def __repr__(self):
         return f"<ProductUnit(name='{self.unit_name}', factor={self.conversion_factor})>"

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Package, DollarSign, Barcode, Tag, Layers, AlertTriangle } from 'lucide-react';
+import { X, Plus, Trash2, Package, DollarSign, Barcode, Tag, Layers, AlertTriangle, Coins } from 'lucide-react';
 import { useConfig } from '../../context/ConfigContext';
 import apiClient from '../../config/axios';
 
@@ -9,6 +9,7 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
 
     const [activeTab, setActiveTab] = useState('general');
     const [categories, setCategories] = useState([]);
+    const [exchangeRates, setExchangeRates] = useState([]);
     const [formData, setFormData] = useState({
         name: '',
         sku: '',
@@ -20,6 +21,7 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
         location: '',
         margin: 0,
         unit_type: 'UNID',
+        exchange_rate_id: null,  // NEW: Product-level exchange rate
         units: []
     });
 
@@ -28,6 +30,8 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
         if (isOpen) {
             // Fetch categories
             fetchCategories();
+            // Fetch exchange rates
+            fetchExchangeRates();
 
             if (initialData) {
                 // Map backend units to frontend format
@@ -44,13 +48,14 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
                         : (u.conversion_factor > 0 ? 1 / u.conversion_factor : 1000);
 
                     return {
-                        id: u.id || Date.now() + Math.random(), // Use backend id or generate temp id
+                        id: u.id || Date.now() + Math.random(),
                         unit_name: u.unit_name,
                         user_input: user_input,
                         conversion_factor: u.conversion_factor,
                         type: type,
                         barcode: u.barcode || '',
-                        price_usd: u.price_usd || 0
+                        price_usd: u.price_usd || 0,
+                        exchange_rate_id: u.exchange_rate_id || null  // NEW
                     };
                 });
 
@@ -67,6 +72,7 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
                     margin: initialData.price > 0
                         ? ((initialData.price - initialData.cost_price) / initialData.price) * 100
                         : 0,
+                    exchange_rate_id: initialData.exchange_rate_id || null,  // NEW
                     units: mappedUnits
                 });
             } else {
@@ -74,7 +80,7 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
                 setFormData({
                     name: '', sku: '', category_id: null,
                     cost: 0, price: 0, stock: 0, min_stock: 5, location: '',
-                    margin: 0, unit_type: 'UNID', units: []
+                    margin: 0, unit_type: 'UNID', exchange_rate_id: null, units: []
                 });
             }
             setActiveTab('general');
@@ -111,6 +117,17 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
         }
     };
 
+    const fetchExchangeRates = async () => {
+        try {
+            const response = await apiClient.get('/config/exchange-rates', {
+                params: { is_active: true }
+            });
+            setExchangeRates(response.data);
+        } catch (error) {
+            console.error('Error fetching exchange rates:', error);
+        }
+    };
+
     // ... Unit Management (keep existing helper functions)
     const handleAddUnit = (type) => {
         const newUnit = {
@@ -143,10 +160,11 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
             category_id: parseInt(formData.category_id) || null,
             cost_price: parseFloat(formData.cost),
             price: parseFloat(formData.price),
-            stock: parseFloat(formData.stock), // Now explicitly sending stock
+            stock: parseFloat(formData.stock),
             min_stock: parseFloat(formData.min_stock),
             unit_type: formData.unit_type,
             location: formData.location,
+            exchange_rate_id: formData.exchange_rate_id || null,  // NEW: Product-level rate
             units: formData.units.map(u => {
                 let factor = parseFloat(u.user_input);
                 if (u.type === 'fraction') factor = factor !== 0 ? 1 / factor : 0;
@@ -155,7 +173,8 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
                     conversion_factor: factor,
                     barcode: u.barcode,
                     price_usd: parseFloat(u.price_usd) || null,
-                    is_default: false
+                    is_default: false,
+                    exchange_rate_id: u.exchange_rate_id || null  // NEW: Unit-level rate
                 };
             })
         };
@@ -354,6 +373,49 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
                                 </div>
                             </div>
 
+                            {/* NEW: Exchange Rate Selector */}
+                            <div className="bg-purple-50 rounded-xl p-6 border border-purple-100">
+                                <h4 className="text-lg font-bold text-purple-800 mb-2 flex items-center">
+                                    <Coins className="mr-2" size={20} /> Perfil de Tasa de Cambio
+                                </h4>
+                                <p className="text-sm text-purple-600 mb-4">Selecciona qué tasa usar para calcular precios en otras monedas</p>
+
+                                <select
+                                    name="exchange_rate_id"
+                                    value={formData.exchange_rate_id || ''}
+                                    onChange={handleInputChange}
+                                    className="w-full border-purple-200 rounded-lg shadow-sm focus:border-purple-500 focus:ring-purple-500 py-3 bg-white"
+                                >
+                                    <option value="">Usar Predeterminada (por moneda)</option>
+                                    {exchangeRates.map(rate => (
+                                        <option key={rate.id} value={rate.id}>
+                                            {rate.name} - {rate.currency_code} ({rate.rate.toFixed(2)})
+                                        </option>
+                                    ))}
+                                </select>
+
+                                {formData.exchange_rate_id && formData.price > 0 && (
+                                    <div className="mt-4 p-3 bg-white rounded-lg border border-purple-200">
+                                        <p className="text-xs font-semibold text-purple-700 mb-2">Vista Previa de Precio:</p>
+                                        {(() => {
+                                            const selectedRate = exchangeRates.find(r => r.id === parseInt(formData.exchange_rate_id));
+                                            if (selectedRate) {
+                                                const convertedPrice = formData.price * selectedRate.rate;
+                                                return (
+                                                    <p className="text-lg font-bold text-purple-900">
+                                                        {convertedPrice.toFixed(2)} {selectedRate.currency_symbol}
+                                                        <span className="text-sm font-normal text-purple-600 ml-2">
+                                                            (usando {selectedRate.name})
+                                                        </span>
+                                                    </p>
+                                                );
+                                            }
+                                            return null;
+                                        })()}
+                                    </div>
+                                )}
+                            </div>
+
                             <div className={`p-4 rounded-lg flex items-center justify-between ${formData.margin < 0 ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
                                 <span className="font-semibold">Margen de Ganancia:</span>
                                 <span className="text-2xl font-bold">{formData.margin.toFixed(2)}%</span>
@@ -467,6 +529,31 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
                                                         className="w-full border-gray-200 rounded p-2 text-sm text-gray-600 font-mono bg-gray-50"
                                                         placeholder="Escanea el código de la caja/unidad..."
                                                     />
+                                                </div>
+
+                                                {/* NEW: Exchange Rate Selector for Unit */}
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Tasa Específica</label>
+                                                    <select
+                                                        value={unit.exchange_rate_id || ''}
+                                                        onChange={(e) => handleUnitChange(unit.id, 'exchange_rate_id', e.target.value ? parseInt(e.target.value) : null)}
+                                                        className="w-full border-gray-200 rounded p-2 text-sm focus:border-purple-500 focus:ring-purple-500"
+                                                    >
+                                                        <option value="">Heredar del Producto</option>
+                                                        {exchangeRates.map(rate => (
+                                                            <option key={rate.id} value={rate.id}>
+                                                                {rate.name} ({rate.rate.toFixed(2)})
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                    <p className="text-[10px] text-gray-400 mt-1">
+                                                        {unit.exchange_rate_id
+                                                            ? `Usa ${exchangeRates.find(r => r.id === unit.exchange_rate_id)?.name || 'tasa específica'}`
+                                                            : formData.exchange_rate_id
+                                                                ? `Hereda ${exchangeRates.find(r => r.id === formData.exchange_rate_id)?.name || 'del producto'}`
+                                                                : 'Usa predeterminada'
+                                                        }
+                                                    </p>
                                                 </div>
                                             </div>
 

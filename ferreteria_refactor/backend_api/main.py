@@ -48,12 +48,17 @@ app.include_router(categories.router, prefix="/api/v1")  # Categories endpoints
 def startup_event():
     from .database.db import SessionLocal
     from .routers.auth import init_admin_user
-    from .routers.config import init_currencies
+    from .routers.config import init_exchange_rates
     db = SessionLocal()
     try:
         init_admin_user(db)
-        init_currencies(db)
+        init_exchange_rates(db)  # NEW: Initialize exchange rates
+        print("✅ Startup initialization complete")
     except Exception as e:
         print(f"Error initializing admin user: {e}")
     finally:
         db.close()
+
+@app.get("/")
+def read_root():
+    return {"message": "Ferreteria API is running"}
