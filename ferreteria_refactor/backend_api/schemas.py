@@ -377,3 +377,27 @@ class BulkImportResult(BaseModel):
     success_count: int
     failed_count: int
     errors: List[str]
+
+# Currency Schemas
+class CurrencyBase(BaseModel):
+    name: str
+    symbol: str
+    rate: float
+    is_anchor: bool = False
+    is_active: bool = True
+
+class CurrencyCreate(CurrencyBase):
+    pass
+
+class CurrencyUpdate(BaseModel):
+    name: Optional[str] = None
+    symbol: Optional[str] = None
+    rate: Optional[float] = None
+    is_anchor: Optional[bool] = None
+    is_active: Optional[bool] = None
+
+class CurrencyRead(CurrencyBase):
+    id: int
+
+    class Config:
+        from_attributes = True

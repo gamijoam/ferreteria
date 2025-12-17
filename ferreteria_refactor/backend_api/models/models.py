@@ -373,3 +373,16 @@ class BusinessConfig(Base):
 
     def __repr__(self):
         return f"<BusinessConfig(key='{self.key}', value='{self.value}')>"
+
+class Currency(Base):
+    __tablename__ = "business_currencies"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    symbol = Column(String, nullable=False)
+    rate = Column(Float, default=1.0)
+    is_anchor = Column(Boolean, default=False)
+    is_active = Column(Boolean, default=True)
+
+    def __repr__(self):
+        return f"<Currency(symbol='{self.symbol}', rate={self.rate})>"

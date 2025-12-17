@@ -5,6 +5,7 @@ import Login from './pages/Login';
 import DashboardLayout from './layouts/DashboardLayout';
 import Products from './pages/Products';
 import Inventory from './pages/Inventory';
+import POS from './pages/POS';
 import CashClose from './pages/CashClose';
 import Settings from './pages/Settings';
 import { CartProvider } from './context/CartContext';

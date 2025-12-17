@@ -14,7 +14,14 @@ const Settings = () => {
     const [isCurrencyModalOpen, setIsCurrencyModalOpen] = useState(false);
 
     useEffect(() => {
-        if (business) setBizForm(business);
+        if (business) {
+            setBizForm({
+                name: business.name || '',
+                document_id: business.document_id || '',
+                address: business.address || '',
+                phone: business.phone || ''
+            });
+        }
     }, [business]);
 
     const handleBizSave = async () => {
@@ -140,7 +147,7 @@ const Settings = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y">
-                                {currencies.map(curr => (
+                                {Array.isArray(currencies) && currencies.map(curr => (
                                     <tr key={curr.id} className="hover:bg-gray-50">
                                         <td className="p-4 font-medium text-gray-800">{curr.name}</td>
                                         <td className="p-4 text-gray-600">{curr.symbol}</td>

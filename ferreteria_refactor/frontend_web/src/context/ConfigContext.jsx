@@ -16,7 +16,7 @@ export const ConfigProvider = ({ children }) => {
                 const bizData = await configService.getBusinessInfo();
                 setBusiness(bizData);
                 const currData = await configService.getCurrencies();
-                setCurrencies(currData);
+                setCurrencies(Array.isArray(currData) ? currData : []);
             } catch (apiError) {
                 console.warn("Using mock config data due to API error:", apiError);
                 // Fallback Mock Data

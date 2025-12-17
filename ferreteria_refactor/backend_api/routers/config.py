@@ -71,3 +71,54 @@ def get_exchange_rate(db: Session = Depends(get_db)):
         return {"rate": float(config.value)}
     except (ValueError, TypeError):
         return {"rate": 1.0}
+
+# Currency Management Endpoints
+
+@router.get("/currencies", response_model=List[schemas.CurrencyRead])
+def get_currencies(db: Session = Depends(get_db)):
+    """Get all currencies"""
+    return db.query(models.Currency).all()
+
+@router.post("/currencies", response_model=schemas.CurrencyRead)
+def create_currency(currency: schemas.CurrencyCreate, db: Session = Depends(get_db)):
+    """Create a new currency"""
+    # If this is anchor, unset others
+    if currency.is_anchor:
+        db.query(models.Currency).update({models.Currency.is_anchor: False})
+    
+    db_currency = models.Currency(**currency.dict())
+    db.add(db_currency)
+    db.commit()
+    db.refresh(db_currency)
+    return db_currency
+
+@router.put("/currencies/{currency_id}", response_model=schemas.CurrencyRead)
+def update_currency(currency_id: int, currency: schemas.CurrencyUpdate, db: Session = Depends(get_db)):
+    """Update a currency"""
+    db_currency = db.query(models.Currency).get(currency_id)
+    if not db_currency:
+        raise HTTPException(status_code=404, detail="Currency not found")
+    
+    update_data = currency.dict(exclude_unset=True)
+    
+    # If setting to anchor, unset others
+    if update_data.get("is_anchor"):
+        db.query(models.Currency).update({models.Currency.is_anchor: False})
+        
+    for key, value in update_data.items():
+        setattr(db_currency, key, value)
+        
+    db.commit()
+    db.refresh(db_currency)
+    return db_currency
+
+@router.delete("/currencies/{currency_id}")
+def delete_currency(currency_id: int, db: Session = Depends(get_db)):
+    """Delete a currency"""
+    db_currency = db.query(models.Currency).get(currency_id)
+    if not db_currency:
+        raise HTTPException(status_code=404, detail="Currency not found")
+        
+    db.delete(db_currency)
+    db.commit()
+    return {"message": "Currency deleted"}

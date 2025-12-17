@@ -4,8 +4,8 @@ import {
     LayoutDashboard,
     Package,
     ShoppingCart,
-    Warehouse,
-    Settings,
+    Archive,
+    Settings as SettingsIcon,
     LogOut,
     User
 } from 'lucide-react';
