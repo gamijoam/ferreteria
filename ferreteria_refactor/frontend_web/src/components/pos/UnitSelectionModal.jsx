@@ -25,16 +25,18 @@ const UnitSelectionModal = ({ isOpen, onClose, product, onSelect }) => {
     // Derived Options from Units
     const unitOptions = (product.units || []).map(u => {
         // Calculate price if not explicit
-        // If u.price_usd is set, use it. Else calculate: base_price * factor
-        // NOTE: For fractions (factor < 1), this works too (price * 0.001)
         const calculatedPrice = u.price_usd !== null && u.price_usd !== undefined && u.price_usd > 0
             ? u.price_usd
             : product.price * u.conversion_factor;
 
         return {
+            unit_name: u.unit_name,
             name: u.unit_name,
+            price_usd: u.price_usd, // Pass explicit price if exists
             price: calculatedPrice,
+            conversion_factor: u.conversion_factor,
             factor: u.conversion_factor,
+            exchange_rate_id: u.exchange_rate_id, // CRITICAL: Pass for hierarchy
             id: u.id,
             is_base: false,
             barcode: u.barcode

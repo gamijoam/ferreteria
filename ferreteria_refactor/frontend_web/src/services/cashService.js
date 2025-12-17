@@ -24,6 +24,16 @@ const cashService = {
         // data: { type: 'EXPENSE'|'WITHDRAWAL', amount: number, reason: string }
         const response = await apiClient.post('/cash/movement', data);
         return response.data;
+    },
+
+    getHistory: async (filters = {}) => {
+        // filters: { startDate: string (YYYY-MM-DD), endDate: string (YYYY-MM-DD) }
+        const params = {};
+        if (filters.startDate) params.start_date = filters.startDate;
+        if (filters.endDate) params.end_date = filters.endDate;
+
+        const response = await apiClient.get('/cash/sessions', { params });
+        return response.data;
     }
 };
 

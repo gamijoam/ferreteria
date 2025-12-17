@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Search, Calendar, Trash2, Eye, Printer, AlertTriangle, X } from 'lucide-react';
 import apiClient from '../config/axios';
+import { useAuth } from '../context/AuthContext';
 
 const SalesHistory = () => {
+    const { user } = useAuth();
     const [sales, setSales] = useState([]);
     const [filteredSales, setFilteredSales] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -98,7 +100,15 @@ const SalesHistory = () => {
 
         try {
             // Validate PIN
-            await apiClient.post('/auth/validate-pin', { pin: adminPin });
+            const pinResponse = await apiClient.post('/auth/validate-pin', {
+                user_id: user?.id,
+                pin: adminPin
+            });
+
+            if (!pinResponse.data.valid) {
+                setPinError('PIN incorrecto');
+                return;
+            }
 
             // Process void as a return
             const items = saleToVoid.details?.map(detail => ({

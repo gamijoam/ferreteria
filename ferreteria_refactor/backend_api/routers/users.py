@@ -122,3 +122,30 @@ def verify_pin(user_id: int, pin: str, db: Session = Depends(get_db)):
         return {"verified": True, "role": user.role.value if hasattr(user.role, 'value') else user.role}
     else:
         return {"verified": False}
+
+@router.put("/{user_id}/pin")
+def update_pin(user_id: int, pin_data: dict, db: Session = Depends(get_db)):
+    """Update user PIN for security operations"""
+    user = db.query(models.User).get(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Validate PIN (should be 4-6 digits)
+    pin = pin_data.get("pin", "")
+    if not pin.isdigit() or len(pin) < 4 or len(pin) > 6:
+        raise HTTPException(
+            status_code=400, 
+            detail="PIN must be 4-6 digits"
+        )
+    
+    # Update PIN
+    user.pin = pin
+    db.commit()
+    db.refresh(user)
+    
+    return {
+        "id": user.id,
+        "username": user.username,
+        "message": "PIN updated successfully"
+    }
+

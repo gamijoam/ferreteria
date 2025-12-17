@@ -196,6 +196,10 @@ const DashboardLayout = () => {
                             <Users size={20} />
                             <span>Usuarios</span>
                         </Link>
+                        <Link to="/cash-history" className={`flex items-center space-x-3 p-3 rounded transition-colors ${isActive('/cash-history') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
+                            <History size={20} />
+                            <span>Historial de Caja</span>
+                        </Link>
                     </RoleGuard>
 
                     {/* Settings - ADMIN ONLY */}

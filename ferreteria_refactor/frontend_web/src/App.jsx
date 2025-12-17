@@ -21,6 +21,7 @@ import SalesHistory from './pages/SalesHistory';
 import CustomerManager from './pages/Customers/CustomerManager';
 import AccountsReceivable from './pages/Credit/AccountsReceivable';
 import UsersManager from './pages/Users/UsersManager';
+import CashHistory from './pages/CashHistory';
 import { CartProvider } from './context/CartContext';
 import { CashProvider } from './context/CashContext';
 import { ConfigProvider } from './context/ConfigContext';
@@ -100,6 +101,11 @@ function App() {
                     <Route path="/users" element={
                       <ProtectedRoute roles="ADMIN">
                         <UsersManager />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/cash-history" element={
+                      <ProtectedRoute roles="ADMIN">
+                        <CashHistory />
                       </ProtectedRoute>
                     } />
                   </Route>

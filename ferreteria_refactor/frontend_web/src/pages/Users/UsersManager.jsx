@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Users, Plus, Edit, Trash2, Key, Shield, X, Check } from 'lucide-react';
+import { Users, Plus, Edit, Trash2, Key, Shield, X, Check, Lock } from 'lucide-react';
 import apiClient from '../../config/axios';
 import { useAuth } from '../../context/AuthContext';
+import SetPinModal from '../../components/users/SetPinModal';
+import userService from '../../services/userService';
 
 const UsersManager = () => {
     const { user: currentUser } = useAuth();
@@ -10,6 +12,10 @@ const UsersManager = () => {
     const [showModal, setShowModal] = useState(false);
     const [modalMode, setModalMode] = useState('create'); // 'create', 'edit', 'password'
     const [selectedUser, setSelectedUser] = useState(null);
+
+    // PIN Modal state
+    const [showPinModal, setShowPinModal] = useState(false);
+    const [selectedUserForPin, setSelectedUserForPin] = useState(null);
 
     // Form state
     const [formData, setFormData] = useState({
@@ -151,6 +157,22 @@ const UsersManager = () => {
         );
     };
 
+    const handleOpenPinModal = (user) => {
+        setSelectedUserForPin(user);
+        setShowPinModal(true);
+    };
+
+    const handlePinUpdate = async (userId, pin) => {
+        try {
+            await userService.updatePin(userId, pin);
+            alert('✅ PIN establecido exitosamente');
+            setShowPinModal(false);
+            setSelectedUserForPin(null);
+        } catch (error) {
+            throw error; // Let SetPinModal handle the error
+        }
+    };
+
     return (
         <div className="p-6">
             {/* Header */}
@@ -235,6 +257,13 @@ const UsersManager = () => {
                                                 title="Editar usuario"
                                             >
                                                 <Edit size={18} />
+                                            </button>
+                                            <button
+                                                onClick={() => handleOpenPinModal(user)}
+                                                className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                                                title="Establecer PIN de seguridad"
+                                            >
+                                                <Lock size={18} />
                                             </button>
                                             <button
                                                 onClick={() => handleOpenModal('password', user)}
@@ -386,6 +415,17 @@ const UsersManager = () => {
                     </div>
                 </div>
             )}
+
+            {/* PIN Modal */}
+            <SetPinModal
+                isOpen={showPinModal}
+                onClose={() => {
+                    setShowPinModal(false);
+                    setSelectedUserForPin(null);
+                }}
+                user={selectedUserForPin}
+                onSuccess={handlePinUpdate}
+            />
         </div>
     );
 };

@@ -6,7 +6,7 @@ import { useConfig } from '../context/ConfigContext';
 import apiClient from '../config/axios';
 
 const Products = () => {
-    const { getActiveCurrencies, convertPrice } = useConfig();
+    const { getActiveCurrencies, convertPrice, convertProductPrice } = useConfig();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState(null); // For editing
 
@@ -100,7 +100,7 @@ const Products = () => {
                                     <div className="text-xs text-gray-500 flex flex-col">
                                         {getActiveCurrencies().map(currency => (
                                             <span key={currency.id}>
-                                                {convertPrice(product.price, currency.symbol).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency.symbol}
+                                                {convertProductPrice(product, currency.currency_code).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency.symbol}
                                             </span>
                                         ))}
                                     </div>

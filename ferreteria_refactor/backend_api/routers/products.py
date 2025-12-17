@@ -16,12 +16,34 @@ def read_products(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)
 
 @router.post("/", response_model=schemas.ProductRead, dependencies=[Depends(has_role([UserRole.ADMIN, UserRole.WAREHOUSE]))])
 def create_product(product: schemas.ProductCreate, db: Session = Depends(get_db)):
+    # DEBUG: Log received data
+    print("=" * 60)
+    print("📦 CREATE PRODUCT - Received Data:")
+    print(f"   Name: {product.name}")
+    print(f"   Price: {product.price}")
+    print(f"   exchange_rate_id: {product.exchange_rate_id}")
+    print(f"   Type: {type(product.exchange_rate_id)}")
+    print("=" * 60)
+    
     # Exclude 'units' from the main Product creation
     product_data = product.dict(exclude={"units"})
+    
+    # DEBUG: Log product_data dict
+    print(f"📋 Product Data Dict: {product_data}")
+    print(f"   exchange_rate_id in dict: {product_data.get('exchange_rate_id')}")
+    
     db_product = models.Product(**product_data)
+    
+    # DEBUG: Log before commit
+    print(f"🔍 Before commit - exchange_rate_id: {db_product.exchange_rate_id}")
+    
     db.add(db_product)
     db.commit()
     db.refresh(db_product)
+    
+    # DEBUG: Log after commit
+    print(f"✅ After commit - exchange_rate_id: {db_product.exchange_rate_id}")
+    print("=" * 60)
 
     # Process Units
     if product.units:
@@ -33,14 +55,19 @@ def create_product(product: schemas.ProductCreate, db: Session = Depends(get_db)
         
     return db_product
 
-@router.put("/{product_id}", response_model=schemas.ProductRead)
+@router.put("/{product_id}", response_model=schemas.ProductRead, dependencies=[Depends(has_role([UserRole.ADMIN, UserRole.WAREHOUSE]))])
 def update_product(product_id: int, product_update: schemas.ProductUpdate, db: Session = Depends(get_db)):
     db_product = db.query(models.Product).filter(models.Product.id == product_id).first()
     if not db_product:
         raise HTTPException(status_code=404, detail="Product not found")
     
-    # Update main fields
+    # DEBUG: Log received data
+    print("=" * 60)
+    print(f"🔄 UPDATE PRODUCT ID {product_id} - Received Data:")
     update_data = product_update.dict(exclude_unset=True)
+    print(f"   Update Data: {update_data}")
+    print(f"   exchange_rate_id: {update_data.get('exchange_rate_id')}")
+    print("=" * 60)
     
     # Separate units data if present
     units_data = None
@@ -48,7 +75,11 @@ def update_product(product_id: int, product_update: schemas.ProductUpdate, db: S
         units_data = update_data.pop("units")
 
     for key, value in update_data.items():
+        print(f"   Setting {key} = {value}")
         setattr(db_product, key, value)
+    
+    # DEBUG: Log before commit
+    print(f"🔍 Before commit - exchange_rate_id: {db_product.exchange_rate_id}")
     
     # Handle Units Update (Snapshot Strategy: Delete all old, create new)
     if units_data is not None:
@@ -65,6 +96,11 @@ def update_product(product_id: int, product_update: schemas.ProductUpdate, db: S
 
     db.commit()
     db.refresh(db_product)
+    
+    # DEBUG: Log after commit
+    print(f"✅ After commit - exchange_rate_id: {db_product.exchange_rate_id}")
+    print("=" * 60)
+    
     return db_product
 
 

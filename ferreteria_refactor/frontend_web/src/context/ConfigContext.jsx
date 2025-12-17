@@ -112,6 +112,32 @@ export const ConfigProvider = ({ children }) => {
         return priceInAnchor * rate;
     };
 
+    const getProductExchangeRate = (product) => {
+        // If product has specific exchange_rate_id, use that rate
+        if (product?.exchange_rate_id && Array.isArray(currencies)) {
+            const productRate = currencies.find(r => r.id === product.exchange_rate_id);
+            if (productRate) {
+                return productRate;
+            }
+        }
+        // Otherwise, return default rate for the currency
+        return currencies.find(c => c.is_default) || currencies[0];
+    };
+
+    const convertProductPrice = (product, targetCurrencyCode) => {
+        // Get the rate assigned to this product (or default)
+        const rate = getProductExchangeRate(product);
+
+        // If target currency matches product's rate currency, use product's rate
+        if (rate && rate.currency_code === targetCurrencyCode) {
+            return product.price * rate.rate;
+        }
+
+        // Otherwise find the rate for target currency
+        const targetRate = currencies.find(c => c.currency_code === targetCurrencyCode);
+        return product.price * (targetRate?.rate || 1);
+    };
+
     return (
         <ConfigContext.Provider value={{
             business,
@@ -120,7 +146,9 @@ export const ConfigProvider = ({ children }) => {
             refreshConfig,
             getExchangeRate,
             getActiveCurrencies,
-            convertPrice
+            convertPrice,
+            getProductExchangeRate,
+            convertProductPrice
         }}>
             {children}
         </ConfigContext.Provider>

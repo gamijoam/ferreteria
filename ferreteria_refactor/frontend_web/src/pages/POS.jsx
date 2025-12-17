@@ -16,7 +16,7 @@ import apiClient from '../config/axios'; // Ensure import
 // ... imports
 
 const POS = () => {
-    const { cart, addToCart, removeFromCart, updateQuantity, clearCart, totalUSD, totalBs } = useCart();
+    const { cart, addToCart, removeFromCart, updateQuantity, clearCart, totalUSD, totalBs, totalsByCurrency, exchangeRates } = useCart();
     const { isSessionOpen, openSession } = useCash();
     const { getActiveCurrencies, convertPrice, currencies } = useConfig();
     const anchorCurrency = currencies.find(c => c.is_anchor) || { symbol: '$' };
@@ -90,12 +90,39 @@ const POS = () => {
     };
 
     const addBaseProductToCart = (product) => {
+        // Determine exchange rate for base product
+        let selectedExchangeRateId = null;
+        let selectedExchangeRateName = 'Sistema Default';
+        let isSpecialRate = false;
+
+        if (product.exchange_rate_id) {
+            selectedExchangeRateId = product.exchange_rate_id;
+            isSpecialRate = true;
+
+            // Get rate name
+            if (Array.isArray(exchangeRates)) {
+                const rateInfo = exchangeRates.find(r => r.id === product.exchange_rate_id);
+                if (rateInfo) {
+                    selectedExchangeRateName = rateInfo.name;
+                }
+            }
+        }
+
         const baseUnit = {
             name: product.unit_type || 'Unidad',
             price_usd: product.price,
             factor: 1,
-            is_base: true
+            is_base: true,
+            exchange_rate_id: selectedExchangeRateId,
+            exchange_rate_name: selectedExchangeRateName,
+            is_special_rate: isSpecialRate
         };
+
+        console.log('🔍 DEBUG addBaseProductToCart:');
+        console.log('   Product:', product.name);
+        console.log('   Product exchange_rate_id:', product.exchange_rate_id);
+        console.log('   baseUnit:', baseUnit);
+
         addToCart(product, baseUnit);
     };
 
@@ -105,13 +132,77 @@ const POS = () => {
         if (!selectedProductForUnits) return;
         const product = selectedProductForUnits;
 
+        // ========================================
+        // ALGORITMO DE PRECIO (USD) - CASCADA ESTRICTA
+        // ========================================
+        let finalPriceUSD;
+
+        // PASO 1: ¿La ProductUnit tiene precio específico?
+        if (unitOption.price_usd && unitOption.price_usd > 0) {
+            finalPriceUSD = unitOption.price_usd;
+            console.log(`💰 Precio Unit Específico: $${finalPriceUSD}`);
+        }
+        // PASO 2: Calcular desde precio base del producto
+        else {
+            const basePriceUSD = product.price || 0;
+            const conversionFactor = unitOption.conversion_factor || unitOption.factor || 1;
+            finalPriceUSD = basePriceUSD * conversionFactor;
+            console.log(`💰 Precio Calculado: $${basePriceUSD} × ${conversionFactor} = $${finalPriceUSD}`);
+        }
+
+        // ========================================
+        // ALGORITMO DE TASA DE CAMBIO - CASCADA ESTRICTA
+        // ========================================
+        let selectedExchangeRateId = null;
+        let selectedExchangeRateName = 'Sistema Default';
+        let isSpecialRate = false;
+
+        // PASO 1: ¿La ProductUnit tiene tasa específica?
+        if (unitOption.exchange_rate_id) {
+            selectedExchangeRateId = unitOption.exchange_rate_id;
+            isSpecialRate = true;
+            console.log(`💱 Tasa de Unit: ID ${selectedExchangeRateId}`);
+        }
+        // PASO 2: ¿El Product padre tiene tasa específica?
+        else if (product.exchange_rate_id) {
+            selectedExchangeRateId = product.exchange_rate_id;
+            isSpecialRate = true;
+            console.log(`💱 Tasa del Producto: ID ${selectedExchangeRateId}`);
+        }
+        // PASO 3: Usar tasa global por defecto (null = sistema decide)
+        else {
+            selectedExchangeRateId = null;
+            isSpecialRate = false;
+            console.log(`💱 Usando tasa predeterminada del sistema`);
+        }
+
+        // Obtener nombre de la tasa para mostrar en UI
+        if (selectedExchangeRateId && Array.isArray(exchangeRates)) {
+            const rateInfo = exchangeRates.find(r => r.id === selectedExchangeRateId);
+            if (rateInfo) {
+                selectedExchangeRateName = rateInfo.name;
+            }
+        }
+
+        // ========================================
+        // CONSTRUIR OBJETO UNIT PARA EL CARRITO
+        // ========================================
         const unit = {
-            name: unitOption.name,
-            price_usd: unitOption.price, // Use the price calculated by UnitSelectionModal
-            factor: unitOption.factor,
-            is_base: unitOption.is_base || false
+            name: unitOption.unit_name || unitOption.name,
+            price_usd: finalPriceUSD,  // Precio ya resuelto
+            factor: unitOption.conversion_factor || unitOption.factor || 1,
+            is_base: unitOption.is_base || false,
+            unit_id: unitOption.id || null,
+
+            // NUEVO: Información de tasa de cambio
+            exchange_rate_id: selectedExchangeRateId,
+            exchange_rate_name: selectedExchangeRateName,
+            is_special_rate: isSpecialRate
         };
 
+        console.log('📦 Unit final para carrito:', unit);
+
+        // Agregar al carrito
         addToCart(product, unit);
         setSelectedProductForUnits(null);
     };
@@ -307,14 +398,19 @@ const POS = () => {
                             <span className="text-3xl font-bold text-gray-800">{anchorCurrency.symbol}{totalUSD.toFixed(2)}</span>
                         </div>
                         {/* Other Currencies */}
-                        {getActiveCurrencies().map(curr => (
-                            <div key={curr.id} className="flex justify-between items-end">
-                                <span className="text-gray-500 text-xs font-medium">Total {curr.name}</span>
-                                <span className="text-lg font-bold text-blue-600 font-mono">
-                                    {curr.symbol} {convertPrice(totalUSD, curr.symbol).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                </span>
-                            </div>
-                        ))}
+                        {getActiveCurrencies().map(curr => {
+                            // Get total for this currency from cart calculations
+                            const currencyTotal = totalsByCurrency?.[curr.currency_code] || 0;
+
+                            return (
+                                <div key={curr.id} className="flex justify-between items-end">
+                                    <span className="text-gray-500 text-xs font-medium">Total {curr.name}</span>
+                                    <span className="text-lg font-bold text-blue-600 font-mono">
+                                        {curr.symbol} {currencyTotal.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </span>
+                                </div>
+                            );
+                        })}
                     </div>
 
                     <button

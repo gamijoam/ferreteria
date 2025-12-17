@@ -85,7 +85,7 @@ export const CartProvider = ({ children }) => {
 
     // Add Item Logic with multi-unit support and exchange rate hierarchy
     const addToCart = (product, unit) => {
-        // unit: { name, price_usd, factor, is_base, exchange_rate_id? }
+        // unit: { name, price_usd, factor, is_base, exchange_rate_id?, exchange_rate_name?, is_special_rate? }
         const itemId = `${product.id}_${unit.name.replace(/\s+/g, '_')}`;
 
         setCart(prevCart => {
@@ -95,9 +95,22 @@ export const CartProvider = ({ children }) => {
                 // Update quantity if exists
                 return updateItemQuantityInList(prevCart, itemId, existingItem.quantity + 1);
             } else {
-                // Get effective exchange rate using hierarchy
-                const rateInfo = getEffectiveExchangeRate(product, unit);
+                // Get effective exchange rate using hierarchy (as fallback if not provided by caller)
+                const rateInfo = unit.exchange_rate_id
+                    ? {
+                        rate: exchangeRates.find(r => r.id === unit.exchange_rate_id)?.rate || 1,
+                        rateName: unit.exchange_rate_name || 'Personalizada',
+                        source: 'pre-resolved',
+                        isSpecial: unit.is_special_rate ?? true
+                    }
+                    : getEffectiveExchangeRate(product, unit);
+
                 const subtotalUsd = unit.price_usd * 1;
+
+                console.log('🛒 DEBUG CartContext addToCart:');
+                console.log('   Product:', product.name);
+                console.log('   Unit received:', unit);
+                console.log('   rateInfo:', rateInfo);
 
                 const newItem = {
                     id: itemId,
@@ -110,10 +123,13 @@ export const CartProvider = ({ children }) => {
                     exchange_rate: rateInfo.rate,
                     exchange_rate_name: rateInfo.rateName,
                     exchange_rate_source: rateInfo.source,
-                    is_special_rate: rateInfo.isSpecial,  // NEW: Flag for visual indicator
+                    is_special_rate: rateInfo.isSpecial,
                     subtotal_usd: subtotalUsd,
                     subtotal_bs: subtotalUsd * rateInfo.rate
                 };
+
+                console.log('   newItem created:', newItem);
+
                 return [...prevCart, newItem];
             }
         });
@@ -149,13 +165,29 @@ export const CartProvider = ({ children }) => {
         });
     };
 
-    // Totals Calculation (Sum of subtotals)
+    // Totals Calculation (Sum of subtotals per currency)
     const totals = useMemo(() => {
-        return cart.reduce((acc, item) => ({
-            usd: acc.usd + item.subtotal_usd,
-            bs: acc.bs + item.subtotal_bs
-        }), { usd: 0, bs: 0 });
-    }, [cart]);
+        const totalsPerCurrency = {};
+
+        cart.forEach(item => {
+            // Get currency code from exchange rate
+            const currencyCode = item.exchange_rate_source === 'pre-resolved'
+                ? (exchangeRates.find(r => r.id === item.exchange_rate_id)?.currency_code || 'VES')
+                : 'VES'; // Default to VES for now
+
+            if (!totalsPerCurrency[currencyCode]) {
+                totalsPerCurrency[currencyCode] = 0;
+            }
+
+            totalsPerCurrency[currencyCode] += item.subtotal_bs || (item.subtotal_usd * item.exchange_rate);
+        });
+
+        return {
+            usd: cart.reduce((acc, item) => acc + item.subtotal_usd, 0),
+            bs: cart.reduce((acc, item) => acc + (item.subtotal_bs || 0), 0),
+            byCurrency: totalsPerCurrency
+        };
+    }, [cart, exchangeRates]);
 
     return (
         <CartContext.Provider value={{
@@ -166,6 +198,7 @@ export const CartProvider = ({ children }) => {
             clearCart,
             totalUSD: totals.usd,
             totalBs: totals.bs,
+            totalsByCurrency: totals.byCurrency,
             exchangeRates  // Expose for other components if needed
         }}>
             {children}

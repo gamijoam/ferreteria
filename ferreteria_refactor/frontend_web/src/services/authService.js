@@ -6,7 +6,7 @@ const authService = {
         params.append('username', username);
         params.append('password', password);
 
-        const response = await apiClient.post('/token', params, {
+        const response = await apiClient.post('/auth/token', params, {
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded'
             }

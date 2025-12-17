@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Package, DollarSign, Barcode, Tag, Layers, AlertTriangle, Coins } from 'lucide-react';
+import { X, Plus, Trash2, Package, DollarSign, Barcode, Tag, Layers, AlertTriangle, AlertCircle, Coins } from 'lucide-react';
 import { useConfig } from '../../context/ConfigContext';
 import apiClient from '../../config/axios';
+import ProductUnitManager from './ProductUnitManager';
 
 const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
     const { getActiveCurrencies, convertPrice, currencies } = useConfig();
@@ -164,7 +165,7 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
             min_stock: parseFloat(formData.min_stock),
             unit_type: formData.unit_type,
             location: formData.location,
-            exchange_rate_id: formData.exchange_rate_id || null,  // NEW: Product-level rate
+            exchange_rate_id: formData.exchange_rate_id ? parseInt(formData.exchange_rate_id) : null,  // Parse as integer
             units: formData.units.map(u => {
                 let factor = parseFloat(u.user_input);
                 if (u.type === 'fraction') factor = factor !== 0 ? 1 / factor : 0;
@@ -174,7 +175,7 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
                     barcode: u.barcode,
                     price_usd: parseFloat(u.price_usd) || null,
                     is_default: false,
-                    exchange_rate_id: u.exchange_rate_id || null  // NEW: Unit-level rate
+                    exchange_rate_id: u.exchange_rate_id ? parseInt(u.exchange_rate_id) : null  // Parse as integer
                 };
             })
         };
@@ -424,150 +425,14 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
                     )}
 
                     {activeTab === 'units' && (
-                        <div className="space-y-8 max-w-3xl mx-auto anime-fade-in relative">
-                            <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                                <label className="block text-sm font-bold text-gray-800 mb-2">Unidad Base del Producto</label>
-                                <p className="text-sm text-gray-500 mb-4">¿Cómo se vende este producto principalmente?</p>
-                                <select
-                                    name="unit_type"
-                                    value={formData.unit_type}
-                                    onChange={handleInputChange}
-                                    className="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 py-3"
-                                >
-                                    <option value="UNID">Unidad (Pieza)</option>
-                                    <option value="KG">Kilogramos (Peso)</option>
-                                    <option value="MTR">Metros (Longitud)</option>
-                                    <option value="LTR">Litros (Volumen)</option>
-                                    <option value="SERV">Servicio</option>
-                                </select>
-                            </div>
-
-                            <div className="flex items-center justify-between mt-8 mb-4">
-                                <div>
-                                    <h4 className="text-lg font-bold text-gray-800">Presentaciones Adicionales</h4>
-                                    <p className="text-xs text-gray-500">Agrega unidades alternas de venta</p>
-                                </div>
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={() => handleAddUnit('fraction')}
-                                        className="bg-orange-50 text-orange-600 hover:bg-orange-100 px-4 py-2 rounded-full font-medium flex items-center transition-colors text-sm"
-                                    >
-                                        <Plus size={16} className="mr-1" /> Fracción
-                                    </button>
-                                    <button
-                                        onClick={() => handleAddUnit('packing')}
-                                        className="bg-blue-50 text-blue-600 hover:bg-blue-100 px-4 py-2 rounded-full font-medium flex items-center transition-colors text-sm"
-                                    >
-                                        <Plus size={16} className="mr-1" /> Empaque
-                                    </button>
-                                </div>
-                            </div>
-
-                            {formData.units.length === 0 ? (
-                                <div className="text-center py-10 bg-gray-50 rounded-xl border-dashed border-2 border-gray-200">
-                                    <Layers className="mx-auto text-gray-300 mb-2" size={48} />
-                                    <p className="text-gray-500 font-medium">No hay presentaciones adicionales</p>
-                                    <p className="text-xs text-gray-400">Solo se venderá por {formData.unit_type}</p>
-                                </div>
-                            ) : (
-                                <div className="space-y-4">
-                                    {formData.units.map(unit => (
-                                        <div key={unit.id} className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow relative group">
-                                            <button
-                                                onClick={() => removeUnit(unit.id)}
-                                                className="absolute top-4 right-4 text-gray-300 hover:text-red-500 transition-colors"
-                                            >
-                                                <Trash2 size={18} />
-                                            </button>
-
-                                            <div className="flex items-center gap-3 mb-4">
-                                                <span className={`px-2 py-1 text-[10px] font-bold uppercase rounded tracking-wider ${unit.type === 'packing' ? 'bg-purple-100 text-purple-700' : 'bg-orange-100 text-orange-700'}`}>
-                                                    {unit.type === 'packing' ? 'Empaque' : 'Fracción'}
-                                                </span>
-                                                <h5 className="font-bold text-gray-800 text-lg">{unit.unit_name || 'Nueva Unidad'}</h5>
-                                            </div>
-
-                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                                <div>
-                                                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Nombre Unidad</label>
-                                                    <input
-                                                        type="text"
-                                                        value={unit.unit_name}
-                                                        onChange={(e) => handleUnitChange(unit.id, 'unit_name', e.target.value)}
-                                                        className="w-full border-gray-200 rounded p-2 text-sm focus:border-blue-500 focus:ring-blue-500"
-                                                        placeholder="Caja, Bulk..."
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
-                                                        {unit.type === 'packing' ? `Contiene (x ${formData.unit_type})` : `Equivale a (1/${formData.unit_type})`}
-                                                    </label>
-                                                    <input
-                                                        type="number"
-                                                        value={unit.user_input}
-                                                        onChange={(e) => handleUnitChange(unit.id, 'user_input', e.target.value)}
-                                                        className="w-full border-gray-200 rounded p-2 text-sm focus:border-blue-500 focus:ring-blue-500 font-medium"
-                                                        placeholder="Cantidad"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Precio Específico ($)</label>
-                                                    <input
-                                                        type="number"
-                                                        value={unit.price_usd}
-                                                        onChange={(e) => handleUnitChange(unit.id, 'price_usd', e.target.value)}
-                                                        className="w-full border-gray-200 rounded p-2 text-sm focus:border-green-500 focus:ring-green-500 text-green-700 font-bold"
-                                                        placeholder="Opcional"
-                                                    />
-                                                </div>
-                                                <div className="col-span-3">
-                                                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Código de Barras</label>
-                                                    <input
-                                                        type="text"
-                                                        value={unit.barcode}
-                                                        onChange={(e) => handleUnitChange(unit.id, 'barcode', e.target.value)}
-                                                        className="w-full border-gray-200 rounded p-2 text-sm text-gray-600 font-mono bg-gray-50"
-                                                        placeholder="Escanea el código de la caja/unidad..."
-                                                    />
-                                                </div>
-
-                                                {/* NEW: Exchange Rate Selector for Unit */}
-                                                <div>
-                                                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Tasa Específica</label>
-                                                    <select
-                                                        value={unit.exchange_rate_id || ''}
-                                                        onChange={(e) => handleUnitChange(unit.id, 'exchange_rate_id', e.target.value ? parseInt(e.target.value) : null)}
-                                                        className="w-full border-gray-200 rounded p-2 text-sm focus:border-purple-500 focus:ring-purple-500"
-                                                    >
-                                                        <option value="">Heredar del Producto</option>
-                                                        {exchangeRates.map(rate => (
-                                                            <option key={rate.id} value={rate.id}>
-                                                                {rate.name} ({rate.rate.toFixed(2)})
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                    <p className="text-[10px] text-gray-400 mt-1">
-                                                        {unit.exchange_rate_id
-                                                            ? `Usa ${exchangeRates.find(r => r.id === unit.exchange_rate_id)?.name || 'tasa específica'}`
-                                                            : formData.exchange_rate_id
-                                                                ? `Hereda ${exchangeRates.find(r => r.id === formData.exchange_rate_id)?.name || 'del producto'}`
-                                                                : 'Usa predeterminada'
-                                                        }
-                                                    </p>
-                                                </div>
-                                            </div>
-
-                                            <div className="mt-3 text-xs text-blue-600 bg-blue-50 rounded px-3 py-2 flex items-center">
-                                                <AlertTriangle size={12} className="mr-1" />
-                                                {unit.type === 'packing'
-                                                    ? `Una ${unit.unit_name || 'unidad'} contiene ${unit.user_input} ${formData.unit_type}s`
-                                                    : `Un ${formData.unit_type} equivale a ${unit.user_input} ${unit.unit_name}s`}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
+                        <ProductUnitManager
+                            units={formData.units}
+                            onUnitsChange={(newUnits) => setFormData(prev => ({ ...prev, units: newUnits }))}
+                            baseUnitType={formData.unit_type}
+                            basePrice={formData.price}
+                            exchangeRates={exchangeRates}
+                            productExchangeRateId={formData.exchange_rate_id}
+                        />
                     )}
                 </div>
 

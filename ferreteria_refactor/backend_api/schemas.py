@@ -24,6 +24,7 @@ class ProductBase(BaseModel):
     category_id: Optional[int] = None
     supplier_id: Optional[int] = None
     location: Optional[str] = None
+    exchange_rate_id: Optional[int] = None  # Tasa de cambio específica del producto
 
 # Exchange Rate Schemas
 class ExchangeRateBase(BaseModel):
