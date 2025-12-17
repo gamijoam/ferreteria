@@ -130,11 +130,11 @@ def init_currencies(db: Session):
     
     currencies = [
         {"name": "Dólar Americano", "symbol": "USD", "rate": 1.00, "is_anchor": True, "is_active": True},
-        {"name": "Bolívar Venezolano", "symbol": "VES", "rate": 50.00, "is_anchor": False, "is_active": True},
-        {"name": "Peso Colombiano", "symbol": "COP", "rate": 4200.00, "is_anchor": False, "is_active": False},
+        {"name": "Bolívar Venezolano", "symbol": "VES", "rate": 60.00, "is_anchor": False, "is_active": True},
+        {"name": "Peso Colombiano", "symbol": "COP", "rate": 4200.00, "is_anchor": False, "is_active": True},
+        {"name": "Euro", "symbol": "EUR", "rate": 1.10, "is_anchor": False, "is_active": False},
         {"name": "Peso Argentino", "symbol": "ARS", "rate": 1000.00, "is_anchor": False, "is_active": False},
         {"name": "Peso Mexicano", "symbol": "MXN", "rate": 17.00, "is_anchor": False, "is_active": False},
-        {"name": "Euro", "symbol": "EUR", "rate": 0.92, "is_anchor": False, "is_active": False},
         {"name": "Sol Peruano", "symbol": "PEN", "rate": 3.70, "is_anchor": False, "is_active": False},
     ]
     
