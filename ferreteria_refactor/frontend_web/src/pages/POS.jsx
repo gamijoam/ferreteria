@@ -9,6 +9,7 @@ import EditItemModal from '../components/pos/EditItemModal';
 import PaymentModal from '../components/pos/PaymentModal';
 import CashOpeningModal from '../components/cash/CashOpeningModal';
 import CashMovementModal from '../components/cash/CashMovementModal';
+import SaleSuccessModal from '../components/pos/SaleSuccessModal';
 
 const POS = () => {
     const { cart, addToCart, removeFromCart, updateQuantity, clearCart, totalUSD, totalBs } = useCart();
@@ -20,6 +21,7 @@ const POS = () => {
     const [selectedItemForEdit, setSelectedItemForEdit] = useState(null);
     const [isPaymentOpen, setIsPaymentOpen] = useState(false);
     const [isMovementOpen, setIsMovementOpen] = useState(false);
+    const [lastSaleData, setLastSaleData] = useState(null); // { cart, totalUSD, paymentData }
 
     // Refs
     const searchInputRef = useRef(null);
@@ -81,10 +83,22 @@ const POS = () => {
     };
 
     const handleCheckout = (paymentData) => {
-        console.log("Processing Sale:", paymentData, cart);
-        alert("¡Venta Exitosa!");
-        clearCart();
+        // Save data for receipt printing
+        setLastSaleData({
+            cart: [...cart], // Copy cart
+            totalUSD,
+            totalBs,
+            paymentData
+        });
+
+        // Don't clear cart immediately, wait for user to close success modal
         setIsPaymentOpen(false);
+        // Success modal triggers based on !!lastSaleData
+    };
+
+    const handleSuccessClose = () => {
+        setLastSaleData(null);
+        clearCart();
     };
 
     return (
@@ -240,6 +254,12 @@ const POS = () => {
             <CashMovementModal
                 isOpen={isMovementOpen}
                 onClose={() => setIsMovementOpen(false)}
+            />
+
+            <SaleSuccessModal
+                isOpen={!!lastSaleData}
+                saleData={lastSaleData}
+                onClose={handleSuccessClose}
             />
 
             {!isSessionOpen && (
