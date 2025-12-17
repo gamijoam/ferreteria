@@ -4,10 +4,12 @@ from typing import List, Dict, Any
 from ..database.db import get_db
 from ..models import models
 from .. import schemas
+from ..dependencies import admin_only
 
 router = APIRouter(
     prefix="/config",
-    tags=["config"]
+    tags=["config"],
+    dependencies=[Depends(admin_only)]  # 🔒 ADMIN ONLY - Business configuration is critical
 )
 
 @router.get("/", response_model=List[schemas.BusinessConfigRead])

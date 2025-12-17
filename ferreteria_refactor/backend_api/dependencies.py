@@ -54,3 +54,20 @@ class RoleChecker:
 
 def has_role(allowed_roles: List[UserRole]):
     return RoleChecker(allowed_roles)
+
+# ========================================
+# RBAC Convenience Aliases
+# ========================================
+# Use these as dependencies in your routes for quick role checking
+
+# Admin only - full access
+admin_only = has_role([UserRole.ADMIN])
+
+# Cashier or Admin - POS operations, sales, returns
+cashier_or_admin = has_role([UserRole.ADMIN, UserRole.CASHIER])
+
+# Warehouse or Admin - inventory management, stock adjustments
+warehouse_or_admin = has_role([UserRole.ADMIN, UserRole.WAREHOUSE])
+
+# All authenticated users (any role)
+any_authenticated = Depends(get_current_active_user)

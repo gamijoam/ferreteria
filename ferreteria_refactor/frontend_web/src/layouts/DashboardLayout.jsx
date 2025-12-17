@@ -2,6 +2,7 @@ import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useConfig } from '../context/ConfigContext';
+import RoleGuard from '../components/RoleGuard';
 import {
     LayoutDashboard,
     Package,
@@ -69,65 +70,69 @@ const DashboardLayout = () => {
                         <span>Dashboard</span>
                     </Link>
 
-                    {/* Inventario y Productos */}
-                    <div>
-                        <button
-                            onClick={() => toggleSection('inventory')}
-                            className="flex items-center justify-between w-full p-3 rounded hover:bg-slate-700 transition-colors"
-                        >
-                            <div className="flex items-center space-x-3">
-                                <Package size={20} />
-                                <span className="font-medium">Inventario</span>
-                            </div>
-                            {openSections.inventory ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                        </button>
-                        {openSections.inventory && (
-                            <div className="ml-4 mt-1 space-y-1">
-                                <Link to="/products" className={`flex items-center space-x-3 p-2 pl-4 rounded text-sm transition-colors ${isActive('/products') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
-                                    <Package size={16} />
-                                    <span>Productos</span>
-                                </Link>
-                                <Link to="/categories" className={`flex items-center space-x-3 p-2 pl-4 rounded text-sm transition-colors ${isActive('/categories') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
-                                    <FolderTree size={16} />
-                                    <span>Categorías</span>
-                                </Link>
-                                <Link to="/inventory" className={`flex items-center space-x-3 p-2 pl-4 rounded text-sm transition-colors ${isActive('/inventory') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
-                                    <Archive size={16} />
-                                    <span>Kardex</span>
-                                </Link>
-                            </div>
-                        )}
-                    </div>
+                    {/* Inventario y Productos - ADMIN or WAREHOUSE */}
+                    <RoleGuard allowed={['ADMIN', 'WAREHOUSE']}>
+                        <div>
+                            <button
+                                onClick={() => toggleSection('inventory')}
+                                className="flex items-center justify-between w-full p-3 rounded hover:bg-slate-700 transition-colors"
+                            >
+                                <div className="flex items-center space-x-3">
+                                    <Package size={20} />
+                                    <span className="font-medium">Inventario</span>
+                                </div>
+                                {openSections.inventory ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                            </button>
+                            {openSections.inventory && (
+                                <div className="ml-4 mt-1 space-y-1">
+                                    <Link to="/products" className={`flex items-center space-x-3 p-2 pl-4 rounded text-sm transition-colors ${isActive('/products') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
+                                        <Package size={16} />
+                                        <span>Productos</span>
+                                    </Link>
+                                    <Link to="/categories" className={`flex items-center space-x-3 p-2 pl-4 rounded text-sm transition-colors ${isActive('/categories') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
+                                        <FolderTree size={16} />
+                                        <span>Categorías</span>
+                                    </Link>
+                                    <Link to="/inventory" className={`flex items-center space-x-3 p-2 pl-4 rounded text-sm transition-colors ${isActive('/inventory') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
+                                        <Archive size={16} />
+                                        <span>Kardex</span>
+                                    </Link>
+                                </div>
+                            )}
+                        </div>
+                    </RoleGuard>
 
-                    {/* Ventas */}
-                    <div>
-                        <button
-                            onClick={() => toggleSection('sales')}
-                            className="flex items-center justify-between w-full p-3 rounded hover:bg-slate-700 transition-colors"
-                        >
-                            <div className="flex items-center space-x-3">
-                                <ShoppingCart size={20} />
-                                <span className="font-medium">Ventas</span>
-                            </div>
-                            {openSections.sales ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                        </button>
-                        {openSections.sales && (
-                            <div className="ml-4 mt-1 space-y-1">
-                                <Link to="/pos" className={`flex items-center space-x-3 p-2 pl-4 rounded text-sm transition-colors ${isActive('/pos') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
-                                    <ShoppingCart size={16} />
-                                    <span>Punto de Venta</span>
-                                </Link>
-                                <Link to="/sales-history" className={`flex items-center space-x-3 p-2 pl-4 rounded text-sm transition-colors ${isActive('/sales-history') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
-                                    <History size={16} />
-                                    <span>Historial</span>
-                                </Link>
-                                <Link to="/returns" className={`flex items-center space-x-3 p-2 pl-4 rounded text-sm transition-colors ${isActive('/returns') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
-                                    <RotateCcw size={16} />
-                                    <span>Devoluciones</span>
-                                </Link>
-                            </div>
-                        )}
-                    </div>
+                    {/* Ventas - ADMIN or CASHIER */}
+                    <RoleGuard allowed={['ADMIN', 'CASHIER']}>
+                        <div>
+                            <button
+                                onClick={() => toggleSection('sales')}
+                                className="flex items-center justify-between w-full p-3 rounded hover:bg-slate-700 transition-colors"
+                            >
+                                <div className="flex items-center space-x-3">
+                                    <ShoppingCart size={20} />
+                                    <span className="font-medium">Ventas</span>
+                                </div>
+                                {openSections.sales ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                            </button>
+                            {openSections.sales && (
+                                <div className="ml-4 mt-1 space-y-1">
+                                    <Link to="/pos" className={`flex items-center space-x-3 p-2 pl-4 rounded text-sm transition-colors ${isActive('/pos') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
+                                        <ShoppingCart size={16} />
+                                        <span>Punto de Venta</span>
+                                    </Link>
+                                    <Link to="/sales-history" className={`flex items-center space-x-3 p-2 pl-4 rounded text-sm transition-colors ${isActive('/sales-history') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
+                                        <History size={16} />
+                                        <span>Historial</span>
+                                    </Link>
+                                    <Link to="/returns" className={`flex items-center space-x-3 p-2 pl-4 rounded text-sm transition-colors ${isActive('/returns') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
+                                        <RotateCcw size={16} />
+                                        <span>Devoluciones</span>
+                                    </Link>
+                                </div>
+                            )}
+                        </div>
+                    </RoleGuard>
 
                     {/* Finanzas */}
                     <div>
@@ -185,11 +190,21 @@ const DashboardLayout = () => {
                         )}
                     </div>
 
-                    {/* Settings */}
-                    <Link to="/settings" className={`flex items-center space-x-3 p-3 rounded transition-colors ${isActive('/settings') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
-                        <SettingsIcon size={20} />
-                        <span>Configuración</span>
-                    </Link>
+                    {/* Users - ADMIN ONLY */}
+                    <RoleGuard allowed="ADMIN">
+                        <Link to="/users" className={`flex items-center space-x-3 p-3 rounded transition-colors ${isActive('/users') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
+                            <Users size={20} />
+                            <span>Usuarios</span>
+                        </Link>
+                    </RoleGuard>
+
+                    {/* Settings - ADMIN ONLY */}
+                    <RoleGuard allowed="ADMIN">
+                        <Link to="/settings" className={`flex items-center space-x-3 p-3 rounded transition-colors ${isActive('/settings') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
+                            <SettingsIcon size={20} />
+                            <span>Configuración</span>
+                        </Link>
+                    </RoleGuard>
                 </nav>
 
                 <div className="p-4 border-t border-slate-700">
@@ -219,7 +234,10 @@ const DashboardLayout = () => {
 
                         <div className="flex items-center space-x-2 text-gray-700">
                             <User size={20} />
-                            <span>{user?.username || 'Usuario'}</span>
+                            <div className="flex flex-col items-end">
+                                <span className="font-medium">{user?.username || 'Usuario'}</span>
+                                <span className="text-xs text-gray-500">{user?.role || 'CASHIER'}</span>
+                            </div>
                         </div>
                     </div>
                 </header>

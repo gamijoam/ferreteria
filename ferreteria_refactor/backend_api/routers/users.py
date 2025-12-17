@@ -6,10 +6,12 @@ import hashlib
 from ..database.db import get_db
 from ..models import models
 from .. import schemas
+from ..dependencies import admin_only
 
 router = APIRouter(
     prefix="/users",
-    tags=["users"]
+    tags=["users"],
+    dependencies=[Depends(admin_only)]  # 🔒 ADMIN ONLY - User management is critical
 )
 
 security = HTTPBasic()

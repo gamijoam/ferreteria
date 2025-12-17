@@ -6,10 +6,12 @@ from datetime import datetime, date
 from ..database.db import get_db
 from ..models import models
 from .. import schemas
+from ..dependencies import admin_only
 
 router = APIRouter(
     prefix="/reports",
-    tags=["reports"]
+    tags=["reports"],
+    dependencies=[Depends(admin_only)]  # 🔒 ADMIN ONLY - Financial data is sensitive
 )
 
 @router.get("/dashboard/financials")

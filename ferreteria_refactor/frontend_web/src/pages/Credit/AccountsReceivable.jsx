@@ -4,7 +4,14 @@ import apiClient from '../../config/axios';
 import { useConfig } from '../../context/ConfigContext';
 
 const AccountsReceivable = () => {
-    const { getExchangeRate } = useConfig();
+    const { getExchangeRate, currencies, getActiveCurrencies } = useConfig();
+
+    // Get all active currencies including USD (anchor)
+    const availableCurrencies = [
+        currencies.find(c => c.is_anchor), // USD
+        ...getActiveCurrencies() // Other active currencies
+    ].filter(Boolean); // Remove undefined if anchor not found
+
     const [invoices, setInvoices] = useState([]);
     const [filteredInvoices, setFilteredInvoices] = useState([]);
     const [filter, setFilter] = useState('pending'); // pending, overdue, paid
@@ -416,9 +423,11 @@ const AccountsReceivable = () => {
                                     onChange={(e) => setPaymentCurrency(e.target.value)}
                                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
                                 >
-                                    <option value="USD">USD - Dólares</option>
-                                    <option value="VES">Bs - Bolívares</option>
-                                    <option value="COP">COP - Pesos</option>
+                                    {availableCurrencies.map(curr => (
+                                        <option key={curr.symbol} value={curr.symbol}>
+                                            {curr.name} ({curr.symbol})
+                                        </option>
+                                    ))}
                                 </select>
                                 {paymentCurrency !== 'USD' && (
                                     <p className="text-xs text-gray-500 mt-2">

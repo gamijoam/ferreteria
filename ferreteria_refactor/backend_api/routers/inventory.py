@@ -5,10 +5,12 @@ from ..database.db import get_db
 from ..models import models
 from .. import schemas
 from datetime import datetime
+from ..dependencies import warehouse_or_admin
 
 router = APIRouter(
     prefix="/inventory",
-    tags=["inventory"]
+    tags=["inventory"],
+    dependencies=[Depends(warehouse_or_admin)]  # 🔒 WAREHOUSE or ADMIN - Inventory control
 )
 
 @router.post("/add")

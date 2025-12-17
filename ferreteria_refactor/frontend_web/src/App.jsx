@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
+import Unauthorized from './pages/Unauthorized';
 import DashboardLayout from './layouts/DashboardLayout';
 import Dashboard from './pages/Dashboard';
 import Products from './pages/Products';
@@ -19,6 +20,7 @@ import ReturnsManager from './pages/Returns/ReturnsManager';
 import SalesHistory from './pages/SalesHistory';
 import CustomerManager from './pages/Customers/CustomerManager';
 import AccountsReceivable from './pages/Credit/AccountsReceivable';
+import UsersManager from './pages/Users/UsersManager';
 import { CartProvider } from './context/CartContext';
 import { CashProvider } from './context/CashContext';
 import { ConfigProvider } from './context/ConfigContext';
@@ -32,25 +34,74 @@ function App() {
             <Router>
               <Routes>
                 <Route path="/login" element={<Login />} />
+                <Route path="/unauthorized" element={<Unauthorized />} />
 
+                {/* Protected Routes */}
                 <Route element={<ProtectedRoute />}>
                   <Route element={<DashboardLayout />}>
                     <Route path="/" element={<Dashboard />} />
-                    <Route path="/products" element={<Products />} />
-                    <Route path="/categories" element={<Categories />} />
-                    <Route path="/inventory" element={<Inventory />} />
+
+                    {/* Inventory - ADMIN or WAREHOUSE */}
+                    <Route path="/products" element={
+                      <ProtectedRoute roles={['ADMIN', 'WAREHOUSE']}>
+                        <Products />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/categories" element={
+                      <ProtectedRoute roles={['ADMIN', 'WAREHOUSE']}>
+                        <Categories />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/inventory" element={
+                      <ProtectedRoute roles={['ADMIN', 'WAREHOUSE']}>
+                        <Inventory />
+                      </ProtectedRoute>
+                    } />
+
+                    {/* Sales - ADMIN or CASHIER */}
+                    <Route path="/pos" element={
+                      <ProtectedRoute roles={['ADMIN', 'CASHIER']}>
+                        <POS />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/sales-history" element={
+                      <ProtectedRoute roles={['ADMIN', 'CASHIER']}>
+                        <SalesHistory />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/returns" element={
+                      <ProtectedRoute roles={['ADMIN', 'CASHIER']}>
+                        <ReturnsManager />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/cash-close" element={
+                      <ProtectedRoute roles={['ADMIN', 'CASHIER']}>
+                        <CashClose />
+                      </ProtectedRoute>
+                    } />
+
+                    {/* Finance - All roles can view */}
+                    <Route path="/customers" element={<CustomerManager />} />
+                    <Route path="/accounts-receivable" element={<AccountsReceivable />} />
+                    <Route path="/suppliers" element={<Suppliers />} />
+                    <Route path="/accounts-payable" element={<AccountsPayable />} />
+
+                    {/* Operations - All roles can view */}
                     <Route path="/purchases" element={<Purchases />} />
                     <Route path="/purchases/create" element={<CreatePurchase />} />
                     <Route path="/purchases/:id" element={<PurchaseDetail />} />
-                    <Route path="/suppliers" element={<Suppliers />} />
-                    <Route path="/accounts-payable" element={<AccountsPayable />} />
-                    <Route path="/customers" element={<CustomerManager />} />
-                    <Route path="/accounts-receivable" element={<AccountsReceivable />} />
-                    <Route path="/returns" element={<ReturnsManager />} />
-                    <Route path="/sales-history" element={<SalesHistory />} />
-                    <Route path="/pos" element={<POS />} />
-                    <Route path="/cash-close" element={<CashClose />} />
-                    <Route path="/settings" element={<Settings />} />
+
+                    {/* Admin Only */}
+                    <Route path="/settings" element={
+                      <ProtectedRoute roles="ADMIN">
+                        <Settings />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/users" element={
+                      <ProtectedRoute roles="ADMIN">
+                        <UsersManager />
+                      </ProtectedRoute>
+                    } />
                   </Route>
                 </Route>
               </Routes>
