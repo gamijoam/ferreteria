@@ -12,6 +12,11 @@ class MovementType(enum.Enum):
     ADJUSTMENT_IN = "ADJUSTMENT_IN"
     ADJUSTMENT_OUT = "ADJUSTMENT_OUT"
 
+class PaymentStatus(enum.Enum):
+    PENDING = "PENDING"
+    PARTIAL = "PARTIAL"
+    PAID = "PAID"
+
 class Category(Base):
     __tablename__ = "categories"
 
@@ -39,6 +44,11 @@ class Supplier(Base):
     notes = Column(Text, nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.datetime.now)
+    
+    # Financial fields for Accounts Payable
+    current_balance = Column(Float, default=0.0)  # Current debt
+    credit_limit = Column(Float, nullable=True)  # Optional credit limit
+    payment_terms = Column(Integer, default=30)  # Payment terms in days
 
     products = relationship("Product", back_populates="supplier")
     purchase_orders = relationship("PurchaseOrder", back_populates="supplier")
@@ -363,41 +373,6 @@ class QuoteDetail(Base):
     def __repr__(self):
         return f"<QuoteDetail(product={self.product_id}, qty={self.quantity})>"
 
-class PurchaseOrder(Base):
-    __tablename__ = "purchase_orders"
-
-    id = Column(Integer, primary_key=True, index=True)
-    supplier_id = Column(Integer, ForeignKey("suppliers.id"), nullable=False)
-    order_date = Column(DateTime, default=datetime.datetime.now)
-    expected_delivery = Column(DateTime, nullable=True)
-    status = Column(String, default="PENDING")  # PENDING, RECEIVED, CANCELLED
-    total_amount = Column(Float, default=0.0)
-    notes = Column(Text, nullable=True)
-    received_date = Column(DateTime, nullable=True)
-    received_by = Column(Integer, ForeignKey("users.id"), nullable=True)
-
-    supplier = relationship("Supplier", back_populates="purchase_orders")
-    details = relationship("PurchaseOrderDetail", back_populates="order")
-
-    def __repr__(self):
-        return f"<PurchaseOrder(id={self.id}, supplier={self.supplier_id}, status='{self.status}')>"
-
-class PurchaseOrderDetail(Base):
-    __tablename__ = "purchase_order_details"
-
-    id = Column(Integer, primary_key=True, index=True)
-    order_id = Column(Integer, ForeignKey("purchase_orders.id"), nullable=False)
-    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
-    quantity = Column(Float, nullable=False)
-    unit_cost = Column(Float, nullable=False)  # Cost per unit
-    subtotal = Column(Float, nullable=False)
-
-    order = relationship("PurchaseOrder", back_populates="details")
-    product = relationship("Product")
-
-    def __repr__(self):
-        return f"<PurchaseOrderDetail(product={self.product_id}, qty={self.quantity}, cost={self.unit_cost})>"
-
 class BusinessConfig(Base):
     __tablename__ = "business_config"
 
@@ -420,6 +395,49 @@ class Currency(Base):
     rate = Column(Float, default=1.0)
     is_anchor = Column(Boolean, default=False)
     is_active = Column(Boolean, default=True)
-
+    
     def __repr__(self):
         return f"<Currency(symbol='{self.symbol}', rate={self.rate})>"
+
+# Purchase Order and Payment Models for Accounts Payable
+
+class PurchaseOrder(Base):
+    __tablename__ = "purchase_orders"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    supplier_id = Column(Integer, ForeignKey("suppliers.id"), nullable=False)
+    purchase_date = Column(DateTime, default=datetime.datetime.now)
+    due_date = Column(DateTime, nullable=True)  # Calculated from purchase_date + payment_terms
+    
+    # Payment tracking
+    total_amount = Column(Float, default=0.0)
+    paid_amount = Column(Float, default=0.0)
+    payment_status = Column(Enum(PaymentStatus), default=PaymentStatus.PENDING)
+    
+    # Additional info
+    invoice_number = Column(String, nullable=True)
+    notes = Column(Text, nullable=True)
+    
+    # Relationships
+    supplier = relationship("Supplier", back_populates="purchase_orders")
+    payments = relationship("PurchasePayment", back_populates="purchase", cascade="all, delete-orphan")
+    
+    def __repr__(self):
+        return f"<PurchaseOrder(id={self.id}, supplier={self.supplier_id}, total={self.total_amount}, status={self.payment_status})>"
+
+class PurchasePayment(Base):
+    __tablename__ = "purchase_payments"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    purchase_id = Column(Integer, ForeignKey("purchase_orders.id"), nullable=False)
+    amount = Column(Float, nullable=False)
+    payment_date = Column(DateTime, default=datetime.datetime.now)
+    payment_method = Column(String, default="Efectivo")  # Efectivo, Transferencia, Cheque
+    reference = Column(String, nullable=True)  # Transfer/check number
+    notes = Column(Text, nullable=True)
+    
+    # Relationship
+    purchase = relationship("PurchaseOrder", back_populates="payments")
+    
+    def __repr__(self):
+        return f"<PurchasePayment(id={self.id}, purchase={self.purchase_id}, amount={self.amount})>"

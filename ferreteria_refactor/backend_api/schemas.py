@@ -489,3 +489,90 @@ class CategoryResponse(CategoryBase):
     
     class Config:
         from_attributes = True
+
+# Supplier Schemas
+
+class SupplierBase(BaseModel):
+    name: str
+    contact_person: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    address: Optional[str] = None
+    notes: Optional[str] = None
+    payment_terms: Optional[int] = 30
+    credit_limit: Optional[float] = None
+
+class SupplierCreate(SupplierBase):
+    pass
+
+class SupplierRead(SupplierBase):
+    id: int
+    is_active: bool
+    created_at: datetime
+    current_balance: float = 0.0
+    
+    class Config:
+        from_attributes = True
+
+# Purchase Order and Payment Schemas
+
+class PurchaseOrderBase(BaseModel):
+    supplier_id: int
+    invoice_number: Optional[str] = None
+    notes: Optional[str] = None
+
+class PurchaseItemCreate(BaseModel):
+    product_id: int
+    quantity: float
+    unit_cost: float
+    update_cost: bool = False
+
+class PurchaseOrderCreate(PurchaseOrderBase):
+    total_amount: float
+    items: List[PurchaseItemCreate] = []
+    payment_type: str = "CREDIT"  # CASH or CREDIT
+
+class PurchaseOrderUpdate(BaseModel):
+    invoice_number: Optional[str] = None
+    notes: Optional[str] = None
+
+class PurchaseOrderResponse(PurchaseOrderBase):
+    id: int
+    purchase_date: datetime
+    due_date: Optional[datetime] = None
+    total_amount: float
+    paid_amount: float
+    payment_status: str
+    supplier: Optional['SupplierRead'] = None  # Include supplier details
+    
+    class Config:
+        from_attributes = True
+
+class PurchasePaymentCreate(BaseModel):
+    amount: float
+    payment_method: str = "Efectivo"
+    reference: Optional[str] = None
+    notes: Optional[str] = None
+
+class PurchasePaymentResponse(BaseModel):
+    id: int
+    purchase_id: int
+    amount: float
+    payment_date: datetime
+    payment_method: str
+    reference: Optional[str] = None
+    notes: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
+class SupplierStatsResponse(BaseModel):
+    supplier_id: int
+    supplier_name: str
+    current_balance: float
+    credit_limit: Optional[float] = None
+    pending_purchases: int
+    total_purchases: int
+    
+    class Config:
+        from_attributes = True

@@ -11,60 +11,116 @@ router = APIRouter(
     tags=["purchases"]
 )
 
-@router.post("/", response_model=schemas.PurchaseOrderRead)
+@router.post("/", response_model=schemas.PurchaseOrderResponse)
 def create_purchase_order(order_data: schemas.PurchaseOrderCreate, db: Session = Depends(get_db)):
-    """Create a new purchase order"""
+    """
+    Create a new purchase order with automatic:
+    - Stock updates
+    - Debt generation (if credit)
+    - Cost price updates
+    """
     try:
-        # Calculate total
-        total = sum(item.quantity * item.unit_cost for item in order_data.items)
+        # Get supplier
+        supplier = db.query(models.Supplier).filter(models.Supplier.id == order_data.supplier_id).first()
+        if not supplier:
+            raise HTTPException(status_code=404, detail="Supplier not found")
         
-        # Create order
-        order = models.PurchaseOrder(
+        # Calculate due date
+        from datetime import datetime, timedelta
+        purchase_date = datetime.now()
+        due_date = purchase_date + timedelta(days=supplier.payment_terms or 30)
+        
+        # Create purchase order
+        purchase = models.PurchaseOrder(
             supplier_id=order_data.supplier_id,
-            total_amount=total,
-            expected_delivery=order_data.expected_delivery,
-            notes=order_data.notes
+            invoice_number=order_data.invoice_number,
+            notes=order_data.notes,
+            total_amount=order_data.total_amount,
+            paid_amount=0.0,
+            payment_status=models.PaymentStatus.PENDING,
+            purchase_date=purchase_date,
+            due_date=due_date
         )
-        db.add(order)
-        db.flush()  # Get order ID
+        db.add(purchase)
+        db.flush()  # Get purchase ID
         
-        # Create details
+        # Process items
         for item in order_data.items:
-            detail = models.PurchaseOrderDetail(
-                order_id=order.id,
-                product_id=item.product_id,
+            product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
+            if not product:
+                continue
+            
+            # Update stock
+            old_stock = product.stock
+            product.stock += item.quantity
+            
+            # Update cost price (weighted average)
+            if item.update_cost:
+                if old_stock == 0:
+                    product.cost_price = item.unit_cost
+                else:
+                    total_value = (product.cost_price * old_stock) + (item.unit_cost * item.quantity)
+                    product.cost_price = total_value / product.stock
+            
+            # Create Kardex entry
+            kardex = models.Kardex(
+                product_id=product.id,
+                movement_type=models.MovementType.PURCHASE,
                 quantity=item.quantity,
-                unit_cost=item.unit_cost,
-                subtotal=item.quantity * item.unit_cost
+                balance_after=product.stock,
+                description=f"Compra #{purchase.id} - {supplier.name}",
+                date=purchase_date
             )
-            db.add(detail)
+            db.add(kardex)
+        
+        # Update supplier balance if credit purchase
+        if order_data.payment_type == 'CREDIT':
+            supplier.current_balance += order_data.total_amount
+        elif order_data.payment_type == 'CASH':
+            # Mark as paid immediately
+            purchase.paid_amount = order_data.total_amount
+            purchase.payment_status = models.PaymentStatus.PAID
         
         db.commit()
-        db.refresh(order)
-        return order
+        db.refresh(purchase)
+        return purchase
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.get("/", response_model=List[schemas.PurchaseOrderRead])
+@router.get("/", response_model=List[schemas.PurchaseOrderResponse])
 def get_all_purchase_orders(status: Optional[str] = None, db: Session = Depends(get_db)):
     """Get all purchase orders, optionally filtered by status"""
     query = db.query(models.PurchaseOrder).options(
-        joinedload(models.PurchaseOrder.supplier),
-        joinedload(models.PurchaseOrder.details).joinedload(models.PurchaseOrderDetail.product)
+        joinedload(models.PurchaseOrder.supplier)
     )
     
     if status:
-        query = query.filter(models.PurchaseOrder.status == status)
+        # Handle multiple statuses separated by comma
+        if ',' in status:
+            statuses = [s.strip() for s in status.split(',')]
+            query = query.filter(models.PurchaseOrder.payment_status.in_(statuses))
+        else:
+            query = query.filter(models.PurchaseOrder.payment_status == status)
     
-    return query.order_by(models.PurchaseOrder.order_date.desc()).all()
+    return query.order_by(models.PurchaseOrder.purchase_date.desc()).all()
 
-@router.get("/{order_id}", response_model=schemas.PurchaseOrderRead)
+@router.get("/pending", response_model=List[schemas.PurchaseOrderResponse])
+def get_pending_purchases(db: Session = Depends(get_db)):
+    """Get all pending and partially paid purchases"""
+    purchases = db.query(models.PurchaseOrder).options(
+        joinedload(models.PurchaseOrder.supplier)
+    ).filter(
+        models.PurchaseOrder.payment_status.in_([models.PaymentStatus.PENDING, models.PaymentStatus.PARTIAL])
+    ).order_by(models.PurchaseOrder.due_date).all()
+    
+    return purchases
+
+@router.get("/{order_id}", response_model=schemas.PurchaseOrderResponse)
 def get_purchase_order(order_id: int, db: Session = Depends(get_db)):
     """Get purchase order by ID"""
     order = db.query(models.PurchaseOrder).options(
-        joinedload(models.PurchaseOrder.supplier),
-        joinedload(models.PurchaseOrder.details).joinedload(models.PurchaseOrderDetail.product)
+        joinedload(models.PurchaseOrder.supplier)
     ).filter(models.PurchaseOrder.id == order_id).first()
     
     if not order:
@@ -72,79 +128,82 @@ def get_purchase_order(order_id: int, db: Session = Depends(get_db)):
     
     return order
 
-@router.post("/{order_id}/receive", response_model=schemas.PurchaseOrderRead)
-def receive_purchase_order(order_id: int, receive_data: schemas.PurchaseOrderReceive, db: Session = Depends(get_db)):
-    """
-    Receive a purchase order:
-    - Update product stock
-    - Update product cost_price
-    - Create Kardex entries
-    - Mark order as RECEIVED
-    """
-    order = db.query(models.PurchaseOrder).filter(models.PurchaseOrder.id == order_id).first()
+# Accounts Payable Endpoints
+
+@router.post("/{purchase_id}/payment", response_model=schemas.PurchasePaymentResponse)
+def register_payment(
+    purchase_id: int,
+    payment_data: schemas.PurchasePaymentCreate,
+    db: Session = Depends(get_db)
+):
+    """Register a payment for a purchase order"""
+    purchase = db.query(models.PurchaseOrder).filter(models.PurchaseOrder.id == purchase_id).first()
     
-    if not order:
+    if not purchase:
         raise HTTPException(status_code=404, detail="Purchase order not found")
     
-    if order.status != "PENDING":
-        raise HTTPException(status_code=400, detail=f"Order is already {order.status}")
+    if purchase.payment_status == models.PaymentStatus.PAID:
+        raise HTTPException(status_code=400, detail="Purchase is already fully paid")
     
     try:
-        for detail in order.details:
-            product = db.query(models.Product).get(detail.product_id)
-            if not product:
-                continue
-            
-            # Update stock
-            old_stock = product.stock
-            product.stock += detail.quantity
-            
-            # Update cost_price with weighted average
-            if product.cost_price == 0:
-                product.cost_price = detail.unit_cost
-            else:
-                total_value = (product.cost_price * old_stock) + (detail.unit_cost * detail.quantity)
-                product.cost_price = total_value / product.stock
-            
-            # Create Kardex entry
-            supplier = db.query(models.Supplier).get(order.supplier_id)
-            kardex = models.Kardex(
-                product_id=product.id,
-                movement_type="PURCHASE",
-                quantity=detail.quantity,
-                balance_after=product.stock,
-                description=f"Recepción OC #{order.id} - {supplier.name if supplier else 'N/A'}",
-                date=datetime.now()
-            )
-            db.add(kardex)
+        # Create payment record
+        payment = models.PurchasePayment(
+            purchase_id=purchase_id,
+            amount=payment_data.amount,
+            payment_method=payment_data.payment_method,
+            reference=payment_data.reference,
+            notes=payment_data.notes
+        )
+        db.add(payment)
         
-        # Mark order as received
-        order.status = "RECEIVED"
-        order.received_date = datetime.now()
-        order.received_by = receive_data.user_id
+        # Update purchase paid amount
+        purchase.paid_amount += payment_data.amount
+        
+        # Update payment status
+        if purchase.paid_amount >= purchase.total_amount:
+            purchase.payment_status = models.PaymentStatus.PAID
+        elif purchase.paid_amount > 0:
+            purchase.payment_status = models.PaymentStatus.PARTIAL
+        
+        # Recalculate supplier balance
+        supplier = db.query(models.Supplier).filter(models.Supplier.id == purchase.supplier_id).first()
+        if supplier:
+            # Recalculate total debt from all pending purchases
+            pending_purchases = db.query(models.PurchaseOrder).filter(
+                models.PurchaseOrder.supplier_id == supplier.id,
+                models.PurchaseOrder.payment_status.in_([models.PaymentStatus.PENDING, models.PaymentStatus.PARTIAL])
+            ).all()
+            
+            supplier.current_balance = sum(
+                (p.total_amount - p.paid_amount) for p in pending_purchases
+            )
         
         db.commit()
-        db.refresh(order)
-        return order
+        db.refresh(payment)
+        return payment
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.delete("/{order_id}")
-def cancel_purchase_order(order_id: int, db: Session = Depends(get_db)):
-    """Cancel a purchase order"""
-    order = db.query(models.PurchaseOrder).filter(models.PurchaseOrder.id == order_id).first()
+@router.get("/{purchase_id}/payments", response_model=List[schemas.PurchasePaymentResponse])
+def get_purchase_payments(purchase_id: int, db: Session = Depends(get_db)):
+    """Get all payments for a purchase order"""
+    purchase = db.query(models.PurchaseOrder).filter(models.PurchaseOrder.id == purchase_id).first()
     
-    if not order:
+    if not purchase:
         raise HTTPException(status_code=404, detail="Purchase order not found")
     
-    if order.status == "RECEIVED":
-        raise HTTPException(status_code=400, detail="Cannot cancel a received order")
+    payments = db.query(models.PurchasePayment).filter(
+        models.PurchasePayment.purchase_id == purchase_id
+    ).order_by(models.PurchasePayment.payment_date.desc()).all()
     
-    try:
-        order.status = "CANCELLED"
-        db.commit()
-        return {"message": "Order cancelled successfully"}
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+    return payments
+
+@router.get("/pending", response_model=List[schemas.PurchaseOrderResponse])
+def get_pending_purchases(db: Session = Depends(get_db)):
+    """Get all pending and partially paid purchases"""
+    purchases = db.query(models.PurchaseOrder).filter(
+        models.PurchaseOrder.payment_status.in_([models.PaymentStatus.PENDING, models.PaymentStatus.PARTIAL])
+    ).order_by(models.PurchaseOrder.due_date).all()
+    
+    return purchases

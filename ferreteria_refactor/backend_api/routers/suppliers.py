@@ -61,3 +61,59 @@ def update_supplier(supplier_id: int, supplier_update: schemas.SupplierCreate, d
     db.commit()
     db.refresh(db_supplier)
     return db_supplier
+
+# Accounts Payable Endpoints
+
+@router.get("/{supplier_id}/stats", response_model=schemas.SupplierStatsResponse)
+def get_supplier_stats(supplier_id: int, db: Session = Depends(get_db)):
+    """Get supplier debt statistics and pending invoices"""
+    supplier = db.query(models.Supplier).filter(models.Supplier.id == supplier_id).first()
+    
+    if not supplier:
+        raise HTTPException(status_code=404, detail="Supplier not found")
+    
+    # Count pending purchases
+    pending_count = db.query(models.PurchaseOrder).filter(
+        models.PurchaseOrder.supplier_id == supplier_id,
+        models.PurchaseOrder.payment_status.in_([models.PaymentStatus.PENDING, models.PaymentStatus.PARTIAL])
+    ).count()
+    
+    # Count total purchases
+    total_count = db.query(models.PurchaseOrder).filter(
+        models.PurchaseOrder.supplier_id == supplier_id
+    ).count()
+    
+    return {
+        "supplier_id": supplier.id,
+        "supplier_name": supplier.name,
+        "current_balance": supplier.current_balance,
+        "credit_limit": supplier.credit_limit,
+        "pending_purchases": pending_count,
+        "total_purchases": total_count
+    }
+
+@router.get("/{supplier_id}/purchases", response_model=List[schemas.PurchaseOrderResponse])
+def get_supplier_purchases(
+    supplier_id: int,
+    status: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """Get purchase history for a supplier"""
+    supplier = db.query(models.Supplier).filter(models.Supplier.id == supplier_id).first()
+    
+    if not supplier:
+        raise HTTPException(status_code=404, detail="Supplier not found")
+    
+    query = db.query(models.PurchaseOrder).filter(
+        models.PurchaseOrder.supplier_id == supplier_id
+    )
+    
+    if status:
+        # Handle multiple statuses separated by comma
+        if ',' in status:
+            statuses = [s.strip() for s in status.split(',')]
+            query = query.filter(models.PurchaseOrder.payment_status.in_(statuses))
+        else:
+            query = query.filter(models.PurchaseOrder.payment_status == status)
+    
+    return query.order_by(models.PurchaseOrder.purchase_date.desc()).all()
