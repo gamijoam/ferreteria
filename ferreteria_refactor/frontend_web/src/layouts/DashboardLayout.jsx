@@ -40,13 +40,11 @@ const DashboardLayout = () => {
                         <ShoppingCart size={20} />
                         <span>Ventas (POS)</span>
                     </Link>
-                    <Link to="/inventory" className="flex items-center space-x-3 p-3 rounded hover:bg-slate-700 transition-colors">
-                        <Warehouse size={20} />
-                        <span>Inventario</span>
+                    <Link to="/inventory" className="flex items-center px-4 py-3 text-gray-300 hover:bg-slate-700 hover:text-white transition-colors">
+                        <Archive className="mr-3" size={20} /> Inventario
                     </Link>
-                    <Link to="/settings" className="flex items-center space-x-3 p-3 rounded hover:bg-slate-700 transition-colors">
-                        <Settings size={20} />
-                        <span>Configuración</span>
+                    <Link to="/settings" className="flex items-center px-4 py-3 text-gray-300 hover:bg-slate-700 hover:text-white transition-colors">
+                        <SettingsIcon className="mr-3" size={20} /> Configuración
                     </Link>
                 </nav>
 
