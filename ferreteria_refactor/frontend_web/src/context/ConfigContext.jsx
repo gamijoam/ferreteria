@@ -1,5 +1,6 @@
 import { createContext, useState, useContext, useEffect } from 'react';
 import configService from '../services/configService';
+import apiClient from '../config/axios';
 
 const ConfigContext = createContext();
 
@@ -15,7 +16,21 @@ export const ConfigProvider = ({ children }) => {
             try {
                 const bizData = await configService.getBusinessInfo();
                 setBusiness(bizData);
-                const currData = await configService.getCurrencies();
+                let currData = await configService.getCurrencies();
+
+                // Fallback to debug endpoint if empty (Safety Net)
+                if (!Array.isArray(currData) || currData.length === 0) {
+                    console.warn("Standard currencies endpoint empty. Trying debug endpoint...");
+                    try {
+                        const debugRes = await apiClient.get('/config/debug/seed');
+                        if (debugRes.data && Array.isArray(debugRes.data.data)) {
+                            currData = debugRes.data.data;
+                        }
+                    } catch (e) {
+                        console.error("Debug endpoint failed too", e);
+                    }
+                }
+
                 setCurrencies(Array.isArray(currData) ? currData : []);
             } catch (apiError) {
                 console.warn("Using mock config data due to API error:", apiError);
@@ -50,13 +65,24 @@ export const ConfigProvider = ({ children }) => {
         return curr ? curr.rate : 1;
     };
 
+    const getActiveCurrencies = () => {
+        return Array.isArray(currencies) ? currencies.filter(c => c.is_active && !c.is_anchor) : [];
+    };
+
+    const convertPrice = (priceInAnchor, targetSymbol) => {
+        const rate = getExchangeRate(targetSymbol);
+        return priceInAnchor * rate;
+    };
+
     return (
         <ConfigContext.Provider value={{
             business,
             currencies,
             loading,
             refreshConfig,
-            getExchangeRate
+            getExchangeRate,
+            getActiveCurrencies,
+            convertPrice
         }}>
             {children}
         </ConfigContext.Provider>

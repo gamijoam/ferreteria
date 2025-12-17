@@ -18,8 +18,25 @@ class ProductBase(BaseModel):
     supplier_id: Optional[int] = None
     location: Optional[str] = None
 
-class ProductCreate(ProductBase):
+class ProductUnitBase(BaseModel):
+    unit_name: str
+    conversion_factor: float
+    barcode: Optional[str] = None
+    price_usd: Optional[float] = None
+    is_default: bool = False
+
+class ProductUnitCreate(ProductUnitBase):
     pass
+
+class ProductUnitRead(ProductUnitBase):
+    id: int
+    product_id: int
+
+    class Config:
+        from_attributes = True
+
+class ProductCreate(ProductBase):
+    units: List[ProductUnitCreate] = []
 
 class ProductUpdate(BaseModel):
     name: Optional[str] = None
@@ -58,6 +75,7 @@ class PriceRuleRead(BaseModel):
 class ProductRead(ProductBase):
     id: int
     price_rules: List[PriceRuleRead] = []
+    units: List[ProductUnitRead] = []
     
     class Config:
         from_attributes = True

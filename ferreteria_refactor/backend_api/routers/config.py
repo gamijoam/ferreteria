@@ -74,10 +74,12 @@ def get_exchange_rate(db: Session = Depends(get_db)):
 
 # Currency Management Endpoints
 
-@router.get("/currencies", response_model=List[schemas.CurrencyRead])
+@router.get("/currencies")
 def get_currencies(db: Session = Depends(get_db)):
     """Get all currencies"""
-    return db.query(models.Currency).all()
+    data = db.query(models.Currency).all()
+    print(f"DEBUG: Returning {len(data)} currencies")
+    return data
 
 @router.post("/currencies", response_model=schemas.CurrencyRead)
 def create_currency(currency: schemas.CurrencyCreate, db: Session = Depends(get_db)):
@@ -144,3 +146,18 @@ def init_currencies(db: Session):
     
     db.commit()
     print("✅ Currencies seeded successfully")
+
+@router.get("/debug/seed")
+def debug_seed_currencies(db: Session = Depends(get_db)):
+    """Force seed check and return status"""
+    count_before = db.query(models.Currency).count()
+    init_currencies(db)
+    count_after = db.query(models.Currency).count()
+    # Also return the actual data to see what the API sees
+    data = db.query(models.Currency).all()
+    return {
+        "count_before": count_before,
+        "count_after": count_after,
+        "seeded": count_after > count_before,
+        "data": data
+    }

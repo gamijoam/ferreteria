@@ -68,12 +68,28 @@ class Product(Base):
     supplier_id = Column(Integer, ForeignKey("suppliers.id"), nullable=True)
 
     category = relationship("Category", back_populates="products")
-    category = relationship("Category", back_populates="products")
     supplier = relationship("Supplier", back_populates="products")
     price_rules = relationship("PriceRule", back_populates="product")
+    units = relationship("ProductUnit", back_populates="product", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Product(name='{self.name}', is_box={self.is_box}, factor={self.conversion_factor})>"
+
+class ProductUnit(Base):
+    __tablename__ = "product_units"
+
+    id = Column(Integer, primary_key=True, index=True)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
+    unit_name = Column(String, nullable=False)  # Ej: "Saco", "Caja", "Gramo"
+    conversion_factor = Column(Float, nullable=False) # Ej: 50.0 (Saco), 0.001 (Gramo)
+    barcode = Column(String, nullable=True) # Código específico de la presentación
+    price_usd = Column(Float, nullable=True) # Precio específico (opcional)
+    is_default = Column(Boolean, default=False)
+
+    product = relationship("Product", back_populates="units")
+
+    def __repr__(self):
+        return f"<ProductUnit(name='{self.unit_name}', factor={self.conversion_factor})>"
 
 class Kardex(Base):
     __tablename__ = "kardex"

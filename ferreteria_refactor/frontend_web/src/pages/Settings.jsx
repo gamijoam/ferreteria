@@ -141,9 +141,9 @@ const Settings = () => {
                                 <tr>
                                     <th className="p-4">Moneda</th>
                                     <th className="p-4">Estado</th>
-                                    <th className="p-4 text-center">Tipo</th>
+                                    <th className="p-4 text-center">Fijar como Base</th>
                                     <th className="p-4">Tasa de Cambio</th>
-                                    <th className="p-4 text-right">Acciones</th>
+                                    <th className="p-4 text-right">Información</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y">
@@ -165,11 +165,18 @@ const Settings = () => {
                                             </button>
                                         </td>
                                         <td className="p-4 text-center">
-                                            {curr.is_anchor ? (
-                                                <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded font-bold border border-blue-200">BASE (USD)</span>
-                                            ) : (
-                                                <span className="text-xs text-gray-500">Secundaria</span>
-                                            )}
+                                            <div
+                                                className={`inline-flex items-center justify-center w-6 h-6 rounded-full border-2 cursor-pointer ${curr.is_anchor ? 'border-blue-600' : 'border-gray-300 hover:border-gray-400'}`}
+                                                onClick={async () => {
+                                                    if (curr.is_anchor) return;
+                                                    if (window.confirm(`⚠️ ADVERTENCIA CRÍTICA ⚠️\n\nAl cambiar la moneda ancla a ${curr.name}, todos los precios base de los productos se asumirán en esta nueva moneda SIN CONVERSIÓN.\n\n¿Estás seguro de que deseas proceder?`)) {
+                                                        await configService.updateCurrency(curr.id, { is_anchor: true, rate: 1.0 });
+                                                        refreshConfig();
+                                                    }
+                                                }}
+                                            >
+                                                {curr.is_anchor && <div className="w-3 h-3 bg-blue-600 rounded-full" />}
+                                            </div>
                                         </td>
                                         <td className="p-4">
                                             <div className="flex items-center">
@@ -193,13 +200,20 @@ const Settings = () => {
                                                 <span className="text-xs text-green-600 font-medium">Editable</span>
                                             )}
                                             {curr.is_anchor && (
-                                                <span className="text-xs text-gray-400">Fija</span>
+                                                <span className="text-xs text-blue-600 font-bold bg-blue-50 px-2 py-1 rounded">ANCLA</span>
                                             )}
                                         </td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
+                        {currencies.length === 0 && (
+                            <div className="p-8 text-center bg-red-50 text-red-600 rounded mt-4">
+                                <p className="font-bold">⚠️ No se encontraron monedas.</p>
+                                <p className="text-sm">Esto puede indicar que el backend no devolvió datos.</p>
+                                <p className="text-xs mt-2 font-mono">{JSON.stringify(currencies)}</p>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

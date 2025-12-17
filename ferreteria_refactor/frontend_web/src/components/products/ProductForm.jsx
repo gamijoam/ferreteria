@@ -1,7 +1,12 @@
 import { useState } from 'react';
 import { X, Plus, Trash2 } from 'lucide-react';
 
+import { useConfig } from '../../context/ConfigContext';
+
 const ProductForm = ({ isOpen, onClose, onSubmit }) => {
+    const { getActiveCurrencies, convertPrice, currencies } = useConfig();
+    const anchorCurrency = currencies.find(c => c.is_anchor) || { symbol: '$' };
+
     const [activeTab, setActiveTab] = useState('info');
     const [formData, setFormData] = useState({
         name: '',
@@ -11,7 +16,11 @@ const ProductForm = ({ isOpen, onClose, onSubmit }) => {
         price: 0,
         margin: 0,
         unit: 'UNID',
-        presentations: []
+        cost: 0,
+        price: 0,
+        margin: 0,
+        unit: 'UNID',
+        units: [] // New standard structure
     });
 
     if (!isOpen) return null;
@@ -36,26 +45,69 @@ const ProductForm = ({ isOpen, onClose, onSubmit }) => {
         });
     };
 
-    const handleAddPresentation = () => {
-        // Simple logic to add a presentation, could be enhanced with a small sub-modal
+    // Unit Management
+    const handleAddUnit = () => {
         const type = window.confirm("¿Es Empaque (Saco, Caja) [OK] o Fracción (Gramo, Metro) [Cancel]?") ? 'packing' : 'fraction';
-        const newPres = {
+        const newUnit = {
             id: Date.now(),
-            name: type === 'packing' ? 'Saco/Caja' : 'Fracción',
-            factor: type === 'packing' ? 50 : 0.001,
-            type
+            unit_name: type === 'packing' ? 'Caja' : 'Gramo',
+            user_input: type === 'packing' ? 12 : 1000, // Visual number
+            conversion_factor: 1, // Calculated later
+            type: type, // packing | fraction
+            barcode: '',
+            price_usd: 0
         };
         setFormData(prev => ({
             ...prev,
-            presentations: [...prev.presentations, newPres]
+            units: [...prev.units, newUnit]
         }));
     };
 
-    const removePresentation = (id) => {
+    const handleUnitChange = (id, field, value) => {
         setFormData(prev => ({
             ...prev,
-            presentations: prev.presentations.filter(p => p.id !== id)
+            units: prev.units.map(u => {
+                if (u.id !== id) return u;
+                return { ...u, [field]: value };
+            })
         }));
+    };
+
+    const removeUnit = (id) => {
+        setFormData(prev => ({
+            ...prev,
+            units: prev.units.filter(u => u.id !== id)
+        }));
+    };
+
+    const handleSubmit = () => {
+        // Prepare Payload
+        const payload = {
+            name: formData.name,
+            sku: formData.sku,
+            category_id: parseInt(formData.category) || null, // Assuming category is ID now, or handle text if needed
+            cost_price: parseFloat(formData.cost),
+            price: parseFloat(formData.price),
+            stock: 0, // Initial stock usually 0 or handled elsewhere
+            // Convert UI units to Backend Schema
+            units: formData.units.map(u => {
+                let factor = parseFloat(u.user_input);
+                if (u.type === 'fraction') {
+                    // Example: 1000g = 1Kg. Factor = 1/1000 = 0.001
+                    factor = factor !== 0 ? 1 / factor : 0;
+                }
+                return {
+                    unit_name: u.unit_name,
+                    conversion_factor: factor,
+                    barcode: u.barcode,
+                    price_usd: parseFloat(u.price_usd) || null,
+                    is_default: false
+                };
+            })
+        };
+
+        console.log("Submitting Payload:", payload);
+        onSubmit(payload);
     };
 
     return (
@@ -114,12 +166,52 @@ const ProductForm = ({ isOpen, onClose, onSubmit }) => {
                         <div className="space-y-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700">Costo ($)</label>
-                                    <input type="number" name="cost" value={formData.cost} onChange={handleInputChange} className="mt-1 block w-full border rounded-md p-2" />
+                                    <label className="block text-sm font-medium text-gray-700">Costo ({anchorCurrency.symbol})</label>
+                                    <div className="relative mt-1 rounded-md shadow-sm">
+                                        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                            <span className="text-gray-500 sm:text-sm">{anchorCurrency.symbol}</span>
+                                        </div>
+                                        <input
+                                            type="number"
+                                            name="cost"
+                                            value={formData.cost}
+                                            onChange={handleInputChange}
+                                            className="block w-full rounded-md border-gray-300 pl-7 p-2 focus:border-blue-500 focus:ring-blue-500 sm:text-sm border"
+                                            placeholder="0.00"
+                                        />
+                                    </div>
+                                    {/* Currency Helper */}
+                                    <div className="mt-1 flex flex-col gap-0.5">
+                                        {getActiveCurrencies().map(curr => (
+                                            <span key={curr.id} className="text-xs text-gray-500">
+                                                ≈ {convertPrice(formData.cost || 0, curr.symbol).toFixed(2)} {curr.symbol}
+                                            </span>
+                                        ))}
+                                    </div>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700">Precio Venta ($)</label>
-                                    <input type="number" name="price" value={formData.price} onChange={handleInputChange} className="mt-1 block w-full border rounded-md p-2" />
+                                    <label className="block text-sm font-medium text-gray-700">Precio Venta ({anchorCurrency.symbol})</label>
+                                    <div className="relative mt-1 rounded-md shadow-sm">
+                                        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                            <span className="text-gray-500 sm:text-sm">{anchorCurrency.symbol}</span>
+                                        </div>
+                                        <input
+                                            type="number"
+                                            name="price"
+                                            value={formData.price}
+                                            onChange={handleInputChange}
+                                            className="block w-full rounded-md border-gray-300 pl-7 p-2 focus:border-blue-500 focus:ring-blue-500 sm:text-sm border"
+                                            placeholder="0.00"
+                                        />
+                                    </div>
+                                    {/* Currency Helper */}
+                                    <div className="mt-1 flex flex-col gap-0.5">
+                                        {getActiveCurrencies().map(curr => (
+                                            <span key={curr.id} className="text-xs text-gray-500">
+                                                ≈ {convertPrice(formData.price || 0, curr.symbol).toFixed(2)} {curr.symbol}
+                                            </span>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
                             <div className="bg-blue-50 p-4 rounded-md">
@@ -141,41 +233,74 @@ const ProductForm = ({ isOpen, onClose, onSubmit }) => {
 
                             <div className="border-t pt-4">
                                 <div className="flex items-center justify-between mb-4">
-                                    <h4 className="font-medium text-gray-800">Presentaciones Adicionales</h4>
-                                    <button onClick={handleAddPresentation} className="text-sm bg-green-100 text-green-700 px-3 py-1 rounded-full flex items-center hover:bg-green-200">
+                                    <h4 className="font-medium text-gray-800">Presentaciones / Unidades</h4>
+                                    <button onClick={handleAddUnit} className="text-sm bg-green-100 text-green-700 px-3 py-1 rounded-full flex items-center hover:bg-green-200">
                                         <Plus size={16} className="mr-1" /> Agregar
                                     </button>
                                 </div>
 
-                                {formData.presentations.length === 0 && (
+                                {formData.units.length === 0 && (
                                     <p className="text-gray-500 text-sm italic">No hay presentaciones adicionales definidas.</p>
                                 )}
 
                                 <div className="space-y-3">
-                                    {formData.presentations.map(pres => (
-                                        <div key={pres.id} className="bg-gray-50 p-3 rounded border flex items-center justify-between">
-                                            <div className="flex-1 grid grid-cols-3 gap-2">
-                                                <input
-                                                    type="text"
-                                                    value={pres.name}
-                                                    className="border rounded p-1 text-sm"
-                                                    placeholder="Nombre (ej: Saco)"
-                                                />
-                                                <input
-                                                    type="number"
-                                                    value={pres.factor}
-                                                    className="border rounded p-1 text-sm"
-                                                    placeholder="Factor"
-                                                />
-                                                <div className="text-xs text-gray-600 flex items-center">
-                                                    {pres.type === 'packing'
-                                                        ? `1 ${pres.name} = ${pres.factor} ${formData.unit}`
-                                                        : `${(1 / pres.factor)} ${pres.name} = 1 ${formData.unit}`}
+                                    {formData.units.map(unit => (
+                                        <div key={unit.id} className="bg-gray-50 p-3 rounded border flex flex-col gap-2">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-xs font-semibold uppercase text-gray-500">{unit.type === 'packing' ? 'Empaque (Contenedor)' : 'Fracción (Sub-unidad)'}</span>
+                                                <button onClick={() => removeUnit(unit.id)} className="text-red-500 hover:text-red-700">
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
+                                            <div className="grid grid-cols-4 gap-2">
+                                                <div className="col-span-1">
+                                                    <label className="text-[10px] text-gray-500 block">Nombre</label>
+                                                    <input
+                                                        type="text"
+                                                        value={unit.unit_name}
+                                                        onChange={(e) => handleUnitChange(unit.id, 'unit_name', e.target.value)}
+                                                        className="border rounded p-1 text-sm w-full"
+                                                        placeholder="Ej: Caja"
+                                                    />
+                                                </div>
+                                                <div className="col-span-1">
+                                                    <label className="text-[10px] text-gray-500 block">
+                                                        {unit.type === 'packing' ? 'Contiene' : 'Equivale a 1/'}
+                                                    </label>
+                                                    <input
+                                                        type="number"
+                                                        value={unit.user_input}
+                                                        onChange={(e) => handleUnitChange(unit.id, 'user_input', e.target.value)}
+                                                        className="border rounded p-1 text-sm w-full"
+                                                        placeholder="Cantidad"
+                                                    />
+                                                </div>
+                                                <div className="col-span-1">
+                                                    <label className="text-[10px] text-gray-500 block">Precio (Opcional)</label>
+                                                    <input
+                                                        type="number"
+                                                        value={unit.price_usd}
+                                                        onChange={(e) => handleUnitChange(unit.id, 'price_usd', e.target.value)}
+                                                        className="border rounded p-1 text-sm w-full"
+                                                        placeholder="$"
+                                                    />
+                                                </div>
+                                                <div className="col-span-1">
+                                                    <label className="text-[10px] text-gray-500 block">Código Barras</label>
+                                                    <input
+                                                        type="text"
+                                                        value={unit.barcode}
+                                                        onChange={(e) => handleUnitChange(unit.id, 'barcode', e.target.value)}
+                                                        className="border rounded p-1 text-sm w-full"
+                                                        placeholder="||||||"
+                                                    />
                                                 </div>
                                             </div>
-                                            <button onClick={() => removePresentation(pres.id)} className="ml-2 text-red-500 hover:text-red-700">
-                                                <Trash2 size={18} />
-                                            </button>
+                                            <div className="text-xs text-blue-600 bg-blue-50 p-1 rounded">
+                                                {unit.type === 'packing'
+                                                    ? `1 ${unit.unit_name} contiene ${unit.user_input} ${formData.unit}s`
+                                                    : `1 ${formData.unit} equivale a ${unit.user_input} ${unit.unit_name}s`}
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
@@ -187,7 +312,7 @@ const ProductForm = ({ isOpen, onClose, onSubmit }) => {
                 {/* Footer */}
                 <div className="p-4 border-t bg-gray-50 flex justify-end space-x-3">
                     <button onClick={onClose} className="px-4 py-2 text-gray-700 hover:text-gray-900 font-medium">Cancelar</button>
-                    <button className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-medium">Guardar Producto</button>
+                    <button onClick={handleSubmit} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-medium">Guardar Producto</button>
                 </div>
             </div>
         </div>

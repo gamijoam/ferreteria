@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { Plus, Search, Package } from 'lucide-react';
 import ProductForm from '../components/products/ProductForm';
+import { useConfig } from '../context/ConfigContext';
 
 const Products = () => {
+    const { getActiveCurrencies, convertPrice } = useConfig();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
 
@@ -66,13 +68,29 @@ const Products = () => {
                                             {product.name.charAt(0)}
                                         </div>
                                         <div className="ml-4">
-                                            <div className="text-sm font-medium text-gray-900">{product.name}</div>
+                                            <div className="text-sm font-medium text-gray-900 flex items-center">
+                                                {product.name}
+                                                {product.units && product.units.length > 0 && (
+                                                    <span className="ml-2 px-2 py-0.5 text-[10px] bg-purple-100 text-purple-700 rounded-full border border-purple-200">
+                                                        Multi-formato
+                                                    </span>
+                                                )}
+                                            </div>
                                             <div className="text-sm text-gray-500">{product.unit}</div>
                                         </div>
                                     </div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{product.sku}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">${product.price.toFixed(2)}</td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                    <div className="text-sm font-semibold text-gray-900">${product.price.toFixed(2)}</div>
+                                    <div className="text-xs text-gray-500 flex flex-col">
+                                        {getActiveCurrencies().map(currency => (
+                                            <span key={currency.id}>
+                                                {convertPrice(product.price, currency.symbol).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency.symbol}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${product.stock > 10 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                                         {product.stock}

@@ -16,10 +16,21 @@ def read_products(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)
 
 @router.post("/", response_model=schemas.ProductRead, dependencies=[Depends(has_role([UserRole.ADMIN, UserRole.WAREHOUSE]))])
 def create_product(product: schemas.ProductCreate, db: Session = Depends(get_db)):
-    db_product = models.Product(**product.dict())
+    # Exclude 'units' from the main Product creation
+    product_data = product.dict(exclude={"units"})
+    db_product = models.Product(**product_data)
     db.add(db_product)
     db.commit()
     db.refresh(db_product)
+
+    # Process Units
+    if product.units:
+        for unit in product.units:
+            db_unit = models.ProductUnit(**unit.dict(), product_id=db_product.id)
+            db.add(db_unit)
+        db.commit()
+        db.refresh(db_product)
+        
     return db_product
 
 @router.put("/{product_id}", response_model=schemas.ProductRead)
@@ -28,10 +39,30 @@ def update_product(product_id: int, product_update: schemas.ProductUpdate, db: S
     if not db_product:
         raise HTTPException(status_code=404, detail="Product not found")
     
+    # Update main fields
     update_data = product_update.dict(exclude_unset=True)
+    
+    # Separate units data if present
+    units_data = None
+    if "units" in update_data:
+        units_data = update_data.pop("units")
+
     for key, value in update_data.items():
         setattr(db_product, key, value)
     
+    # Handle Units Update (Snapshot Strategy: Delete all old, create new)
+    if units_data is not None:
+        # Delete existing units
+        db.query(models.ProductUnit).filter(models.ProductUnit.product_id == product_id).delete()
+        
+        # Add new units
+        for unit in units_data:
+            # We use unit (dict) from the popped data
+            # Note: unit is already a dict if we used .dict(), or we might need to handle Pydantic objects if we didn't
+            # update_data comes from product_update.dict(), so 'units' is a list of dicts.
+            db_unit = models.ProductUnit(**unit, product_id=product_id)
+            db.add(db_unit)
+
     db.commit()
     db.refresh(db_product)
     return db_product

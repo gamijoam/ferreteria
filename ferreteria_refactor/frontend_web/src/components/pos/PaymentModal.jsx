@@ -1,109 +1,179 @@
-import { useState } from 'react';
-import { DollarSign, CreditCard, Banknote, CheckCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { DollarSign, CreditCard, Banknote, CheckCircle, Calculator } from 'lucide-react';
+import { useConfig } from '../../context/ConfigContext';
 
-const PaymentModal = ({ isOpen, onClose, totalUSD, totalBs, onConfirm }) => {
-    const [method, setMethod] = useState('cash_usd');
-    const [amountReceived, setAmountReceived] = useState('');
+const PaymentModal = ({ isOpen, onClose, totalUSD, onConfirm }) => {
+    const { getActiveCurrencies, convertPrice, getExchangeRate } = useConfig();
+    const currencies = [{ id: 'base', symbol: 'USD', name: 'Dólar', rate: 1, is_anchor: true }, ...getActiveCurrencies()];
+
+    // State for multiple payments: [{ amount: 0, currency: 'USD', method: 'Efectivo' }]
+    const [payments, setPayments] = useState([]);
     const [processing, setProcessing] = useState(false);
+
+    // Initialize with one default payment entry
+    useEffect(() => {
+        if (isOpen) {
+            setPayments([{ amount: '', currency: 'USD', method: 'Efectivo' }]);
+        }
+    }, [isOpen]);
 
     if (!isOpen) return null;
 
-    const change = amountReceived ? Number(amountReceived) - totalUSD : 0;
+    // Calculate Totals
+    const totalPaidUSD = payments.reduce((acc, p) => {
+        const amount = parseFloat(p.amount) || 0;
+        const rate = getExchangeRate(p.currency);
+        // If rate is 0 or undefined, avoid division by zero (shouldn't happen with valid config)
+        return acc + (amount / (rate || 1));
+    }, 0);
+
+    const remainingUSD = totalUSD - totalPaidUSD;
+    const changeUSD = totalPaidUSD - totalUSD;
+    const isComplete = remainingUSD <= 0.01; // Tolerance
+
+    const addPaymentRow = () => {
+        setPayments([...payments, { amount: '', currency: 'USD', method: 'Efectivo' }]);
+    };
+
+    const removePaymentRow = (index) => {
+        const newPayments = [...payments];
+        newPayments.splice(index, 1);
+        setPayments(newPayments);
+    };
+
+    const updatePayment = (index, field, value) => {
+        const newPayments = [...payments];
+        newPayments[index][field] = value;
+        setPayments(newPayments);
+    };
 
     const handleConfirm = async () => {
+        if (!isComplete && Math.abs(remainingUSD) > 0.01) return;
         setProcessing(true);
         // Simulate API delay
         await new Promise(r => setTimeout(r, 1000));
-        onConfirm({ method, amountReceived, totalUSD, totalBs });
+
+        // Pass summarized payment data
+        onConfirm({
+            payments,
+            totalPaidUSD,
+            changeUSD: changeUSD > 0 ? changeUSD : 0
+        });
+
         setProcessing(false);
         onClose();
     };
 
     return (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col md:flex-row h-[500px]">
-                {/* Left: Totals */}
-                <div className="bg-slate-900 text-white p-8 md:w-2/5 flex flex-col justify-center relative">
-                    <h3 className="text-gray-400 uppercase text-sm font-bold mb-6">Total a Pagar</h3>
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col md:flex-row h-[600px]">
+                {/* Left: Totals Summary */}
+                <div className="bg-slate-900 text-white p-8 md:w-1/3 flex flex-col relative">
+                    <h3 className="text-gray-400 uppercase text-sm font-bold mb-6">Resumen de Pago</h3>
 
                     <div className="mb-8">
-                        <div className="text-5xl font-bold text-green-400 tracking-tight">${totalUSD.toFixed(2)}</div>
-                        <div className="text-sm text-gray-400 mt-1">Dólares (USD)</div>
+                        <div className="text-sm text-gray-400">Total a Pagar</div>
+                        <div className="text-4xl font-bold text-white tracking-tight">${totalUSD.toFixed(2)}</div>
                     </div>
 
-                    <div>
-                        <div className="text-3xl font-bold text-blue-300 tracking-tight">Bs {totalBs.toFixed(2)}</div>
-                        <div className="text-sm text-gray-400 mt-1">Bolívares (VES)</div>
+                    <div className="space-y-4 mb-8 flex-1 overflow-y-auto">
+                        {currencies.map(curr => (
+                            <div key={curr.symbol} className="flex justify-between items-center border-b border-gray-700 pb-2">
+                                <span className="text-gray-400 text-sm">{curr.name}</span>
+                                <span className="font-mono text-blue-300">
+                                    {convertPrice(totalUSD, curr.symbol).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {curr.symbol}
+                                </span>
+                            </div>
+                        ))}
                     </div>
 
-                    <div className="mt-auto border-t border-slate-700 pt-6">
-                        <div className="text-sm text-gray-400">Tasa de Cambio</div>
-                        <div className="text-xl font-mono">{(totalBs / totalUSD || 0).toFixed(2)} / $</div>
+                    <div className={`mt-auto p-4 rounded-lg ${isComplete ? 'bg-green-600/20 border border-green-500' : 'bg-red-600/20 border border-red-500'}`}>
+                        {isComplete ? (
+                            <div className="text-center">
+                                <div className="text-sm text-green-300 mb-1">Cambio / Vuelto</div>
+                                <div className="text-3xl font-bold text-green-400">${changeUSD.toFixed(2)}</div>
+                            </div>
+                        ) : (
+                            <div className="text-center">
+                                <div className="text-sm text-red-300 mb-1">Faltante</div>
+                                <div className="text-3xl font-bold text-red-400">${remainingUSD.toFixed(2)}</div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
-                {/* Right: Payment Method */}
-                <div className="p-8 md:w-3/5 bg-gray-50 flex flex-col">
-                    <h3 className="text-gray-800 font-bold text-xl mb-6">Método de Pago</h3>
-
-                    <div className="grid grid-cols-2 gap-3 mb-6">
+                {/* Right: Hybrid Payment Form */}
+                <div className="p-8 md:w-2/3 bg-gray-50 flex flex-col">
+                    <div className="flex justify-between items-center mb-6">
+                        <h3 className="text-gray-800 font-bold text-xl flex items-center">
+                            <Banknote className="mr-2" /> Pagos Recibidos
+                        </h3>
                         <button
-                            onClick={() => setMethod('cash_usd')}
-                            className={`p-4 rounded-lg border-2 flex flex-col items-center justify-center transition-all ${method === 'cash_usd' ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}
+                            onClick={addPaymentRow}
+                            className="text-sm bg-blue-100 text-blue-700 px-3 py-1 rounded-full font-bold hover:bg-blue-200 transition"
                         >
-                            <DollarSign size={24} className="mb-2" />
-                            <span className="font-bold text-sm">Efectivo USD</span>
-                        </button>
-                        <button
-                            onClick={() => setMethod('pago_movil')}
-                            className={`p-4 rounded-lg border-2 flex flex-col items-center justify-center transition-all ${method === 'pago_movil' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}
-                        >
-                            <Banknote size={24} className="mb-2" />
-                            <span className="font-bold text-sm">Pago Móvil</span>
-                        </button>
-                        <button
-                            onClick={() => setMethod('zelle')}
-                            className={`p-4 rounded-lg border-2 flex flex-col items-center justify-center transition-all ${method === 'zelle' ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}
-                        >
-                            <CreditCard size={24} className="mb-2" />
-                            <span className="font-bold text-sm">Zelle</span>
-                        </button>
-                        <button
-                            onClick={() => setMethod('point')}
-                            className={`p-4 rounded-lg border-2 flex flex-col items-center justify-center transition-all ${method === 'point' ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}
-                        >
-                            <CreditCard size={24} className="mb-2" />
-                            <span className="font-bold text-sm">Punto Venta</span>
+                            + Agregar Método
                         </button>
                     </div>
 
-                    <div className="mb-6">
-                        <label className="block text-sm font-bold text-gray-700 mb-2">Monto Recibido</label>
-                        <input
-                            type="number"
-                            className="w-full text-2xl p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                            placeholder="0.00"
-                            value={amountReceived}
-                            onChange={(e) => setAmountReceived(e.target.value)}
-                        />
-                        {amountReceived && change >= 0 && (
-                            <div className="mt-2 text-right">
-                                <span className="text-gray-500 text-sm">Vuelto Estimado: </span>
-                                <span className="font-bold text-green-600 text-lg">${change.toFixed(2)}</span>
+                    <div className="flex-1 overflow-y-auto space-y-3 mb-6 pr-2">
+                        {payments.map((payment, index) => (
+                            <div key={index} className="flex gap-2 items-center bg-white p-3 rounded-lg shadow-sm border border-gray-200">
+                                <select
+                                    className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5"
+                                    value={payment.method}
+                                    onChange={(e) => updatePayment(index, 'method', e.target.value)}
+                                >
+                                    <option value="Efectivo">Efectivo</option>
+                                    <option value="Pago Movil">Pago Móvil</option>
+                                    <option value="Punto de Venta">Punto Venta</option>
+                                    <option value="Zelle">Zelle</option>
+                                    <option value="Transferencia">Transferencia</option>
+                                </select>
+
+                                <select
+                                    className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 w-24"
+                                    value={payment.currency}
+                                    onChange={(e) => updatePayment(index, 'currency', e.target.value)}
+                                >
+                                    {currencies.map(c => (
+                                        <option key={c.symbol} value={c.symbol}>{c.symbol}</option>
+                                    ))}
+                                </select>
+
+                                <div className="relative flex-1">
+                                    <input
+                                        type="number"
+                                        className="block w-full p-2.5 text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+                                        placeholder="Monto"
+                                        value={payment.amount}
+                                        onChange={(e) => updatePayment(index, 'amount', e.target.value)}
+                                        autoFocus={index === payments.length - 1} // Autofocus on new rows
+                                    />
+                                </div>
+
+                                {payments.length > 1 && (
+                                    <button
+                                        onClick={() => removePaymentRow(index)}
+                                        className="text-red-400 hover:text-red-600 p-2"
+                                    >
+                                        &times;
+                                    </button>
+                                )}
                             </div>
-                        )}
+                        ))}
                     </div>
 
                     <div className="mt-auto flex justify-end gap-3">
                         <button onClick={onClose} className="px-6 py-3 text-gray-600 font-bold hover:bg-gray-200 rounded-lg">Cancelar</button>
                         <button
                             onClick={handleConfirm}
-                            disabled={processing}
-                            className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg flex items-center justify-center text-lg disabled:opacity-50"
+                            disabled={!isComplete || processing}
+                            className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-lg shadow-lg flex items-center justify-center text-lg"
                         >
                             {processing ? 'Procesando...' : (
                                 <>
-                                    <CheckCircle className="mr-2" /> Finalizar Venta
+                                    <CheckCircle className="mr-2" /> Completar Venta
                                 </>
                             )}
                         </button>
@@ -115,3 +185,4 @@ const PaymentModal = ({ isOpen, onClose, totalUSD, totalBs, onConfirm }) => {
 };
 
 export default PaymentModal;
+

@@ -1,8 +1,9 @@
-
+```
 import { useState, useRef, useEffect } from 'react';
-import { Search, ShoppingCart, Trash2, Edit, AlertCircle } from 'lucide-react';
+import { Search, ShoppingCart, Trash2, Plus, Minus, CreditCard, RotateCcw } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useCash } from '../context/CashContext';
+import { useConfig } from '../context/ConfigContext';
 import { Link } from 'react-router-dom';
 import UnitSelectionModal from '../components/pos/UnitSelectionModal';
 import EditItemModal from '../components/pos/EditItemModal';
@@ -12,12 +13,15 @@ import CashMovementModal from '../components/cash/CashMovementModal';
 import SaleSuccessModal from '../components/pos/SaleSuccessModal';
 
 const POS = () => {
-    const { cart, addToCart, removeFromCart, updateQuantity, clearCart, totalUSD, totalBs } = useCart();
+    const { cart, addToCart, removeFromCart, updateQuantity, clearCart, totalUSD, totalBs, setCart } = useCart();
     const { isSessionOpen, openSession } = useCash();
+    const { getActiveCurrencies, convertPrice, currencies } = useConfig();
+    const anchorCurrency = currencies.find(c => c.is_anchor) || { symbol: '$' };
 
     // UI State
     const [searchTerm, setSearchTerm] = useState('');
-    const [selectedProductForAdd, setSelectedProductForAdd] = useState(null);
+    const [selectedCategory, setSelectedCategory] = useState(null);
+    const [selectedProductForUnits, setSelectedProductForUnits] = useState(null); // For Modal
     const [selectedItemForEdit, setSelectedItemForEdit] = useState(null);
     const [isPaymentOpen, setIsPaymentOpen] = useState(false);
     const [isMovementOpen, setIsMovementOpen] = useState(false);
@@ -35,9 +39,9 @@ const POS = () => {
             unit: 'KG',
             stock: 500,
             exchange_rate: 45,
-            presentations: [
-                { name: 'Saco 50kg', price_usd: 50.00, factor: 50 }, // Bulk price
-                { name: 'Saco 25kg', price_usd: 26.00, factor: 25 }
+            units: [ // Changed from presentations to units
+                { id: 'p1', name: 'Saco 50kg', price: 50.00, factor: 50 }, // Bulk price
+                { id: 'p2', name: 'Saco 25kg', price: 26.00, factor: 25 }
             ]
         },
         {
@@ -55,8 +59,8 @@ const POS = () => {
             unit: 'M3',
             stock: 100,
             exchange_rate: 45,
-            presentations: [
-                { name: 'Camión 7m3', price_usd: 120.00, factor: 7 }
+            units: [ // Changed from presentations to units
+                { id: 'p3', name: 'Camión 7m3', price: 120.00, factor: 7 }
             ]
         },
         { id: 4, name: 'Tubería PVC 1/2', price: 4.00, unit: 'Tubo', exchange_rate: 45 },
@@ -69,17 +73,76 @@ const POS = () => {
     );
 
     const handleProductClick = (product) => {
-        if (product.presentations && product.presentations.length > 0) {
-            setSelectedProductForAdd(product);
-        } else {
-            // Direct add base unit
-            addToCart(product, {
-                name: product.unit,
-                price_usd: product.price,
-                factor: 1,
-                is_base: true
-            });
+        // Multi-Unit Logic
+        if (product.units && product.units.length > 0) {
+            setSelectedProductForUnits(product);
+            return;
         }
+        
+        // Classic Logic (Base Unit)
+        addBaseProductToCart(product);
+    };
+
+    const addBaseProductToCart = (product) => {
+        setCart(currentCart => {
+            const existingItem = currentCart.find(item => item.id === product.id && item.unit_id === null); // Check unit_id null
+            
+            if (existingItem) {
+                return currentCart.map(item =>
+                    (item.id === product.id && item.unit_id === null)
+                        ? { ...item, quantity: item.quantity + 1, quantity_to_deduct: (item.quantity + 1) * 1 }
+                        : item
+                );
+            }
+
+            return [...currentCart, {
+                ...product,
+                quantity: 1,
+                // Multi-unit fields (Base)
+                unit_id: null,
+                unit_name: product.unit || 'Unidad',
+                conversion_factor: 1,
+                quantity_to_deduct: 1,
+                price_unit_usd: product.price
+            }];
+        });
+    };
+
+    const handleUnitSelect = (unitOption) => {
+        if (!selectedProductForUnits) return;
+        const product = selectedProductForUnits;
+
+        setCart(currentCart => {
+            // Check if this specific combo (Product + Unit) exists
+            const existingItem = currentCart.find(item => item.id === product.id && item.unit_id === unitOption.id);
+            
+            if (existingItem) {
+                return currentCart.map(item =>
+                    (item.id === product.id && item.unit_id === unitOption.id)
+                        ? { 
+                            ...item, 
+                            quantity: item.quantity + 1,
+                            quantity_to_deduct: (item.quantity + 1) * unitOption.factor
+                          }
+                        : item
+                );
+            }
+
+            return [...currentCart, {
+                ...product, // ID, Name, etc from parent
+                quantity: 1,
+                // Overwrite price with unit price
+                price: unitOption.price, 
+                // Multi-unit fields
+                unit_id: unitOption.id,
+                unit_name: unitOption.name,
+                conversion_factor: unitOption.factor,
+                quantity_to_deduct: 1 * unitOption.factor,
+                price_unit_usd: unitOption.price
+            }];
+        });
+        
+        setSelectedProductForUnits(null); // Close modal
     };
 
     const handleCheckout = (paymentData) => {
@@ -137,9 +200,9 @@ const POS = () => {
                                 <span className="block text-right text-lg font-bold text-blue-600">
                                     ${product.price.toFixed(2)}
                                 </span>
-                                {product.presentations?.length > 0 && (
+                                {product.units?.length > 0 && (
                                     <span className="block text-right text-xs text-orange-500 font-medium">
-                                        + {product.presentations.length} Presentaciones
+                                        + {product.units.length} Presentaciones
                                     </span>
                                 )}
                             </div>
@@ -185,15 +248,17 @@ const POS = () => {
                     )}
                     {cart.map(item => (
                         <div
-                            key={item.id}
+                            key={item.id + (item.unit_id || '')}
                             onClick={() => setSelectedItemForEdit(item)}
                             className="flex justify-between items-center p-3 hover:bg-blue-50 cursor-pointer rounded-lg border-b border-gray-100 last:border-0 transition-colors group"
                         >
                             <div className="flex-1">
                                 <div className="font-medium text-gray-800 leading-snug">{item.name}</div>
                                 <div className="text-xs text-gray-500 flex gap-2">
-                                    <span className="bg-blue-100 text-blue-700 px-1.5 rounded">{item.unit_name}</span>
-                                    <span>${item.unit_price_usd.toFixed(2)}</span>
+                                    <span className="bg-blue-100 text-blue-700 px-1.5 rounded">
+                                        {item.unit_name} {item.unit_id && `(x${ item.conversion_factor })`}
+                                    </span>
+                                    <span>${item.price_unit_usd.toFixed(2)}</span>
                                 </div>
                             </div>
                             <div className="flex flex-col items-end">
@@ -206,15 +271,21 @@ const POS = () => {
 
                 {/* Footer Totals */}
                 <div className="bg-gray-50 p-4 border-t-2 border-slate-200">
-                    <div className="space-y-1 mb-4">
-                        <div className="flex justify-between items-end">
-                            <span className="text-gray-500 text-sm font-medium">Subtotal USD</span>
-                            <span className="text-xl font-bold text-gray-800">${totalUSD.toFixed(2)}</span>
+                    <div className="space-y-2 mb-4">
+                        {/* Base Currency (Anchor) */}
+                        <div className="flex justify-between items-end border-b pb-2">
+                            <span className="text-gray-500 text-sm font-medium">Total ({anchorCurrency.symbol})</span>
+                            <span className="text-3xl font-bold text-gray-800">{anchorCurrency.symbol}{totalUSD.toFixed(2)}</span>
                         </div>
-                        <div className="flex justify-between items-end">
-                            <span className="text-gray-500 text-sm font-medium">Total Bolívares</span>
-                            <span className="text-lg font-bold text-blue-600">Bs {totalBs.toFixed(2)}</span>
-                        </div>
+                        {/* Other Currencies */}
+                        {getActiveCurrencies().map(curr => (
+                            <div key={curr.id} className="flex justify-between items-end">
+                                <span className="text-gray-500 text-xs font-medium">Total {curr.name}</span>
+                                <span className="text-lg font-bold text-blue-600 font-mono">
+                                    {curr.symbol} {convertPrice(totalUSD, curr.symbol).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </span>
+                            </div>
+                        ))}
                     </div>
 
                     <button
@@ -265,6 +336,13 @@ const POS = () => {
             {!isSessionOpen && (
                 <CashOpeningModal onOpen={openSession} />
             )}
+            {/* Modals */}
+            <UnitSelectionModal 
+                isOpen={!!selectedProductForUnits}
+                onClose={() => setSelectedProductForUnits(null)}
+                product={selectedProductForUnits}
+                onSelect={handleUnitSelect}
+            />
         </div>
     );
 };
