@@ -1,10 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Search, Calendar, Trash2, Eye, Printer, AlertTriangle, X } from 'lucide-react';
+import { Search, Calendar, Trash2, Eye, Printer, AlertTriangle, X, FileText } from 'lucide-react';
 import apiClient from '../config/axios';
 import { useAuth } from '../context/AuthContext';
+import { useConfig } from '../context/ConfigContext';
+import { pdf } from '@react-pdf/renderer';
+import InvoicePDF from '../components/pdf/InvoicePDF';
 
 const SalesHistory = () => {
     const { user } = useAuth();
+    const { business } = useConfig();
     const [sales, setSales] = useState([]);
     const [filteredSales, setFilteredSales] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -142,6 +146,17 @@ const SalesHistory = () => {
             } else {
                 setPinError(error.response?.data?.detail || 'Error al anular venta');
             }
+        }
+    };
+
+    const handlePrintPDF = async (sale) => {
+        try {
+            const blob = await pdf(<InvoicePDF sale={sale} business={business} />).toBlob();
+            const url = URL.createObjectURL(blob);
+            window.open(url, '_blank');
+        } catch (error) {
+            console.error('Error generating PDF:', error);
+            alert('Error al generar el PDF');
         }
     };
 
@@ -347,6 +362,13 @@ const SalesHistory = () => {
                                             >
                                                 <Eye size={18} />
                                             </button>
+                                            <button
+                                                onClick={() => handlePrintPDF(sale)}
+                                                className="p-2 text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                                                title="PDF Nota de Entrega"
+                                            >
+                                                <FileText size={18} />
+                                            </button>
                                             {sale.status !== 'VOIDED' && (
                                                 <button
                                                     onClick={() => handleVoidClick(sale)}
@@ -425,6 +447,13 @@ const SalesHistory = () => {
                         </div>
 
                         <div className="p-6 border-t flex gap-3">
+                            <button
+                                onClick={() => handlePrintPDF(selectedSale)}
+                                className="flex-1 px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium flex items-center justify-center transition-colors"
+                            >
+                                <FileText className="mr-2" size={20} />
+                                Generar PDF
+                            </button>
                             <button
                                 onClick={() => handleReprint(selectedSale)}
                                 className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium flex items-center justify-center transition-colors"

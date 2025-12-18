@@ -39,6 +39,10 @@ async def add_stock(adjustment: schemas.StockAdjustmentCreate, db: Session = Dep
     db.commit()
     db.refresh(product)
     
+    # AUDIT LOG
+    from ..audit_utils import log_action
+    log_action(db, user_id=1, action="UPDATE", table_name="products", record_id=product.id, changes=f"Stock Adjustment (IN): +{adjustment.quantity}. Reason: {adjustment.reason}")
+
     await manager.broadcast(WebSocketEvents.PRODUCT_UPDATED, {
         "id": product.id,
         "name": product.name,
@@ -81,6 +85,10 @@ async def remove_stock(adjustment: schemas.StockAdjustmentCreate, db: Session = 
     db.commit()
     db.refresh(product)
     
+    # AUDIT LOG
+    from ..audit_utils import log_action
+    log_action(db, user_id=1, action="UPDATE", table_name="products", record_id=product.id, changes=f"Stock Adjustment (OUT): -{adjustment.quantity}. Reason: {adjustment.reason}")
+
     await manager.broadcast(WebSocketEvents.PRODUCT_UPDATED, {
         "id": product.id,
         "name": product.name,

@@ -472,5 +472,23 @@ class PurchasePayment(Base):
     # Relationship
     purchase = relationship("PurchaseOrder", back_populates="payments")
     
+    
     def __repr__(self):
         return f"<PurchasePayment(id={self.id}, purchase={self.purchase_id}, amount={self.amount})>"
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True) # Nullable for system actions or if user deleted
+    action = Column(String, nullable=False) # CREATE, UPDATE, DELETE, LOGIN
+    table_name = Column(String, nullable=False)
+    record_id = Column(Integer, nullable=True)
+    changes = Column(Text, nullable=True) # JSON String
+    ip_address = Column(String, nullable=True)
+    timestamp = Column(DateTime, default=datetime.datetime.now)
+
+    user = relationship("User")
+
+    def __repr__(self):
+        return f"<AuditLog(action='{self.action}', table='{self.table_name}')>"

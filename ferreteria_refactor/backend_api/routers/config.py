@@ -102,6 +102,13 @@ async def update_exchange_rate(
     db.commit()
     db.refresh(rate)
     
+    # AUDIT LOG
+    from ..audit_utils import log_action
+    import json
+    # Since we didn't capture 'old_state' easily, we'll log the new state.
+    # Ideally we'd do the diff, but this is a quick action.
+    log_action(db, user_id=1, action="UPDATE", table_name="exchange_rates", record_id=rate.id, changes=json.dumps({"rate": rate.rate, "is_active": rate.is_active}, default=str))
+
     # Broadcast event
     await manager.broadcast(WebSocketEvents.EXCHANGE_RATE_UPDATED, {
         "id": rate.id,

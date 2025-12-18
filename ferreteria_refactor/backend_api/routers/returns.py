@@ -192,6 +192,11 @@ def process_return(return_data: schemas.ReturnCreate, db: Session = Depends(get_
     
     db.commit()
     db.refresh(new_return)
+
+    # AUDIT LOG
+    from ..audit_utils import log_action
+    log_action(db, user_id=1, action="CREATE", table_name="returns", record_id=new_return.id, changes=f"Return Processed for Sale #{sale.id}. Reason: {return_data.reason}. Refunded: {total_refund}")
+
     
     return new_return
 

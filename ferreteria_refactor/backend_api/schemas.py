@@ -649,3 +649,26 @@ class BusinessInfo(BaseModel):
     website: Optional[str] = ""
     logo_url: Optional[str] = "" # URL for displayed logo
 
+# ========================
+# Audit Log Schemas
+# ========================
+
+class AuditLogBase(BaseModel):
+    action: str
+    table_name: str
+    record_id: Optional[int] = None
+    changes: Optional[str] = None
+    timestamp: Optional[datetime] = None
+    ip_address: Optional[str] = None
+
+class AuditLogCreate(AuditLogBase):
+    user_id: Optional[int] = None
+
+class AuditLogRead(AuditLogBase):
+    id: int
+    user_id: Optional[int] = None
+    user: Optional[UserRead] = None
+
+    class Config:
+        from_attributes = True
+

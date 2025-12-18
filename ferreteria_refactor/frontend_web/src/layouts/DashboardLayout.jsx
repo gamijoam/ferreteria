@@ -21,7 +21,8 @@ import {
     ChevronDown,
     ChevronRight,
     Users,
-    FileText
+    FileText,
+    ClipboardList
 } from 'lucide-react';
 
 const DashboardLayout = () => {
@@ -202,6 +203,10 @@ const DashboardLayout = () => {
                         <Link to="/cash-history" className={`flex items-center space-x-3 p-3 rounded transition-colors ${isActive('/cash-history') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
                             <History size={20} />
                             <span>Historial de Caja</span>
+                        </Link>
+                        <Link to="/audit-logs" className={`flex items-center space-x-3 p-3 rounded transition-colors ${isActive('/audit-logs') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
+                            <ClipboardList size={20} />
+                            <span>Auditoría</span>
                         </Link>
                     </RoleGuard>
 

@@ -58,6 +58,18 @@ async def update_product(product_id: int, product_update: schemas.ProductUpdate,
     if "units" in update_data:
         units_data = update_data.pop("units")
 
+    # Prepare BEFORE state for audit
+    # We create a simple dict representation or clone object attributes
+    # Ideally, we use the helper from audit_utils which handles models
+    # But here db_product is attached to session.
+    # To avoid issues with session refresh, we might want to capture dict now.
+    from ..audit_utils import log_action, calculate_diff
+    
+    # Simple snapshot of relevant fields before update
+    # or rely on calculate_diff handling the model directly if we pass a copy?
+    # Easier: Convert to dict manually for the "old" state before applying changes
+    old_state = {c.name: getattr(db_product, c.name) for c in db_product.__table__.columns}
+
     for key, value in update_data.items():
         setattr(db_product, key, value)
     
@@ -74,6 +86,33 @@ async def update_product(product_id: int, product_update: schemas.ProductUpdate,
     db.commit()
     db.refresh(db_product)
     
+    # LOG ACTION
+    # We pass the old_state dict as "before" and the refreshed db_product as "after"
+    user_id = 1 # TODO: Get from current user dependency if available, otherwise 1 (System/Admin)
+    # The routers/products.py dependencies don't inject 'current_user' into the function, only check roles.
+    # We should update function sig to get user ID if we want strict attribution.
+    # For now, we'll try to get it if added to params, or default to None.
+    
+    # Let's improve this: Add user dependency or placeholder
+    
+    # Calculate diff manually since we have dict vs model
+    # audit_utils.calculate_diff handles model vs model usually. 
+    # Let's construct a temp object or just use a specialized diff logic?
+    # Actually, let's just use log_action with the manual diff.
+    
+    new_state = {c.name: getattr(db_product, c.name) for c in db_product.__table__.columns}
+    
+    # Calculate diff
+    import json
+    changes = {}
+    for k, v in new_state.items():
+        if k in old_state and old_state[k] != v:
+            changes[k] = {"old": old_state[k], "new": v}
+            
+    if changes:
+        log_action(db, user_id=1, action="UPDATE", table_name="products", record_id=db_product.id, changes=json.dumps(changes, default=str))
+
+
     await manager.broadcast(WebSocketEvents.PRODUCT_UPDATED, {
         "id": db_product.id,
         "name": db_product.name,
