@@ -15,7 +15,7 @@ venv.bak/
 # Distribution / Build
 build/
 dist/
-*.spec
+!frontend_web/dist/
 
 # IDEs
 .vscode/
