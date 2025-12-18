@@ -1,364 +1,269 @@
-import { useState } from 'react';
-import { Package, Tag, Trash2, AlertCircle, Plus, DollarSign, TrendingUp } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Layers, Plus, Trash2, ArrowRight, Package, Divide, Bitcoin, Info } from 'lucide-react';
 
-/**
- * ProductUnitManager - Dedicated component for managing product units/presentations
- * Provides an intuitive wizard interface with visual feedback
- */
-const ProductUnitManager = ({
-    units = [],
-    onUnitsChange,
-    baseUnitType = 'UNID',
-    basePrice = 0,
-    exchangeRates = [],
-    productExchangeRateId = null
-}) => {
-    // Wizard state
-    const [wizardData, setWizardData] = useState({
+const ProductUnitManager = ({ units, onUnitsChange, baseUnitType, basePrice, exchangeRates, productExchangeRateId }) => {
+    const [isWizardOpen, setIsWizardOpen] = useState(false);
+    const [wizardStep, setWizardStep] = useState(1); // 1: Type, 2: Details
+
+    // Wizard State
+    const [newUnit, setNewUnit] = useState({
         unit_name: '',
-        type: 'packing', // 'packing' or 'fraction'
-        user_input: '',
-        price_usd: '',
+        type: 'packing', // 'packing' | 'fraction'
+        user_input: 1, // The factor user types (e.g. 12 or 1000)
         barcode: '',
-        exchange_rate_id: null
+        price_usd: '',
+        exchange_rate_id: ''
     });
 
     const resetWizard = () => {
-        setWizardData({
+        setNewUnit({
             unit_name: '',
             type: 'packing',
-            user_input: '',
-            price_usd: '',
+            user_input: 1,
             barcode: '',
-            exchange_rate_id: null
+            price_usd: '',
+            exchange_rate_id: ''
         });
-    };
-
-    const handleWizardChange = (field, value) => {
-        setWizardData(prev => ({ ...prev, [field]: value }));
+        setWizardStep(1);
+        setIsWizardOpen(false);
     };
 
     const handleAddUnit = () => {
-        // Validation
-        if (!wizardData.unit_name.trim()) {
-            alert('Por favor ingresa un nombre para la presentación');
-            return;
-        }
-        if (!wizardData.user_input || parseFloat(wizardData.user_input) <= 0) {
-            alert('Por favor ingresa una cantidad válida');
-            return;
+        // Calculate conversion factor based on type
+        let finalFactor = parseFloat(newUnit.user_input);
+        if (newUnit.type === 'fraction') {
+            finalFactor = finalFactor !== 0 ? 1 / finalFactor : 0;
         }
 
-        // Calculate conversion factor
-        let conversionFactor;
-        if (wizardData.type === 'packing') {
-            conversionFactor = parseFloat(wizardData.user_input);
-        } else {
-            conversionFactor = 1 / parseFloat(wizardData.user_input);
-        }
-
-        const newUnit = {
-            id: Date.now(), // Temporary ID for local state
-            unit_name: wizardData.unit_name.trim(),
-            type: wizardData.type,
-            user_input: parseFloat(wizardData.user_input),
-            conversion_factor: conversionFactor,
-            price_usd: wizardData.price_usd ? parseFloat(wizardData.price_usd) : 0,
-            barcode: wizardData.barcode.trim(),
-            exchange_rate_id: wizardData.exchange_rate_id || null
+        const unitToAdd = {
+            id: Date.now(),
+            unit_name: newUnit.unit_name,
+            user_input: parseFloat(newUnit.user_input),
+            conversion_factor: finalFactor,
+            type: newUnit.type,
+            barcode: newUnit.barcode,
+            price_usd: parseFloat(newUnit.price_usd) || 0,
+            exchange_rate_id: newUnit.exchange_rate_id ? parseInt(newUnit.exchange_rate_id) : null
         };
 
-        // Add to units array
-        onUnitsChange([...units, newUnit]);
+        onUnitsChange([...units, unitToAdd]);
         resetWizard();
     };
 
-    const handleDeleteUnit = (unitId) => {
-        // CRITICAL FIX: Filter out the unit by ID
-        const updatedUnits = units.filter(u => u.id !== unitId);
-        onUnitsChange(updatedUnits);
-    };
-
-    // Calculate displayed price for a unit
-    const calculateDisplayPrice = (unit) => {
-        if (unit.price_usd && unit.price_usd > 0) {
-            return unit.price_usd;
-        }
-        return basePrice * unit.conversion_factor;
-    };
-
-    // Get exchange rate name
-    const getExchangeRateName = (rateId) => {
-        if (!rateId) return 'Heredar del Producto';
-        const rate = exchangeRates.find(r => r.id === rateId);
-        return rate ? `${rate.name} (${rate.currency_code})` : 'Tasa Desconocida';
-    };
-
-    // Visual formula text
-    const getFormulaText = () => {
-        if (!wizardData.user_input || parseFloat(wizardData.user_input) <= 0) {
-            return 'Ingresa una cantidad para ver la fórmula';
-        }
-
-        const quantity = parseFloat(wizardData.user_input);
-        const unitName = wizardData.unit_name || 'Presentación';
-
-        if (wizardData.type === 'packing') {
-            return `Esto significa que 1 ${unitName} descontará ${quantity} ${baseUnitType} del inventario.`;
+    // Derived Logic for Feedback
+    const feedbackMessage = useMemo(() => {
+        const val = parseFloat(newUnit.user_input) || 0;
+        if (newUnit.type === 'packing') {
+            return `Entendido: Al vender 1 ${newUnit.unit_name || '[Nueva Unidad]'}, se descontarán ${val} ${baseUnitType} del inventario.`;
         } else {
-            return `Esto significa que 1 ${baseUnitType} equivale a ${quantity} ${unitName}s.`;
+            return `Entendido: 1 ${newUnit.unit_name || '[Nueva Unidad]'} equivale a una fracción 1/${val} de ${baseUnitType}.`;
         }
-    };
+    }, [newUnit.user_input, newUnit.type, newUnit.unit_name, baseUnitType]);
 
-    return (
-        <div className="space-y-6">
-            {/* Wizard Panel */}
-            <div className="bg-gradient-to-br from-indigo-50 to-purple-50 p-6 rounded-2xl border-2 border-indigo-200 shadow-sm">
-                <h3 className="text-lg font-black text-indigo-900 mb-4 flex items-center gap-2">
-                    <Plus className="text-indigo-600" size={22} />
-                    Crear Nueva Presentación
-                </h3>
+    // Render Wizard
+    const renderWizard = () => (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-fade-in-up">
+                <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6 text-white">
+                    <h3 className="text-xl font-bold flex items-center">
+                        <Layers className="mr-2" /> Agregar Nueva Presentación
+                    </h3>
+                    <p className="text-blue-100 text-sm mt-1">Paso {wizardStep} de 2: {wizardStep === 1 ? 'Tipo de Unidad' : 'Detalles'}</p>
+                </div>
 
-                <div className="space-y-4">
-                    {/* Unit Name */}
-                    <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-2">
-                            Nombre de la Presentación
-                        </label>
-                        <input
-                            type="text"
-                            value={wizardData.unit_name}
-                            onChange={(e) => handleWizardChange('unit_name', e.target.value)}
-                            className="w-full border-2 border-indigo-200 rounded-xl p-3 text-gray-800 font-medium focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none"
-                            placeholder="Ej: Caja, Saco, Gramo, Metro..."
-                        />
-                    </div>
+                <div className="p-8">
+                    {wizardStep === 1 ? (
+                        <div className="space-y-4">
+                            <p className="text-gray-600 mb-4 font-medium">¿Qué tipo de unidad deseas agregar?</p>
 
-                    {/* Type Selector */}
-                    <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-3">
-                            Tipo de Relación
-                        </label>
-                        <div className="grid grid-cols-2 gap-3">
                             <button
-                                type="button"
-                                onClick={() => handleWizardChange('type', 'packing')}
-                                className={`p-4 rounded-xl border-2 transition-all ${wizardData.type === 'packing'
-                                        ? 'border-purple-500 bg-purple-100 shadow-md'
-                                        : 'border-gray-200 bg-white hover:border-purple-300'
-                                    }`}
+                                onClick={() => { setNewUnit({ ...newUnit, type: 'packing' }); setWizardStep(2); }}
+                                className="w-full p-4 border-2 border-gray-200 hover:border-blue-500 hover:bg-blue-50 rounded-xl transition-all flex items-center group text-left"
                             >
-                                <Package className={`mx-auto mb-2 ${wizardData.type === 'packing' ? 'text-purple-600' : 'text-gray-400'}`} size={28} />
-                                <p className={`text-sm font-bold ${wizardData.type === 'packing' ? 'text-purple-900' : 'text-gray-600'}`}>
-                                    EMPAQUE
-                                </p>
-                                <p className="text-xs text-gray-500 mt-1">Contiene X unidades</p>
+                                <div className="bg-blue-100 text-blue-600 p-3 rounded-lg mr-4 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                                    <Package size={24} />
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-gray-800">Unidad de Empaque (Mayorista)</h4>
+                                    <p className="text-sm text-gray-500">Ej: Caja de 12, Bulto de 50. Contiene múltiples unidades base.</p>
+                                </div>
                             </button>
 
                             <button
-                                type="button"
-                                onClick={() => handleWizardChange('type', 'fraction')}
-                                className={`p-4 rounded-xl border-2 transition-all ${wizardData.type === 'fraction'
-                                        ? 'border-orange-500 bg-orange-100 shadow-md'
-                                        : 'border-gray-200 bg-white hover:border-orange-300'
-                                    }`}
+                                onClick={() => { setNewUnit({ ...newUnit, type: 'fraction' }); setWizardStep(2); }}
+                                className="w-full p-4 border-2 border-gray-200 hover:border-indigo-500 hover:bg-indigo-50 rounded-xl transition-all flex items-center group text-left"
                             >
-                                <Tag className={`mx-auto mb-2 ${wizardData.type === 'fraction' ? 'text-orange-600' : 'text-gray-400'}`} size={28} />
-                                <p className={`text-sm font-bold ${wizardData.type === 'fraction' ? 'text-orange-900' : 'text-gray-600'}`}>
-                                    FRACCIÓN
-                                </p>
-                                <p className="text-xs text-gray-500 mt-1">Es parte de la unidad</p>
+                                <div className="bg-indigo-100 text-indigo-600 p-3 rounded-lg mr-4 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                                    <Divide size={24} />
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-gray-800">Unidad Fraccionaria (Menudeo)</h4>
+                                    <p className="text-sm text-gray-500">Ej: Gramos, Mililitros. Es una parte de la unidad base.</p>
+                                </div>
                             </button>
                         </div>
-                    </div>
-
-                    {/* Quantity Input */}
-                    <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-2">
-                            {wizardData.type === 'packing'
-                                ? `¿Cuántas ${baseUnitType}s contiene?`
-                                : `¿Cuántos ${wizardData.unit_name || 'unidades'} hay en 1 ${baseUnitType}?`
-                            }
-                        </label>
-                        <input
-                            type="number"
-                            step="0.01"
-                            value={wizardData.user_input}
-                            onChange={(e) => handleWizardChange('user_input', e.target.value)}
-                            className={`w-full border-2 rounded-xl p-3 text-2xl font-black text-center outline-none focus:ring-4 ${wizardData.type === 'packing'
-                                    ? 'border-purple-300 text-purple-700 focus:border-purple-500 focus:ring-purple-100'
-                                    : 'border-orange-300 text-orange-700 focus:border-orange-500 focus:ring-orange-100'
-                                }`}
-                            placeholder="0"
-                        />
-                    </div>
-
-                    {/* Visual Formula */}
-                    <div className={`p-4 rounded-xl border-2 ${wizardData.type === 'packing' ? 'bg-purple-50 border-purple-200' : 'bg-orange-50 border-orange-200'
-                        }`}>
-                        <div className="flex items-start gap-2">
-                            <AlertCircle className={wizardData.type === 'packing' ? 'text-purple-600' : 'text-orange-600'} size={20} />
-                            <p className={`text-sm font-bold ${wizardData.type === 'packing' ? 'text-purple-900' : 'text-orange-900'}`}>
-                                {getFormulaText()}
-                            </p>
-                        </div>
-                    </div>
-
-                    {/* Optional Fields */}
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-xs font-bold text-gray-600 uppercase mb-2">
-                                💵 Precio Específico (Opcional)
-                            </label>
-                            <div className="relative">
-                                <span className="absolute left-3 top-3 text-gray-400 font-bold">$</span>
+                    ) : (
+                        <div className="space-y-5 animate-fade-in-right">
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">Nombre de la Unidad</label>
                                 <input
-                                    type="number"
-                                    step="0.01"
-                                    value={wizardData.price_usd}
-                                    onChange={(e) => handleWizardChange('price_usd', e.target.value)}
-                                    className="w-full pl-8 border-gray-200 rounded-xl p-3 text-sm focus:border-green-400 focus:ring-4 focus:ring-green-100 outline-none"
-                                    placeholder="Auto"
+                                    autoFocus
+                                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                    placeholder={newUnit.type === 'packing' ? "Ej: Caja, Bulto, Paquete" : "Ej: Gramo, Metro"}
+                                    value={newUnit.unit_name}
+                                    onChange={e => setNewUnit({ ...newUnit, unit_name: e.target.value })}
                                 />
                             </div>
+
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">
+                                    {newUnit.type === 'packing' ? `¿Cuántos ${baseUnitType} contiene?` : `¿En cuántas partes se divide 1 ${baseUnitType}?`}
+                                </label>
+                                <div className="flex items-center">
+                                    <input
+                                        type="number"
+                                        className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono font-bold text-lg"
+                                        value={newUnit.user_input}
+                                        onChange={e => setNewUnit({ ...newUnit, user_input: e.target.value })}
+                                    />
+                                </div>
+                                <div className="mt-2 text-xs bg-blue-50 text-blue-700 p-3 rounded-lg flex items-start">
+                                    <Info size={16} className="mr-2 mt-0.5 flex-shrink-0" />
+                                    <span>{feedbackMessage}</span>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-1">Precio USD (Opcional)</label>
+                                    <input
+                                        type="number"
+                                        className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                        placeholder="0.00"
+                                        value={newUnit.price_usd}
+                                        onChange={e => setNewUnit({ ...newUnit, price_usd: e.target.value })}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-1">Código Barra</label>
+                                    <input
+                                        className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                        placeholder="SCAN..."
+                                        value={newUnit.barcode}
+                                        onChange={e => setNewUnit({ ...newUnit, barcode: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">Tasa de Cambio Específica</label>
+                                <select
+                                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                    value={newUnit.exchange_rate_id}
+                                    onChange={e => setNewUnit({ ...newUnit, exchange_rate_id: e.target.value })}
+                                >
+                                    <option value="">-- Automático / Heredado --</option>
+                                    {exchangeRates.map(r => (
+                                        <option key={r.id} value={r.id}>{r.name} ({r.currency_code})</option>
+                                    ))}
+                                </select>
+                            </div>
                         </div>
+                    )}
+                </div>
 
-                        <div>
-                            <label className="block text-xs font-bold text-gray-600 uppercase mb-2">
-                                💱 Tasa de Cambio
-                            </label>
-                            <select
-                                value={wizardData.exchange_rate_id || ''}
-                                onChange={(e) => handleWizardChange('exchange_rate_id', e.target.value ? parseInt(e.target.value) : null)}
-                                className="w-full border-gray-200 rounded-xl p-3 text-sm focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 outline-none"
-                            >
-                                <option value="">🔗 Heredar</option>
-                                {exchangeRates.map(rate => (
-                                    <option key={rate.id} value={rate.id}>
-                                        {rate.name} - {rate.currency_code}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                    </div>
-
-                    <div>
-                        <label className="block text-xs font-bold text-gray-600 uppercase mb-2">
-                            📟 Código de Barras (Opcional)
-                        </label>
-                        <input
-                            type="text"
-                            value={wizardData.barcode}
-                            onChange={(e) => handleWizardChange('barcode', e.target.value)}
-                            className="w-full border-gray-200 rounded-xl p-3 text-sm font-mono focus:border-blue-400 focus:ring-4 focus:ring-blue-100 outline-none"
-                            placeholder="Escanea o ingresa manualmente..."
-                        />
-                    </div>
-
-                    {/* Add Button */}
-                    <button
-                        type="button"
-                        onClick={handleAddUnit}
-                        className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold py-4 rounded-xl shadow-lg transition-all hover:-translate-y-0.5 flex items-center justify-center gap-2"
-                    >
-                        <Plus size={20} />
-                        Agregar Presentación
-                    </button>
+                <div className="bg-gray-50 p-5 flex justify-end gap-3 border-t">
+                    {wizardStep === 2 && (
+                        <button onClick={() => setWizardStep(1)} className="px-5 py-2 text-gray-600 hover:bg-gray-200 rounded-lg font-medium transition-colors">Atrás</button>
+                    )}
+                    <button onClick={resetWizard} className="px-5 py-2 text-red-600 hover:bg-red-50 rounded-lg font-medium transition-colors">Cancelar</button>
+                    {wizardStep === 1 ? (
+                        null
+                    ) : (
+                        <button
+                            disabled={!newUnit.unit_name || !newUnit.user_input}
+                            onClick={handleAddUnit}
+                            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-lg transition-all transform active:scale-95 disabled:opacity-50 disabled:scale-100"
+                        >
+                            Guardar Unidad
+                        </button>
+                    )}
                 </div>
             </div>
+        </div>
+    );
 
-            {/* Units List (Cards) */}
-            <div>
-                <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                    <Package className="text-blue-600" size={22} />
-                    Presentaciones Creadas ({units.length})
-                </h3>
+    return (
+        <div className="max-w-4xl mx-auto space-y-6 animate-fade-in-up">
+            <div className="flex items-center justify-between">
+                <div>
+                    <h3 className="text-xl font-bold text-gray-800">Unidades y Presentaciones</h3>
+                    <p className="text-gray-500 text-sm">Administra cajas, bultos y fracciones para este producto.</p>
+                </div>
+                <button
+                    onClick={() => setIsWizardOpen(true)}
+                    className="bg-gray-900 hover:bg-gray-800 text-white px-5 py-2.5 rounded-xl font-semibold shadow-lg shadow-gray-200 transition-all flex items-center"
+                >
+                    <Plus size={18} className="mr-2" /> Agregar Unidad
+                </button>
+            </div>
 
-                {units.length === 0 ? (
-                    <div className="text-center py-12 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
-                        <Package className="mx-auto text-gray-300 mb-3" size={48} />
-                        <p className="text-gray-400 font-medium">No hay presentaciones adicionales</p>
-                        <p className="text-xs text-gray-400 mt-2">Solo se venderá por {baseUnitType}</p>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {units.map(unit => (
-                            <div
-                                key={unit.id}
-                                className={`relative bg-white p-5 rounded-2xl border-2 shadow-sm hover:shadow-md transition-all ${unit.type === 'packing' ? 'border-purple-200' : 'border-orange-200'
-                                    }`}
-                            >
-                                {/* Delete Button */}
+            {units.length === 0 ? (
+                <div className="text-center py-12 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
+                    <Layers className="mx-auto text-gray-300 mb-4" size={48} />
+                    <p className="text-gray-500 font-medium">Solo se vende por unidad base ({baseUnitType}).</p>
+                    <p className="text-sm text-gray-400 mt-2">Agrega presentaciones si vendes cajas o fracciones.</p>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {units.map((unit) => (
+                        <div key={unit.id} className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow relative group">
+                            <div className="flex justify-between items-start mb-3">
+                                <div className="flex items-center gap-3">
+                                    <div className={`p-2 rounded-lg ${unit.type === 'packing' ? 'bg-blue-100 text-blue-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                                        {unit.type === 'packing' ? <Package size={20} /> : <Divide size={20} />}
+                                    </div>
+                                    <div>
+                                        <h4 className="font-bold text-gray-900">{unit.unit_name}</h4>
+                                        <span className="text-xs uppercase font-bold tracking-wider text-gray-400">
+                                            {unit.type === 'packing' ? 'Empaque' : 'Fracción'}
+                                        </span>
+                                    </div>
+                                </div>
                                 <button
-                                    type="button"
-                                    onClick={() => handleDeleteUnit(unit.id)}
-                                    className="absolute top-3 right-3 p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                                    title="Eliminar presentación"
+                                    onClick={() => onUnitsChange(units.filter(u => u.id !== unit.id))}
+                                    className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
                                 >
                                     <Trash2 size={18} />
                                 </button>
-
-                                {/* Header */}
-                                <div className="flex items-center gap-3 mb-3 pr-10">
-                                    <span className={`px-3 py-1 text-xs font-black uppercase rounded-lg ${unit.type === 'packing'
-                                            ? 'bg-purple-600 text-white'
-                                            : 'bg-orange-600 text-white'
-                                        }`}>
-                                        {unit.type === 'packing' ? '📦' : '✂️'}
-                                    </span>
-                                    <h4 className="text-lg font-bold text-gray-800">{unit.unit_name}</h4>
-                                </div>
-
-                                {/* Formula Badge */}
-                                <div className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-bold mb-3 ${unit.type === 'packing' ? 'bg-purple-100 text-purple-700' : 'bg-orange-100 text-orange-700'
-                                    }`}>
-                                    <TrendingUp size={14} />
-                                    {unit.type === 'packing'
-                                        ? `×${unit.user_input} ${baseUnitType}`
-                                        : `÷${unit.user_input}`
-                                    }
-                                </div>
-
-                                {/* Price Display */}
-                                <div className="mb-3">
-                                    <p className="text-xs text-gray-500 font-medium mb-1">Precio Calculado</p>
-                                    <p className="text-2xl font-black text-green-600 flex items-center gap-1">
-                                        <DollarSign size={20} />
-                                        {calculateDisplayPrice(unit).toFixed(2)}
-                                    </p>
-                                    {unit.price_usd > 0 && (
-                                        <span className="text-xs text-green-600 font-medium">✓ Precio Fijo</span>
-                                    )}
-                                </div>
-
-                                {/* Exchange Rate */}
-                                <div className="text-xs text-gray-600 border-t pt-2 space-y-1">
-                                    <p>
-                                        <span className="font-bold">Tasa:</span> {getExchangeRateName(unit.exchange_rate_id)}
-                                    </p>
-                                    {unit.barcode && (
-                                        <p>
-                                            <span className="font-bold">Código:</span> <span className="font-mono">{unit.barcode}</span>
-                                        </p>
-                                    )}
-                                </div>
                             </div>
-                        ))}
-                    </div>
-                )}
-            </div>
 
-            {/* Help Section */}
-            <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4">
-                <h5 className="font-bold text-blue-900 mb-2 flex items-center gap-2 text-sm">
-                    <AlertCircle size={16} />
-                    ¿Cuándo usar cada tipo?
-                </h5>
-                <div className="space-y-1 text-xs text-blue-800">
-                    <p><span className="font-bold text-purple-700">📦 EMPAQUE:</span> Cajas, Sacos, Pallets (múltiples unidades juntas).</p>
-                    <p><span className="font-bold text-orange-700">✂️ FRACCIÓN:</span> Gramos, Metros, Litros (partes de la unidad base).</p>
+                            <div className="space-y-2 text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
+                                <div className="flex justify-between">
+                                    <span>Factor:</span>
+                                    <span className="font-mono font-bold">
+                                        {unit.type === 'packing' ? `x${unit.user_input}` : `1/${unit.user_input}`}
+                                    </span>
+                                </div>
+                                {unit.price_usd > 0 && (
+                                    <div className="flex justify-between text-green-700">
+                                        <span>Precio Fijo USD:</span>
+                                        <span className="font-bold">${unit.price_usd.toFixed(2)}</span>
+                                    </div>
+                                )}
+                                {unit.barcode && (
+                                    <div className="flex justify-between">
+                                        <span>Barcode:</span>
+                                        <span className="font-mono">{unit.barcode}</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    ))}
                 </div>
-            </div>
+            )}
+
+            {isWizardOpen && renderWizard()}
         </div>
     );
 };

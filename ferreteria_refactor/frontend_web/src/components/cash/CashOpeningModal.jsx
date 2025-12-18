@@ -9,15 +9,34 @@ const CashOpeningModal = ({ onOpen }) => {
 
     useEffect(() => {
         // Get active currencies including USD base
-        const activeCurr = [
+        const rawCurrencies = [
             { symbol: 'USD', name: 'Dólar' },
             ...getActiveCurrencies()
         ];
-        setCurrencies(activeCurr);
+
+        // DEDUPLICATION LOGIC:
+        // Group by symbol (e.g. "Bs"). If multiple rates exist for "Bs", we only want ONE input field.
+        const uniqueSymbols = new Set();
+        const uniqueCurrencies = [];
+
+        rawCurrencies.forEach(c => {
+            // Normalize symbol
+            const sym = (c.symbol || c.currency_symbol || '').trim();
+            if (sym && !uniqueSymbols.has(sym)) {
+                uniqueSymbols.add(sym);
+                uniqueCurrencies.push({
+                    ...c,
+                    symbol: sym, // Ensure consistent property
+                    name: c.name
+                });
+            }
+        });
+
+        setCurrencies(uniqueCurrencies);
 
         // Initialize amounts to 0
         const initialAmounts = {};
-        activeCurr.forEach(curr => {
+        uniqueCurrencies.forEach(curr => {
             initialAmounts[curr.symbol] = '';
         });
         setAmounts(initialAmounts);

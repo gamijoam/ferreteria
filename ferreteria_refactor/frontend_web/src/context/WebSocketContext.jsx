@@ -1,38 +1,47 @@
-import { createContext, useContext, useEffect, useState, useRef } from 'react';
+import { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
+import apiClient from '../config/axios';
 
 const WebSocketContext = createContext(null);
 
 export const WebSocketProvider = ({ children }) => {
-    const [isConnected, setIsConnected] = useState(false);
+    const [status, setStatus] = useState('DISCONNECTED'); // CONNECTED, DISCONNECTED, RECONNECTING
     const ws = useRef(null);
     const listeners = useRef({});
     const reconnectTimeout = useRef(null);
-    const maxRetries = 10;
+    const pingInterval = useRef(null);
     const retryCount = useRef(0);
+    const maxRetries = 10;
+    const isMounting = useRef(true);
 
-    const connect = () => {
-        // Close existing connection if any
-        if (ws.current) {
-            ws.current.close();
-            ws.current = null;
+    const connect = useCallback(() => {
+        // Prevent multiple connections
+        if (ws.current && (ws.current.readyState === WebSocket.OPEN || ws.current.readyState === WebSocket.CONNECTING)) {
+            return;
         }
 
-        // Connect to WebSocket
-        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        // In development we use localhost:8000, in prod we might use relative path
-        const wsUrl = `ws://localhost:8000/api/v1/ws`;
+        // Calculate URL
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        // Use the base URL from axios config or default
+        const baseUrl = apiClient.defaults.baseURL
+            ? apiClient.defaults.baseURL.replace('http', 'ws')
+            : 'ws://127.0.0.1:8000/api/v1';
 
-        console.log(`🔌 Attempting WebSocket connection to ${wsUrl}...`);
+        // Ensure /ws endpoint
+        const wsUrl = baseUrl.endsWith('/ws') ? baseUrl : `${baseUrl}/ws`;
+
+        console.log(`🔌 WS: Connecting to ${wsUrl} (Attempt ${retryCount.current + 1})`);
+        setStatus(retryCount.current > 0 ? 'RECONNECTING' : 'DISCONNECTED'); // Visual state
 
         ws.current = new WebSocket(wsUrl);
 
         ws.current.onopen = () => {
-            console.log('✅ WebSocket Connected Successfully');
-            setIsConnected(true);
+            console.log('✅ WS: Connected');
+            setStatus('CONNECTED');
             retryCount.current = 0;
 
-            // Send ping every 30 seconds to keep connection alive
-            setInterval(() => {
+            // Start Ping Heartbeat
+            if (pingInterval.current) clearInterval(pingInterval.current);
+            pingInterval.current = setInterval(() => {
                 if (ws.current?.readyState === WebSocket.OPEN) {
                     ws.current.send('ping');
                 }
@@ -41,99 +50,85 @@ export const WebSocketProvider = ({ children }) => {
 
         ws.current.onmessage = (event) => {
             if (event.data === 'pong') return;
-
             try {
                 const message = JSON.parse(event.data);
                 const { type, data } = message;
 
-                // Log received event
-                console.log(`📡 WebSocket Event Received: ${type}`, data);
-
-                // Notify all listeners for this event type
                 if (listeners.current[type]) {
-                    listeners.current[type].forEach(callback => {
-                        try {
-                            callback(data);
-                        } catch (err) {
-                            console.error(`Error in listener for ${type}:`, err);
-                        }
-                    });
+                    listeners.current[type].forEach(cb => cb(data));
                 }
             } catch (err) {
-                console.warn('Received non-JSON message:', event.data);
+                console.warn('WS: Non-JSON message', event.data);
             }
         };
 
         ws.current.onclose = () => {
-            console.log('❌ WebSocket Disconnected');
-            setIsConnected(false);
+            console.log('❌ WS: Disconnected');
+            setStatus('DISCONNECTED');
+            if (pingInterval.current) clearInterval(pingInterval.current);
 
-            // Attempt Reconnect with exponential backoff
-            if (retryCount.current < maxRetries) {
-                const timeout = Math.min(1000 * Math.pow(2, retryCount.current), 30000);
-                console.log(`Reconnecting in ${timeout}ms (Attempt ${retryCount.current + 1}/${maxRetries})`);
+            // Exponential Backoff Reconnect
+            if (ws.current) { // Only reconnect if not manually closed (cleaned up)
+                const delay = Math.min(1000 * Math.pow(2, retryCount.current), 30000);
+                console.log(`🔄 WS: Reconnecting in ${delay}ms...`);
 
+                if (reconnectTimeout.current) clearTimeout(reconnectTimeout.current);
                 reconnectTimeout.current = setTimeout(() => {
                     retryCount.current++;
                     connect();
-                }, timeout);
+                }, delay);
             }
         };
 
-        ws.current.onerror = (error) => {
-            console.error('WebSocket Error. Check backend is running.');
-            // setIsConnected(false); // onerror is usually followed by onclose
+        ws.current.onerror = (err) => {
+            console.error('WS: Error', err);
+            ws.current.close(); // Force close to trigger onclose logic
         };
-    };
+
+    }, []);
 
     useEffect(() => {
         connect();
 
         return () => {
+            console.log('🛑 WS: Cleanup');
+            isMounting.current = false;
+            // Prevent reconnect loops
+            if (reconnectTimeout.current) clearTimeout(reconnectTimeout.current);
+            if (pingInterval.current) clearInterval(pingInterval.current);
+
             if (ws.current) {
+                // Remove onclose listener to prevent reconnect trigger during unmount
+                ws.current.onclose = null;
                 ws.current.close();
-            }
-            if (reconnectTimeout.current) {
-                clearTimeout(reconnectTimeout.current);
+                ws.current = null;
             }
         };
-    }, []);
+    }, [connect]);
 
-    const subscribe = (eventType, callback) => {
+    const subscribe = useCallback((eventType, callback) => {
         if (!listeners.current[eventType]) {
             listeners.current[eventType] = [];
         }
         listeners.current[eventType].push(callback);
-        console.log(`🎧 Subscribed to ${eventType}`);
 
-        // Return unsubscribe function
+        // Unsubscribe function
         return () => {
             if (listeners.current[eventType]) {
-                listeners.current[eventType] = listeners.current[eventType].filter(
-                    cb => cb !== callback
-                );
-                console.log(`🔕 Unsubscribed from ${eventType}`);
+                listeners.current[eventType] = listeners.current[eventType].filter(cb => cb !== callback);
             }
         };
-    };
+    }, []);
 
     return (
-        <WebSocketContext.Provider value={{ isConnected, subscribe }}>
+        <WebSocketContext.Provider value={{ status, subscribe }}>
             {children}
-            {/* Connection Status Indicator */}
-            {!isConnected && (
-                <div className="fixed bottom-0 right-0 m-4 p-2 bg-red-500 text-white text-xs rounded shadow-lg z-50">
-                    🔴 Sin conexión en tiempo real
-                </div>
-            )}
         </WebSocketContext.Provider>
     );
 };
 
 export const useWebSocket = () => {
     const context = useContext(WebSocketContext);
-    if (!context) {
-        throw new Error('useWebSocket must be used within a WebSocketProvider');
-    }
+    if (!context) throw new Error('useWebSocket must be used within WebSocketProvider');
     return context;
 };

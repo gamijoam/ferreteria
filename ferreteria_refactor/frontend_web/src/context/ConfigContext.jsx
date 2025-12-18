@@ -121,7 +121,15 @@ export const ConfigProvider = ({ children }) => {
 
     // Helper to get Exchange Rate by Currency Code (Symbol or ID preferably)
     const getExchangeRate = (symbol) => {
-        const curr = currencies.find(c => c.symbol === symbol);
+        if (!symbol) return 1;
+        const normalize = s => String(s).trim().toUpperCase();
+        const target = normalize(symbol);
+
+        const curr = currencies.find(c =>
+            normalize(c.symbol) === target ||
+            normalize(c.currency_symbol) === target ||
+            normalize(c.currency_code) === target
+        );
         return curr ? curr.rate : 1;
     };
 
@@ -134,21 +142,40 @@ export const ConfigProvider = ({ children }) => {
         // Deduplicate by currency_code (group multiple rates for same physical currency)
         const uniqueByCurrencyCode = {};
         activeCurrencies.forEach(curr => {
-            const code = curr.currency_code || curr.symbol;
-            // If we haven't seen this currency code yet, or if this one is the default rate, use it
-            if (!uniqueByCurrencyCode[code] || curr.is_default) {
-                uniqueByCurrencyCode[code] = {
-                    id: curr.id,
-                    name: curr.name || code,
-                    symbol: curr.currency_symbol || curr.symbol,
-                    currency_code: code,
-                    currency_symbol: curr.currency_symbol || curr.symbol,
-                    rate: curr.rate,
-                    is_active: curr.is_active,
-                    is_default: curr.is_default
-                };
+            // Normalize Code/Symbol to handle "VES" vs "VES " mismatches
+            const code = (curr.currency_code || curr.symbol || '').trim().toUpperCase();
+
+            // PRIORITY LOGIC:
+            // 1. Current iteration IS default -> Overwrite everything.
+            // 2. We don't have this code yet -> Add it.
+            // 3. We have it (non-default), and current (non-default) has HIGHER rate -> Upgrade to higher rate (heuristic).
+
+            const existing = uniqueByCurrencyCode[code];
+
+            if (curr.is_default) {
+                // Priority 1: Default always wins
+                uniqueByCurrencyCode[code] = { ...formatCurrency(curr, code) };
+            } else if (!existing) {
+                // Priority 2: New entry
+                uniqueByCurrencyCode[code] = { ...formatCurrency(curr, code) };
+            } else if (!existing.is_default && curr.rate > existing.rate) {
+                // Priority 3: Higher rate wins among non-defaults
+                uniqueByCurrencyCode[code] = { ...formatCurrency(curr, code) };
             }
         });
+
+        function formatCurrency(c, code) {
+            return {
+                id: c.id,
+                name: c.name || code,
+                symbol: (c.currency_symbol || c.symbol || '').trim(),
+                currency_code: code,
+                currency_symbol: (c.currency_symbol || c.symbol || '').trim(),
+                rate: c.rate,
+                is_active: c.is_active,
+                is_default: c.is_default
+            };
+        }
 
         // Return array of unique currencies
         return Object.values(uniqueByCurrencyCode);

@@ -466,6 +466,7 @@ const POS = () => {
                 isOpen={isPaymentOpen}
                 totalUSD={totalUSD}
                 totalBs={totalBs}
+                totalsByCurrency={totalsByCurrency} // Pass calculated totals
                 cart={cart}
                 onClose={() => setIsPaymentOpen(false)}
                 onConfirm={handleCheckout}

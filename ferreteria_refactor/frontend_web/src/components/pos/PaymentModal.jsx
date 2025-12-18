@@ -3,7 +3,7 @@ import { DollarSign, CreditCard, Banknote, CheckCircle, Calculator, Users, X } f
 import { useConfig } from '../../context/ConfigContext';
 import apiClient from '../../config/axios';
 
-const PaymentModal = ({ isOpen, onClose, totalUSD, cart, onConfirm }) => {
+const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onConfirm }) => {
     const { getActiveCurrencies, convertPrice, getExchangeRate } = useConfig();
     const currencies = [{ id: 'base', symbol: 'USD', name: 'Dólar', rate: 1, is_anchor: true }, ...getActiveCurrencies()];
 
@@ -133,14 +133,26 @@ const PaymentModal = ({ isOpen, onClose, totalUSD, cart, onConfirm }) => {
                     </div>
 
                     <div className="space-y-4 mb-8 flex-1 overflow-y-auto">
-                        {currencies.map(curr => (
-                            <div key={curr.symbol} className="flex justify-between items-center border-b border-gray-700 pb-2">
-                                <span className="text-gray-400 text-sm">{curr.name}</span>
-                                <span className="font-mono text-blue-300">
-                                    {convertPrice(totalUSD, curr.symbol).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {curr.symbol}
-                                </span>
-                            </div>
-                        ))}
+                        <div className="space-y-4 mb-8 flex-1 overflow-y-auto">
+                            {currencies.map(curr => {
+                                // If it's the anchor currency (USD), show totalUSD directly
+                                const amount = curr.is_anchor
+                                    ? totalUSD
+                                    : (totalsByCurrency?.[curr.currency_code] || 0);
+
+                                return (
+                                    <div key={curr.symbol} className="flex justify-between items-center border-b border-gray-700 pb-2">
+                                        <span className="text-gray-400 text-sm">{curr.name}</span>
+                                        <span className="font-mono text-blue-300 flex flex-col items-end">
+                                            <span>{amount.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {curr.symbol}</span>
+                                            {curr.symbol !== 'USD' && (
+                                                <span className="text-xs text-gray-500">Tasa Ref: {curr.rate.toLocaleString('es-VE')}</span>
+                                            )}
+                                        </span>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
 
                     {!isCreditSale && (
@@ -303,8 +315,8 @@ const PaymentModal = ({ isOpen, onClose, totalUSD, cart, onConfirm }) => {
                             onClick={handleConfirm}
                             disabled={processing || (!isCreditSale && !isComplete) || (isCreditSale && !selectedCustomer)}
                             className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 ${processing || (!isCreditSale && !isComplete) || (isCreditSale && !selectedCustomer)
-                                    ? 'bg-gray-300 cursor-not-allowed'
-                                    : 'bg-green-600 hover:bg-green-700 text-white'
+                                ? 'bg-gray-300 cursor-not-allowed'
+                                : 'bg-green-600 hover:bg-green-700 text-white'
                                 }`}
                         >
                             {processing ? (

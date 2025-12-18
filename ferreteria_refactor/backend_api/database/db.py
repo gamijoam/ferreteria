@@ -6,6 +6,7 @@ from ..config import settings
 engine = create_engine(
     settings.DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in settings.DATABASE_URL else {}
 )
+print(f"DEBUG: settings.DATABASE_URL repr: {repr(settings.DATABASE_URL)}")
 print(f"DATABASE CONNECTED TO: {settings.DATABASE_URL.split('@')[-1] if '@' in settings.DATABASE_URL else settings.DATABASE_URL}")
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
