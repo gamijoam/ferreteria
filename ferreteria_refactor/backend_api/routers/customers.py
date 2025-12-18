@@ -4,6 +4,8 @@ from typing import List, Optional
 from ..database.db import get_db
 from ..models import models
 from .. import schemas
+from ..websocket.manager import manager
+from ..websocket.events import WebSocketEvents
 
 router = APIRouter(
     prefix="/customers",
@@ -27,7 +29,7 @@ def read_customers(
     return query.offset(skip).limit(limit).all()
 
 @router.post("/", response_model=schemas.CustomerRead)
-def create_customer(customer: schemas.CustomerCreate, db: Session = Depends(get_db)):
+async def create_customer(customer: schemas.CustomerCreate, db: Session = Depends(get_db)):
     # Check duplicate ID
     if customer.id_number:
         exists = db.query(models.Customer).filter(models.Customer.id_number == customer.id_number).first()
@@ -38,10 +40,19 @@ def create_customer(customer: schemas.CustomerCreate, db: Session = Depends(get_
     db.add(db_customer)
     db.commit()
     db.refresh(db_customer)
+    
+    # Broadcast customer created
+    await manager.broadcast(WebSocketEvents.CUSTOMER_CREATED, {
+        "id": db_customer.id,
+        "name": db_customer.name,
+        "id_number": db_customer.id_number,
+        "credit_limit": float(db_customer.credit_limit) if db_customer.credit_limit else 0.0
+    })
+    
     return db_customer
 
 @router.put("/{customer_id}", response_model=schemas.CustomerRead)
-def update_customer(customer_id: int, customer_data: schemas.CustomerCreate, db: Session = Depends(get_db)):
+async def update_customer(customer_id: int, customer_data: schemas.CustomerCreate, db: Session = Depends(get_db)):
     db_customer = db.query(models.Customer).filter(models.Customer.id == customer_id).first()
     if not db_customer:
         raise HTTPException(status_code=404, detail="Customer not found")
@@ -51,8 +62,15 @@ def update_customer(customer_id: int, customer_data: schemas.CustomerCreate, db:
         
     db.commit()
     db.refresh(db_customer)
-    db.commit()
-    db.refresh(db_customer)
+    
+    # Broadcast customer updated
+    await manager.broadcast(WebSocketEvents.CUSTOMER_UPDATED, {
+        "id": db_customer.id,
+        "name": db_customer.name,
+        "id_number": db_customer.id_number,
+        "credit_limit": float(db_customer.credit_limit) if db_customer.credit_limit else 0.0
+    })
+    
     return db_customer
 
 @router.get("/{customer_id}/debt")

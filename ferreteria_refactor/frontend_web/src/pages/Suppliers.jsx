@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Building2, Phone, Mail, CreditCard } from 'lucide-react';
+import { useWebSocket } from '../context/WebSocketContext';
 import apiClient from '../config/axios';
 
 const Suppliers = () => {
+    const { subscribe } = useWebSocket();
     const [suppliers, setSuppliers] = useState([]);
     const [showModal, setShowModal] = useState(false);
     const [editingSupplier, setEditingSupplier] = useState(null);
@@ -10,7 +12,21 @@ const Suppliers = () => {
 
     useEffect(() => {
         fetchSuppliers();
-    }, []);
+
+        // WebSocket subscriptions for real-time updates
+        const unsubCreate = subscribe('supplier:created', (newSupplier) => {
+            setSuppliers(prev => [newSupplier, ...prev]);
+        });
+
+        const unsubUpdate = subscribe('supplier:updated', (updatedSupplier) => {
+            setSuppliers(prev => prev.map(s => s.id === updatedSupplier.id ? { ...s, ...updatedSupplier } : s));
+        });
+
+        return () => {
+            unsubCreate();
+            unsubUpdate();
+        };
+    }, [subscribe]);
 
     const fetchSuppliers = async () => {
         try {

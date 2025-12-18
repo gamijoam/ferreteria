@@ -10,16 +10,38 @@ export const CashProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
     const { subscribe } = useWebSocket();
 
-    const checkStatus = async () => {
+    const checkStatus = async (retryCount = 0) => {
         try {
             const response = await apiClient.get('/cash/sessions/current');
             setIsSessionOpen(true);
             setSession(response.data);
+            setLoading(false);
         } catch (error) {
-            // No active session
+            // If 401 Unauthorized, token might be invalid (server restarted)
+            if (error.response?.status === 401) {
+                // Clear potentially invalid token
+                const hasToken = localStorage.getItem('token');
+                if (hasToken) {
+                    console.log('⚠️ Invalid token detected after server restart, clearing...');
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user');
+                }
+                setIsSessionOpen(false);
+                setSession(null);
+                setLoading(false);
+                return;
+            }
+
+            // If it's a network error and we haven't retried too many times, retry
+            if (error.code === 'ERR_NETWORK' && retryCount < 3) {
+                console.log(`⏳ Cash session check failed, retrying in ${(retryCount + 1) * 500}ms...`);
+                setTimeout(() => checkStatus(retryCount + 1), (retryCount + 1) * 500);
+                return;
+            }
+
+            // No active session or max retries reached
             setIsSessionOpen(false);
             setSession(null);
-        } finally {
             setLoading(false);
         }
     };

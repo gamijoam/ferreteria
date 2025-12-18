@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { DollarSign, CreditCard, Banknote, CheckCircle, Calculator, Users, X } from 'lucide-react';
 import { useConfig } from '../../context/ConfigContext';
+import { useWebSocket } from '../../context/WebSocketContext';
 import apiClient from '../../config/axios';
 import toast from 'react-hot-toast';
 
 const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onConfirm }) => {
     const { getActiveCurrencies, convertPrice, getExchangeRate } = useConfig();
+    const { subscribe } = useWebSocket();
     const currencies = [{ id: 'base', symbol: 'USD', name: 'Dólar', rate: 1, is_anchor: true }, ...getActiveCurrencies()];
 
     // State for multiple payments
@@ -25,6 +27,22 @@ const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onCon
             fetchCustomers();
         }
     }, [isOpen]);
+
+    // WebSocket subscriptions for real-time customer updates
+    useEffect(() => {
+        const unsubCreate = subscribe('customer:created', (newCustomer) => {
+            setCustomers(prev => [newCustomer, ...prev]);
+        });
+
+        const unsubUpdate = subscribe('customer:updated', (updatedCustomer) => {
+            setCustomers(prev => prev.map(c => c.id === updatedCustomer.id ? { ...c, ...updatedCustomer } : c));
+        });
+
+        return () => {
+            unsubCreate();
+            unsubUpdate();
+        };
+    }, [subscribe]);
 
     const fetchCustomers = async () => {
         try {

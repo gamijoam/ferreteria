@@ -99,7 +99,7 @@ const AccountsPayable = () => {
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-red-100 text-sm font-medium">Deuda Total</p>
-                                <p className="text-4xl font-bold mt-2">${totalDebt.toFixed(2)}</p>
+                                <p className="text-4xl font-bold mt-2">${Number(totalDebt).toFixed(2)}</p>
                             </div>
                             <DollarSign size={48} className="opacity-30" />
                         </div>
@@ -145,11 +145,11 @@ const AccountsPayable = () => {
                                         <td className="p-4 text-gray-600">{supplier.phone || '-'}</td>
                                         <td className="p-4 text-right">
                                             <span className="text-red-600 font-bold text-lg">
-                                                ${supplier.current_balance.toFixed(2)}
+                                                ${Number(supplier.current_balance).toFixed(2)}
                                             </span>
                                         </td>
                                         <td className="p-4 text-right text-gray-600">
-                                            {supplier.credit_limit ? `$${supplier.credit_limit.toFixed(2)}` : '-'}
+                                            {supplier.credit_limit ? `$${Number(supplier.credit_limit).toFixed(2)}` : '-'}
                                         </td>
                                         <td className="p-4 text-right">
                                             <button
@@ -186,7 +186,7 @@ const AccountsPayable = () => {
                     <div>
                         <p className="text-sm text-gray-600">Deuda Actual</p>
                         <p className="text-2xl font-bold text-red-600">
-                            ${selectedSupplier.current_balance.toFixed(2)}
+                            ${Number(selectedSupplier.current_balance).toFixed(2)}
                         </p>
                     </div>
                     <div>
@@ -196,7 +196,7 @@ const AccountsPayable = () => {
                     <div>
                         <p className="text-sm text-gray-600">Límite de Crédito</p>
                         <p className="text-xl font-medium">
-                            {selectedSupplier.credit_limit ? `$${selectedSupplier.credit_limit.toFixed(2)}` : 'Sin límite'}
+                            {selectedSupplier.credit_limit ? `$${Number(selectedSupplier.credit_limit).toFixed(2)}` : 'Sin límite'}
                         </p>
                     </div>
                 </div>
@@ -252,10 +252,10 @@ const AccountsPayable = () => {
                                                 </span>
                                             ) : '-'}
                                         </td>
-                                        <td className="p-4 text-right font-bold">${purchase.total_amount.toFixed(2)}</td>
-                                        <td className="p-4 text-right text-green-600">${purchase.paid_amount.toFixed(2)}</td>
+                                        <td className="p-4 text-right font-bold">${Number(purchase.total_amount).toFixed(2)}</td>
+                                        <td className="p-4 text-right text-green-600">${Number(purchase.paid_amount).toFixed(2)}</td>
                                         <td className="p-4 text-right">
-                                            <span className="text-red-600 font-bold">${balance.toFixed(2)}</span>
+                                            <span className="text-red-600 font-bold">${Number(balance).toFixed(2)}</span>
                                         </td>
                                         <td className="p-4 text-center">
                                             <span className={`px-2 py-1 rounded text-xs font-medium ${purchase.payment_status === 'PENDING'
@@ -308,7 +308,7 @@ const PaymentModal = ({ purchase, onClose, onSuccess }) => {
         e.preventDefault();
 
         if (formData.amount <= 0 || formData.amount > balance) {
-            alert(`El monto debe estar entre $0.01 y $${balance.toFixed(2)}`);
+            alert(`El monto debe estar entre $0.01 y $${Number(balance).toFixed(2)}`);
             return;
         }
 
@@ -339,15 +339,15 @@ const PaymentModal = ({ purchase, onClose, onSuccess }) => {
                     <div className="bg-blue-50 p-4 rounded-lg">
                         <div className="flex justify-between mb-2">
                             <span className="text-gray-700">Total Factura:</span>
-                            <span className="font-bold">${purchase.total_amount.toFixed(2)}</span>
+                            <span className="font-bold">${Number(purchase.total_amount).toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between mb-2">
                             <span className="text-gray-700">Pagado:</span>
-                            <span className="text-green-600 font-medium">${purchase.paid_amount.toFixed(2)}</span>
+                            <span className="text-green-600 font-medium">${Number(purchase.paid_amount).toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between pt-2 border-t border-blue-200">
                             <span className="font-bold text-gray-800">Saldo Pendiente:</span>
-                            <span className="font-bold text-red-600 text-lg">${balance.toFixed(2)}</span>
+                            <span className="font-bold text-red-600 text-lg">${Number(balance).toFixed(2)}</span>
                         </div>
                     </div>
 

@@ -4,6 +4,8 @@ from typing import List, Optional
 from ..database.db import get_db
 from ..models import models
 from .. import schemas
+from ..websocket.manager import manager
+from ..websocket.events import WebSocketEvents
 
 router = APIRouter(
     prefix="/suppliers",
@@ -30,7 +32,7 @@ def read_suppliers(
     return query.order_by(models.Supplier.name).offset(skip).limit(limit).all()
 
 @router.post("/", response_model=schemas.SupplierRead)
-def create_supplier(supplier: schemas.SupplierCreate, db: Session = Depends(get_db)):
+async def create_supplier(supplier: schemas.SupplierCreate, db: Session = Depends(get_db)):
     # Check duplicate name
     exists = db.query(models.Supplier).filter(models.Supplier.name.ilike(supplier.name)).first()
     if exists:
@@ -40,6 +42,14 @@ def create_supplier(supplier: schemas.SupplierCreate, db: Session = Depends(get_
     db.add(db_supplier)
     db.commit()
     db.refresh(db_supplier)
+    
+    # Broadcast supplier created
+    await manager.broadcast(WebSocketEvents.SUPPLIER_CREATED, {
+        "id": db_supplier.id,
+        "name": db_supplier.name,
+        "credit_limit": float(db_supplier.credit_limit) if db_supplier.credit_limit else 0.0
+    })
+    
     return db_supplier
 
 @router.get("/{supplier_id}", response_model=schemas.SupplierRead)
@@ -50,7 +60,7 @@ def read_supplier(supplier_id: int, db: Session = Depends(get_db)):
     return supplier
 
 @router.put("/{supplier_id}", response_model=schemas.SupplierRead)
-def update_supplier(supplier_id: int, supplier_update: schemas.SupplierCreate, db: Session = Depends(get_db)):
+async def update_supplier(supplier_id: int, supplier_update: schemas.SupplierCreate, db: Session = Depends(get_db)):
     db_supplier = db.query(models.Supplier).filter(models.Supplier.id == supplier_id).first()
     if not db_supplier:
         raise HTTPException(status_code=404, detail="Supplier not found")
@@ -60,6 +70,14 @@ def update_supplier(supplier_id: int, supplier_update: schemas.SupplierCreate, d
         
     db.commit()
     db.refresh(db_supplier)
+    
+    # Broadcast supplier updated
+    await manager.broadcast(WebSocketEvents.SUPPLIER_UPDATED, {
+        "id": db_supplier.id,
+        "name": db_supplier.name,
+        "credit_limit": float(db_supplier.credit_limit) if db_supplier.credit_limit else 0.0
+    })
+    
     return db_supplier
 
 # Accounts Payable Endpoints
