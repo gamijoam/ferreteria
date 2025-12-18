@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { DollarSign, CreditCard, Banknote, CheckCircle, Calculator, Users, X } from 'lucide-react';
 import { useConfig } from '../../context/ConfigContext';
 import apiClient from '../../config/axios';
+import toast from 'react-hot-toast';
 
 const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onConfirm }) => {
     const { getActiveCurrencies, convertPrice, getExchangeRate } = useConfig();
@@ -101,6 +102,8 @@ const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onCon
                 notes: ""
             };
 
+            // ... (inside handleConfirm)
+
             await apiClient.post('/products/sales/', saleData);
 
             onConfirm({
@@ -115,7 +118,8 @@ const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onCon
             onClose();
         } catch (error) {
             console.error('Error creating sale:', error);
-            alert('Error al procesar la venta: ' + (error.response?.data?.detail || error.message));
+            const errorMessage = error.response?.data?.detail || error.message || "Error desconocido al procesar venta";
+            toast.error(errorMessage);
             setProcessing(false);
         }
     };

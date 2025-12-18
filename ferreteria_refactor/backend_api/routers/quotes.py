@@ -43,12 +43,7 @@ def create_quote(quote_data: schemas.QuoteCreate, db: Session = Depends(get_db))
 def read_quotes(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return db.query(models.Quote).order_by(models.Quote.date.desc()).offset(skip).limit(limit).all()
 
-@router.get("/{quote_id}", response_model=schemas.QuoteReadWithDetails)
-def read_quote_details(quote_id: int, db: Session = Depends(get_db)):
-    quote = db.query(models.Quote).filter(models.Quote.id == quote_id).first()
-    if not quote:
-        raise HTTPException(status_code=404, detail="Quote not found")
-    return quote
+
 
 @router.get("/{quote_id}", response_model=schemas.QuoteReadWithDetails)
 def read_quote_details(quote_id: int, db: Session = Depends(get_db)):

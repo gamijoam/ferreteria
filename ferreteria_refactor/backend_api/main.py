@@ -14,7 +14,22 @@ from .routers import (
 
 models.Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Ferreteria API", version="2.0.0")
+app = FastAPI(
+    title="Ferretería Enterprise API",
+    description="""API profesional para la gestión integral de ferretería.
+    
+    Módulos incluidos:
+    * **Inventario**: Gestión de productos, SKUs, categorías y control de stock.
+    * **Ventas (POS)**: Punto de venta con soporte de concurrencia, pagos múltiples y caja.
+    * **Usuarios**: Control de acceso basado en roles (RBAC).
+    * **Caja**: Apertura y cierre de sesiones de caja con auditoría.
+    """,
+    version="2.1.0",
+    contact={
+        "name": "Soporte Técnico",
+        "email": "admin@ferreteria.local",
+    },
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -25,21 +40,21 @@ app.add_middleware(
 )
 
 # --- ROUTERS ---
-app.include_router(products.router, prefix="/api/v1")
-app.include_router(customers.router, prefix="/api/v1")
-app.include_router(quotes.router, prefix="/api/v1")
-app.include_router(cash.router, prefix="/api/v1")
-app.include_router(suppliers.router, prefix="/api/v1")
-app.include_router(inventory.router, prefix="/api/v1")
-app.include_router(returns.router, prefix="/api/v1")
-app.include_router(reports.router, prefix="/api/v1")
-app.include_router(purchases.router, prefix="/api/v1")
-app.include_router(users.router, prefix="/api/v1")
-app.include_router(config.router, prefix="/api/v1")
-app.include_router(auth.router, prefix="/api/v1")
-app.include_router(categories.router, prefix="/api/v1")
-app.include_router(websocket.router, prefix="/api/v1")
-app.include_router(audit.router, prefix="/api/v1")
+app.include_router(products.router, prefix="/api/v1", tags=["Inventario"])
+app.include_router(customers.router, prefix="/api/v1", tags=["Clientes"])
+app.include_router(quotes.router, prefix="/api/v1", tags=["Presupuestos"])
+app.include_router(cash.router, prefix="/api/v1", tags=["Caja"])
+app.include_router(suppliers.router, prefix="/api/v1", tags=["Proveedores"])
+app.include_router(inventory.router, prefix="/api/v1", tags=["Inventario (Operaciones)"])
+app.include_router(returns.router, prefix="/api/v1", tags=["Devoluciones"])
+app.include_router(reports.router, prefix="/api/v1", tags=["Reportes"])
+app.include_router(purchases.router, prefix="/api/v1", tags=["Compras"])
+app.include_router(users.router, prefix="/api/v1", tags=["Usuarios"])
+app.include_router(config.router, prefix="/api/v1", tags=["Configuración"])
+app.include_router(auth.router, prefix="/api/v1", tags=["Autenticación"])
+app.include_router(categories.router, prefix="/api/v1", tags=["Categorías"])
+app.include_router(websocket.router, prefix="/api/v1", tags=["WebSocket Events"])
+app.include_router(audit.router, prefix="/api/v1", tags=["Auditoría"])
 
 @app.on_event("startup")
 def startup_event():
@@ -64,14 +79,14 @@ frontend_dist = os.path.join(base_path, "frontend_web", "dist")
 
 # IMPRIMIMOS EL DIAGNÓSTICO EN CONSOLA
 print("\n" + "="*40)
-print("🔍 DIAGNÓSTICO DE RUTAS DE FRONTEND")
+print("DIAGNOSTICO DE RUTAS DE FRONTEND")
 print("="*40)
 print(f"1. Archivo main.py en: {current_dir}")
 print(f"2. Base del proyecto:   {base_path}")
 print(f"3. Buscando 'dist' en:  {frontend_dist}")
 
 if os.path.exists(frontend_dist):
-    print(f"✅ ¡CARPETA ENCONTRADA!")
+    print("CARPETA ENCONTRADA!")
     try:
         contenido = os.listdir(frontend_dist)
         print(f"   Contenido: {contenido}")
@@ -84,9 +99,9 @@ if os.path.exists(frontend_dist):
     # Check what files are actually in assets
     assets_dir = os.path.join(frontend_dist, "assets")
     if os.path.exists(assets_dir):
-        print(f"📁 Archivos en assets detectados: {os.listdir(assets_dir)}")
+        print(f"Archivos en assets detectados: {os.listdir(assets_dir)}")
     else:
-        print("⚠️ Carpeta assets no encontrada en dist!")
+        print("Carpeta assets no encontrada en dist!")
 
     # Catch-all para React
     from fastapi import Request
@@ -104,16 +119,16 @@ if os.path.exists(frontend_dist):
         
         # Debug logging (visible in console)
         if path.startswith("/assets"):
-            print(f"⚠️ 404 Asset: {path} - Checking manually...")
+            print(f"404 Asset: {path} - Checking manually...")
             # Fallback manual para assets (por si StaticFiles falla)
             asset_filename = path.replace("/assets/", "")
             asset_path = os.path.join(frontend_dist, "assets", asset_filename)
             if os.path.exists(asset_path):
-                print(f"   ✅ Asset encontrado manualmente: {asset_path}")
+                print(f"   Asset encontrado manualmente: {asset_path}")
                 media_type, _ = mimetypes.guess_type(asset_path)
                 return FileResponse(asset_path, media_type=media_type)
             else:
-                print(f"   ❌ Asset NO encontrado en disco: {asset_path}")
+                print(f"   Asset NO encontrado en disco: {asset_path}")
             
         # Si es una llamada a la API, retornar JSON 404 real
         if path.startswith("/api") or path.startswith("/docs") or path.startswith("/openapi"):

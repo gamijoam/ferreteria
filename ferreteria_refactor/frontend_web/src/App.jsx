@@ -28,9 +28,12 @@ import { CashProvider } from './context/CashContext';
 import { ConfigProvider } from './context/ConfigContext';
 import { WebSocketProvider } from './context/WebSocketContext';
 
+import { Toaster } from 'react-hot-toast';
+
 function App() {
   return (
     <AuthProvider>
+      <Toaster position="top-right" />
       <WebSocketProvider>
         <ConfigProvider>
           <CashProvider>

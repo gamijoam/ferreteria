@@ -1,7 +1,6 @@
 import sys
 import os
 from sqlalchemy import create_engine, text, inspect
-from sqlalchemy.orm import sessionmaker
 
 # Add project root to path to import config
 current_dir = os.path.dirname(os.path.abspath(__file__))

@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List, Dict
 from datetime import datetime
 from enum import Enum
@@ -9,22 +9,23 @@ class ItemCondition(str, Enum):
     DAMAGED = "DAMAGED"
 
 class ProductBase(BaseModel):
-    name: str
-    sku: Optional[str] = None
-    price: float
-    price_mayor_1: Optional[float] = 0.0
-    price_mayor_2: Optional[float] = 0.0
-    stock: float
-    description: Optional[str] = None
-    cost_price: Optional[float] = 0.0
-    min_stock: Optional[float] = 5.0
-    unit_type: Optional[str] = "Unidad" # Added to match model
-    is_box: bool = False
-    conversion_factor: int = 1
-    category_id: Optional[int] = None
-    supplier_id: Optional[int] = None
-    location: Optional[str] = None
-    exchange_rate_id: Optional[int] = None  # Tasa de cambio específica del producto
+    name: str = Field(..., description="Nombre comercial del producto", example="Taladro Percutor 500W")
+    sku: Optional[str] = Field(None, description="Código único de inventario (SKU)", example="TAL-001")
+    price: float = Field(..., description="Precio de venta al público en USD", gt=0, example=45.99)
+    price_mayor_1: Optional[float] = Field(0.0, description="Precio mayorista nivel 1", example=42.00)
+    price_mayor_2: Optional[float] = Field(0.0, description="Precio mayorista nivel 2", example=40.00)
+    stock: float = Field(..., description="Cantidad actual en inventario físico", example=10)
+    description: Optional[str] = Field(None, description="Descripción detallada del producto", example="Incluye maletín y brocas")
+    cost_price: Optional[float] = Field(0.0, description="Costo de adquisición en USD", example=25.00)
+    min_stock: Optional[float] = Field(5.0, description="Nivel mínimo para alerta de reabastecimiento", example=5)
+    unit_type: Optional[str] = Field("Unidad", description="Unidad de medida base", example="Unidad")
+    is_box: bool = Field(False, description="Indica si es vendido por caja (Legacy)")
+    conversion_factor: int = Field(1, description="Factor de conversión si es caja", example=1)
+    category_id: Optional[int] = Field(None, description="ID de la categoría a la que pertenece", example=3)
+    supplier_id: Optional[int] = Field(None, description="ID del proveedor principal", example=1)
+    location: Optional[str] = Field(None, description="Ubicación física en almacén", example="Pasillo 4, Estante B")
+    exchange_rate_id: Optional[int] = Field(None, description="ID de tasa de cambio específica (opcional)", example=2)
+    is_active: bool = Field(True, description="Indica si el producto está disponible para la venta")
 
 # Exchange Rate Schemas
 class ExchangeRateBase(BaseModel):
@@ -72,7 +73,7 @@ class ProductUnitRead(ProductUnitBase):
         from_attributes = True
 
 class ProductCreate(ProductBase):
-    units: List[ProductUnitCreate] = []
+    units: List[ProductUnitCreate] = Field([], description="Lista de unidades alternativas (cajas, bultos)")
 
 class ProductUpdate(BaseModel):
     name: Optional[str] = None
@@ -133,15 +134,15 @@ class SalePaymentCreate(BaseModel):
     exchange_rate: float = 1.0
 
 class SaleCreate(BaseModel):
-    customer_id: Optional[int] = None
-    payment_method: str = "Efectivo" # Main method (for legacy/display)
-    payments: List[SalePaymentCreate] = [] # List of specific payments
-    items: List[SaleDetailCreate]
-    total_amount: float
-    currency: str = "USD"
-    exchange_rate: float = 1.0
-    notes: Optional[str] = None
-    is_credit: bool = False
+    customer_id: Optional[int] = Field(None, description="ID del cliente (Opcional)", example=5)
+    payment_method: str = Field("Efectivo", description="Método de pago principal", example="Efectivo")
+    payments: List[SalePaymentCreate] = Field([], description="Lista de pagos desglosados (Multi-moneda)")
+    items: List[SaleDetailCreate] = Field(..., description="Lista de productos a vender")
+    total_amount: float = Field(..., description="Monto total de la venta en USD", gt=0, example=150.50)
+    currency: str = Field("USD", description="Moneda de referencia de la venta", example="USD")
+    exchange_rate: float = Field(1.0, description="Tasa de cambio aplicada", example=35.5)
+    notes: Optional[str] = Field(None, description="Notas adicionales o observaciones", example="Entregar en puerta trasera")
+    is_credit: bool = Field(False, description="Indica si es una venta a crédito")
 
 # Sale Payment Schema
 class SalePaymentCreate(BaseModel):
@@ -178,14 +179,14 @@ class SaleRead(BaseModel):
         from_attributes = True
 
 class CustomerBase(BaseModel):
-    name: str
-    id_number: Optional[str] = None
-    phone: Optional[str] = None
-    email: Optional[str] = None
-    address: Optional[str] = None
-    credit_limit: float = 0.0
-    payment_term_days: int = 15
-    is_blocked: bool = False
+    name: str = Field(..., description="Nombre completo o Razón Social", example="Constructora Global S.A.")
+    id_number: Optional[str] = Field(None, description="Cédula o RIF del cliente", example="J-12345678-9")
+    phone: Optional[str] = Field(None, description="Teléfono de contacto principal", example="+58 412 5555555")
+    email: Optional[str] = Field(None, description="Correo electrónico para facturación", example="compras@global.com")
+    address: Optional[str] = Field(None, description="Dirección fiscal o de entrega", example="Av. Principal, Edif. Azul")
+    credit_limit: float = Field(0.0, description="Límite máximo de crédito permitido en USD", ge=0)
+    payment_term_days: int = Field(15, description="Días de crédito otorgados", ge=0)
+    is_blocked: bool = Field(False, description="Bloqueo administrativo para impedir nuevas ventas")
 
 class CustomerCreate(CustomerBase):
     pass
@@ -197,25 +198,9 @@ class CustomerPaymentCreate(BaseModel):
     currency: str = "USD"
     exchange_rate: float = 1.0
 
-class StockAdjustmentCreate(BaseModel):
-    product_id: int
-    quantity: float
-    is_box_input: bool = False
-    description: str = "Ajuste de Salida"
-    movement_type: str = "ADJUSTMENT_OUT" # PURCHASE, ADJUSTMENT_OUT
 
-class KardexRead(BaseModel):
-    id: int
-    product_id: int
-    date: datetime
-    movement_type: str
-    quantity: float
-    balance_after: float
-    description: Optional[str]
-    product: Optional[ProductRead] = None
 
-    class Config:
-        from_attributes = True
+
 
 class CustomerRead(CustomerBase):
     id: int
@@ -350,23 +335,9 @@ class CashSessionCloseResponse(BaseModel):
     expected_by_currency: Optional[Dict[str, float]] = {}
     diff_by_currency: Optional[Dict[str, float]] = {}
 
-class SupplierBase(BaseModel):
-    name: str
-    contact_person: Optional[str] = None
-    phone: Optional[str] = None
-    email: Optional[str] = None
-    address: Optional[str] = None
-    notes: Optional[str] = None
-    is_active: bool = True
 
-class SupplierCreate(SupplierBase):
-    pass
 
-class SupplierRead(SupplierBase):
-    id: int
 
-    class Config:
-        from_attributes = True
 
 class ReturnItemCreate(BaseModel):
     product_id: int
@@ -405,46 +376,7 @@ class ReturnRead(BaseModel):
     class Config:
         from_attributes = True
 
-class PurchaseOrderItemCreate(BaseModel):
-    product_id: int
-    quantity: float
-    unit_cost: float
 
-class PurchaseOrderCreate(BaseModel):
-    supplier_id: int
-    items: List[PurchaseOrderItemCreate]
-    expected_delivery: Optional[datetime] = None
-    notes: Optional[str] = None
-
-class PurchaseOrderDetailRead(BaseModel):
-    id: int
-    product_id: int
-    quantity: float
-    unit_cost: float
-    subtotal: float
-    product: Optional[ProductRead] = None
-
-    class Config:
-        from_attributes = True
-
-class PurchaseOrderRead(BaseModel):
-    id: int
-    supplier_id: int
-    order_date: datetime
-    total_amount: float
-    status: str
-    expected_delivery: Optional[datetime]
-    received_date: Optional[datetime]
-    received_by: Optional[int]
-    notes: Optional[str]
-    details: List[PurchaseOrderDetailRead] = []
-    supplier: Optional[SupplierRead] = None
-
-    class Config:
-        from_attributes = True
-
-class PurchaseOrderReceive(BaseModel):
-    user_id: int = 1  # Default user
 
 # User Management Schemas
 class UserCreate(BaseModel):

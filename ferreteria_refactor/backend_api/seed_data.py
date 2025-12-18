@@ -2,12 +2,11 @@
 import sys
 import os
 import random
-from datetime import datetime, timedelta
 
 # Add parent directory to path to allow importing modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from backend_api.database.db import SessionLocal, engine, Base
+from backend_api.database.db import SessionLocal
 from backend_api.models import models
 from backend_api.security import get_password_hash
 

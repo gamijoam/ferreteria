@@ -1,24 +1,19 @@
+
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi.security import HTTPBasic
 from sqlalchemy.orm import Session
-from typing import List
-import hashlib
+from .. import schemas
 from ..database.db import get_db
 from ..models import models
-from .. import schemas
-from ..dependencies import admin_only
+from typing import List
+from ..security import verify_password, get_password_hash
 
 router = APIRouter(
     prefix="/users",
-    tags=["users"],
-    dependencies=[Depends(admin_only)]  # 🔒 ADMIN ONLY - User management is critical
+    tags=["users"]
 )
 
 security = HTTPBasic()
-
-from datetime import timedelta
-from ..security import verify_password, get_password_hash, create_access_token
-from ..config import settings
 
 # Deleted local hash_password and verify_password in favor of imported ones
 

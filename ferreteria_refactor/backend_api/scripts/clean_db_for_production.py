@@ -5,7 +5,7 @@ from sqlalchemy import text
 # Add parent directory to path to allow imports
 sys.path.append(os.getcwd())
 
-from backend_api.database.db import SessionLocal, engine
+from backend_api.database.db import SessionLocal
 from backend_api.models import models
 
 def clean_database():

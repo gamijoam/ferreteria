@@ -152,7 +152,7 @@ class Sale(Base):
     __tablename__ = "sales"
 
     id = Column(Integer, primary_key=True, index=True)
-    date = Column(DateTime, default=datetime.datetime.now)
+    date = Column(DateTime, default=datetime.datetime.now, index=True)
     total_amount = Column(Float, nullable=False)
     payment_method = Column(String, default="Efectivo") # Efectivo, Tarjeta, Credito
     
@@ -486,7 +486,7 @@ class AuditLog(Base):
     record_id = Column(Integer, nullable=True)
     changes = Column(Text, nullable=True) # JSON String
     ip_address = Column(String, nullable=True)
-    timestamp = Column(DateTime, default=datetime.datetime.now)
+    timestamp = Column(DateTime, default=datetime.datetime.now, index=True)
 
     user = relationship("User")
 

@@ -10,7 +10,6 @@ import zipfile
 import urllib.request
 import time
 import subprocess
-import shutil
 
 def main():
     # Get BASE_DIR from command line argument
@@ -42,7 +41,7 @@ def main():
         print(f"   Versión disponible: {remote_version}")
         
         # 2. Download ZIP with retry logic
-        print(f"\n[2/5] Descargando actualización...")
+        print("\n[2/5] Descargando actualización...")
         zip_path = os.path.join(BASE_DIR, "update_temp.zip")
         
         def download_with_retry(url, dest, max_retries=3):
@@ -89,7 +88,7 @@ def main():
                 except Exception as e:
                     print(f"   ✗ Error en intento {attempt + 1}: {e}")
                     if attempt < max_retries - 1:
-                        print(f"   Reintentando en 3 segundos...")
+                        print("   Reintentando en 3 segundos...")
                         time.sleep(3)
                     else:
                         raise Exception(f"Descarga falló después de {max_retries} intentos: {e}")
@@ -99,11 +98,11 @@ def main():
         download_with_retry(download_url, zip_path)
         
         # 3. Wait for processes to close
-        print(f"\n[3/5] Esperando cierre de procesos...")
+        print("\n[3/5] Esperando cierre de procesos...")
         time.sleep(3)  # Give time for Launcher to fully exit
         
         # 4. Extract with forced overwrite
-        print(f"\n[4/5] Instalando actualización...")
+        print("\n[4/5] Instalando actualización...")
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             file_list = zip_ref.namelist()
             total = len(file_list)
@@ -129,7 +128,7 @@ def main():
         print("   ✓ Extracción completa")
         
         # 5. Cleanup
-        print(f"\n[5/5] Limpiando archivos temporales...")
+        print("\n[5/5] Limpiando archivos temporales...")
         try:
             os.remove(zip_path)
         except:

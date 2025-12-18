@@ -1,4 +1,3 @@
-from sqlalchemy.orm import Session
 from ferreteria_refactor.backend_api.database.db import SessionLocal
 from ferreteria_refactor.backend_api.models import models
 from ferreteria_refactor.backend_api.security import get_password_hash

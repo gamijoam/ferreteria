@@ -4,7 +4,6 @@ from typing import List, Optional
 from ..database.db import get_db
 from ..models import models
 from .. import schemas
-from datetime import datetime
 from ..websocket.manager import manager
 from ..websocket.events import WebSocketEvents
 
@@ -221,11 +220,4 @@ def get_purchase_payments(purchase_id: int, db: Session = Depends(get_db)):
     
     return payments
 
-@router.get("/pending", response_model=List[schemas.PurchaseOrderResponse])
-def get_pending_purchases(db: Session = Depends(get_db)):
-    """Get all pending and partially paid purchases"""
-    purchases = db.query(models.PurchaseOrder).filter(
-        models.PurchaseOrder.payment_status.in_([models.PaymentStatus.PENDING, models.PaymentStatus.PARTIAL])
-    ).order_by(models.PurchaseOrder.due_date).all()
-    
-    return purchases
+

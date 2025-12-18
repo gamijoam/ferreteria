@@ -7,7 +7,6 @@ from typing import List, Annotated
 from .database.db import get_db
 from .config import settings
 from .models.models import User, UserRole
-from .models.models import User, UserRole
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 

@@ -7,7 +7,7 @@ parent_dir = os.path.dirname(current_dir)
 sys.path.append(parent_dir)
 
 from backend_api.database.db import engine
-from backend_api.models.models import Base, AuditLog
+from backend_api.models.models import AuditLog
 
 def create_tables():
     print("Iniciando creación de tabla de Auditoría...")
