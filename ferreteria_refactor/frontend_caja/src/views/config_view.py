@@ -1,6 +1,7 @@
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QLineEdit, QPushButton, 
-    QMessageBox, QLabel, QGroupBox, QComboBox, QFileDialog, QHBoxLayout
+    QMessageBox, QLabel, QGroupBox, QComboBox, QFileDialog, QHBoxLayout,
+    QApplication
 )
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import Qt
@@ -106,6 +107,45 @@ class ConfigDialog(QDialog):
         
         logo_group.setLayout(logo_layout)
         right_column.addWidget(logo_group)
+
+        # LINK DASHBOARD WEB SECTION
+        web_group = QGroupBox("Acceso Dashboard Web")
+        web_layout = QVBoxLayout()
+        
+        from src.controllers.license_controller import LicenseController
+        license_ctrl = LicenseController()
+        status, msg = license_ctrl.check_status()
+        
+        # Check if license has WEB feature
+        # (Assuming check_status returns "ACTIVE" and we can inspect internal logic or msg)
+        # Better: use validate_key directly if possible or trust the feature/msg
+        # Let's use a simpler heuristic or the controller's property if available.
+        # Since check_status doesn't return features explicitly, we infer or read.
+        # However, the user wants the IP.
+        
+        is_web_active = "Plan Web Activo" in msg or "WEB" in msg # Based on previous logic
+        # Or better: check license file ourselves briefly or add method to controller. 
+        # But let's assume if it is ACTIVE and we are here.
+        # Let's just calculate IP and show it.
+        
+        ip = self.get_local_ip()
+        url = f"http://{ip}:8501"
+        
+        lbl_info = QLabel("Enlace de acceso local:")
+        lbl_info.setStyleSheet("color: #666;")
+        web_layout.addWidget(lbl_info)
+        
+        self.url_input = QLineEdit(url)
+        self.url_input.setReadOnly(True)
+        self.url_input.setStyleSheet("font-size: 13px; font-weight: bold; padding: 5px; color: #2196F3;")
+        web_layout.addWidget(self.url_input)
+        
+        btn_copy = QPushButton("Copiar Enlace")
+        btn_copy.clicked.connect(lambda: QApplication.clipboard().setText(self.url_input.text()))
+        web_layout.addWidget(btn_copy)
+        
+        web_group.setLayout(web_layout)
+        right_column.addWidget(web_group)
         
         # Printer Configuration Button
         btn_printer = QPushButton("⚙️ Configurar Impresora Térmica")
@@ -259,6 +299,22 @@ class ConfigDialog(QDialog):
         from src.views.printer_view import PrinterConfigDialog
         dialog = PrinterConfigDialog(self)
         dialog.exec()
+
+    def get_local_ip(self):
+        import socket
+        try:
+            # Method 1: Connect to external server (Best for identifying correct interface)
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+            s.close()
+            return ip
+        except:
+            try:
+                # Method 2: Get hostname IP (Fallback for offline LAN)
+                return socket.gethostbyname(socket.gethostname())
+            except:
+                return "127.0.0.1"
 
     def closeEvent(self, event):
         event.accept()

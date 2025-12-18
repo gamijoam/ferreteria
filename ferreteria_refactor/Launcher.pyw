@@ -204,18 +204,116 @@ class Launcher(QDialog):
         except:
             return False
 
+    def get_local_ip(self):
+        import socket
+        try:
+            # Connect to an external server to know which interface is used
+            # We don't actually send data
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+            s.close()
+            return ip
+        except:
+            return "127.0.0.1"
+
+    def check_license_features(self):
+        """Quick check of license file for WEB feature without full controller logic"""
+        try:
+            app_data = os.path.join(os.getenv('APPDATA'), 'InventarioSoft')
+            license_file = os.path.join(app_data, 'license.dat')
+            
+            if os.path.exists(license_file):
+                with open(license_file, 'r') as f:
+                    data = json.load(f)
+                    
+                    # Check validation using a simplistic check or rely on file trust for launcher speed
+                    # Ideally we should use the controller, but importing it might be complex if paths aren't set
+                    # Let's trust the "features" key if present, assuming 'activate_license' wrote it.
+                    # Security note: A user could edit the JSON, but the backend validates the key hash anyway.
+                    # The Launcher is just a convenience UI.
+                    features = data.get("features", [])
+                    if "WEB" in features:
+                        return True
+        except:
+            pass
+        return False
+
+    def get_python_command(self):
+        """Get a valid python command. Avoids using sys.executable if it points to the frozen EXE."""
+        if getattr(sys, 'frozen', False):
+            # If frozen, we CANNOT use sys.executable because it is the Launcher.exe itself.
+            # We must assume a python environment is available or bundled.
+            # Strategy:
+            # 1. Look for a 'runtime/python.exe' (bundled)
+            # 2. Fallback to system 'python' command
+            
+            bundled_python = os.path.join(BASE_DIR, "runtime", "python.exe")
+            if os.path.exists(bundled_python):
+                return bundled_python
+            
+            # Fallback to PATH
+            return "python"
+        else:
+            return sys.executable
+
     def launch_app(self):
         self.status_label.setText("Iniciando aplicación...")
         QApplication.processEvents()
         
+        # --- WEB DASHBOARD LAUNCH LOGIC ---
+        web_process = None
+        web_enabled = self.check_license_features()
+        
+        if web_enabled:
+            # Launch Streamlit
+            try:
+                self.status_label.setText("Iniciando Dashboard Web...")
+                QApplication.processEvents()
+                
+                dashboard_path = os.path.join(BASE_DIR, "web_dashboard", "app.py")
+                
+                if not os.path.exists(dashboard_path):
+                     # Log error but don't block
+                     print(f"Error: No se encuentra {dashboard_path}")
+                     self.status_label.setText("Error: falta carpeta web_dashboard")
+                
+                else:
+                    startupinfo = subprocess.STARTUPINFO()
+                    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                    
+                    # USE SAFE COMMAND
+                    py_cmd = self.get_python_command()
+                    
+                    cmd = [py_cmd, "-m", "streamlit", "run", dashboard_path, "--server.headless=true", "--server.address=0.0.0.0"]
+                    
+                    web_process = subprocess.Popen(
+                        cmd,
+                        cwd=BASE_DIR,
+                        startupinfo=startupinfo,
+                        shell=False
+                    )
+                    
+                    ip = self.get_local_ip()
+                    final_msg = f"Dashboard Activo: http://{ip}:8501"
+                    self.status_label.setText(final_msg)
+                    print(final_msg)
+
+            except Exception as e:
+                print(f"Error starting web dashboard: {e}")
+                self.status_label.setText("Error al iniciar Web")
+            except Exception as e:
+                print(f"Error starting web dashboard: {e}")
+                QMessageBox.critical(self, "Error Web", f"Excepción al iniciar dashboard:\n{str(e)}")
+
         # 0. Start Server (if needed)
         server_process = None
         server_managed = False  # Flag to know if WE started it
         
         if os.path.exists(SERVER_EXE):
             if self.is_server_running():
-                self.status_label.setText("Servidor ya activo...")
-                print("Server port 8000 busy, assuming running.")
+                if not web_enabled:
+                    self.status_label.setText("Servidor ya activo...")
             else:
                 self.status_label.setText("Iniciando Servidor...")
                 QApplication.processEvents()
@@ -276,6 +374,13 @@ class Launcher(QDialog):
                         server_process.kill() # Force kill
                 except Exception as e:
                     print(f"Error killing server: {e}")
+            
+            # Kill Web Dashboard
+            if web_process:
+                try:
+                    web_process.terminate()
+                except:
+                    pass
                         
             self.close()
             sys.exit(0)

@@ -29,7 +29,7 @@ import src
 print(f"DEBUG: 'src' module loaded from: {src.__file__}")
 # print(f"DEBUG: sys.path: {sys.path}")
 
-# from src.database.db import engine, Base # REMOVED DB
+from src.database.db import engine, Base, SessionLocal
 from src.controllers.excel_import_controller import ExcelImportController
 from src.views.product_view import ProductWindow
 from src.views.inventory_view import InventoryWindow
@@ -47,8 +47,14 @@ from src.views.customer_view import CustomerWindow
 from src.views.supplier_view import SupplierWindow
 from src.views.purchase_view import PurchaseOrderWindow
 from src.views.config_view import ConfigDialog
+# Ensure all models are imported so Base metadata is populated
+import src.models.models 
 from src.models.models import UserRole
+
+# Config Controller (Missing previously)
 from src.controllers.config_controller import ConfigController
+
+# Database and other imports
 from src.database.db import SessionLocal
 from src.views.cash_history_view import CashHistoryWindow
 import os
@@ -59,13 +65,17 @@ class MainWindow(QMainWindow):
         self.user = user
         
         # Load business config
-        self.db = None # SessionLocal()
+        self.db = SessionLocal()
         self.config_controller = ConfigController(self.db)
         self.business_info = self.config_controller.get_business_info()
         
         self.setWindowTitle(f"🏪 {self.business_info['name']} - ERP (v1.0.2)")
         # self.resize(900, 700)
         self.showMaximized()
+
+# ... (skipped lines)
+
+
 
         # Set window style
         self.setStyleSheet("""
@@ -394,26 +404,34 @@ class MainWindow(QMainWindow):
         event.accept()
 
 def main():
+    app = QApplication(sys.argv)
+    
+    # --- DIAGNOSTIC START ---
+    from src.database.db import DATABASE_URL, BASE_DIR, env_files
+    
+    debug_msg = f"Diagnostic Info:\n\n"
+    debug_msg += f"BASE_DIR: {BASE_DIR}\n"
+    debug_msg += f"DB_URL: {DATABASE_URL}\n"
+    
+    # Check what env file existed
+    found_envs = [p for p in env_files if os.path.exists(p)]
+    debug_msg += f"Found .env files: {found_envs}\n"
+    
+    QMessageBox.information(None, "Startup Diagnostic", debug_msg)
+    # --- DIAGNOSTIC END ---
+
     # Create tables
-    # print("Creando tablas en la base de datos...")
-    # Base.metadata.create_all(bind=engine)
-    # print("Tablas creadas exitosamente.")
+    print("Creando tablas en la base de datos...")
+    Base.metadata.create_all(bind=engine)
+    print("Tablas creadas exitosamente.")
 
     # Initialize Admin User if needed
-    from src.controllers.auth_controller import AuthController
-    # from src.database.db import SessionLocal
+    # (Admin/Auth logic is handled by Backend API)
+    pass
     
-    db = None # SessionLocal()
-    try:
-        auth = AuthController(db)
-        # if auth.init_admin():
-        #     print("Usuario admin creado por defecto (admin/admin123)")
-    except Exception as e:
-        print(f"Error inicializando admin: {e}")
-    finally:
-        pass # db.close()
+    # Remove the second app creation below since we moved it up
+    # app = QApplication(sys.argv) <- This needs to be handled carefully as main() had it later.
 
-    app = QApplication(sys.argv)
 
     # Apply modern theme
     from src.theme import MODERN_THEME
@@ -440,9 +458,18 @@ def main():
     login = LoginDialog()
     
     if login.exec() == QDialog.DialogCode.Accepted:
-        window = MainWindow(login.user)
-        window.show()
-        sys.exit(app.exec())
+        try:
+            window = MainWindow(login.user)
+            window.show()
+            sys.exit(app.exec())
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            try:
+                QMessageBox.critical(None, "Error Fatal", f"Error al iniciar ventana principal:\n{str(e)}")
+            except:
+                pass
+            sys.exit(1)
     else:
         sys.exit(0)
 

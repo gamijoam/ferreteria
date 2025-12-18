@@ -1,10 +1,12 @@
 import sys
 import os
 
-# Add src to path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# Add path to find the controller
+# Path: ./ferreteria_refactor/frontend_caja/src
+src_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ferreteria_refactor', 'frontend_caja', 'src')
+sys.path.append(src_path)
 
-from src.controllers.license_controller import LicenseController
+from controllers.license_controller import LicenseController
 
 def main():
     print("="*60)
@@ -32,8 +34,13 @@ def main():
                 print("Error: Días debe ser un número")
                 continue
                 
-            key = controller.generate_key(hw_id, days)
+            web_enabled = input("¿Incluir Plan Web? (s/n): ").strip().lower() == 's'
+            features = ['WEB'] if web_enabled else []
+                
+            key = controller.generate_key(hw_id, days, features=features)
             print(f"\n✅ LICENCIA GENERADA:\n{key}")
+            if web_enabled:
+               print("(Incluye acceso al Dashboard Web)")
             print("\nCopie esta clave y envíela al cliente.")
             
         elif choice == "2":

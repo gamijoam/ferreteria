@@ -19,35 +19,61 @@ class LicenseController:
         mac = uuid.getnode()
         return hashlib.md5(str(mac).encode()).hexdigest().upper()[:16]
     
-    def generate_key(self, hardware_id, days=365):
-        """Generate a license key for a given hardware ID (Admin only)"""
+    def generate_key(self, hardware_id, days=365, features=None):
+        """
+        Generate a license key for a given hardware ID (Admin only).
+        Features: List of strings e.g. ['WEB']
+        """
         # Simple hash: MD5(HardwareID + SecretSalt + Days)
         secret = "INVENTARIO_SOFT_SECRET_KEY_2025"
-        raw = f"{hardware_id}{secret}{days}"
-        key = hashlib.sha256(raw.encode()).hexdigest().upper()[:20]
-        # Format: KEY-DAYS (e.g., ABC123...-365)
-        return f"{key}-{days}"
+        
+        feature_suffix = ""
+        if features and "WEB" in features:
+            feature_suffix = "-WEB"
+            
+        raw = f"{hardware_id}{secret}{days}{feature_suffix}"
+        
+        # Base Key
+        key_hash = hashlib.sha256(raw.encode()).hexdigest().upper()[:20]
+        
+        # Format: KEY-DAYS-WEB (e.g., ABC123...-365-WEB) or KEY-DAYS
+        return f"{key_hash}-{days}{feature_suffix}"
         
     def validate_key(self, key):
-        """Validate if a key is valid for this machine"""
+        """
+        Validate if a key is valid for this machine.
+        Returns: (is_valid, days, features_list)
+        """
         try:
-            # Split key and days
+            # Format could be: HASH-DAYS or HASH-DAYS-WEB
             parts = key.split('-')
-            if len(parts) != 2:
-                return False, 0
+            
+            if len(parts) < 2:
+                return False, 0, []
             
             key_part = parts[0]
             days = int(parts[1])
+            features = []
+            
+            # Check for features
+            feature_suffix = ""
+            if len(parts) > 2 and parts[2] == "WEB":
+                features.append("WEB")
+                feature_suffix = "-WEB"
             
             # Re-generate expected key
             hw_id = self.get_hardware_id()
-            expected_key = self.generate_key(hw_id, days).split('-')[0]
+            
+            # We need to reconstruct the raw string exactly as it was generated
+            secret = "INVENTARIO_SOFT_SECRET_KEY_2025"
+            raw = f"{hw_id}{secret}{days}{feature_suffix}"
+            expected_key = hashlib.sha256(raw.encode()).hexdigest().upper()[:20]
             
             if key_part == expected_key:
-                return True, days
-            return False, 0
+                return True, days, features
+            return False, 0, []
         except:
-            return False, 0
+            return False, 0, []
 
     def check_status(self):
         """
@@ -66,7 +92,7 @@ class LicenseController:
                 days = data.get('days')
                 
                 # Validate key again (to prevent copying file to another PC)
-                is_valid, _ = self.validate_key(key)
+                is_valid, _, features = self.validate_key(key)
                 if not is_valid:
                     return 'INVALID', "Licencia inválida para este equipo"
                 
@@ -75,7 +101,10 @@ class LicenseController:
                 if datetime.datetime.now() > expiration_date:
                     return 'EXPIRED', f"Licencia vencida el {expiration_date.strftime('%d/%m/%Y')}"
                 
-                return 'ACTIVE', f"Licencia activa hasta {expiration_date.strftime('%d/%m/%Y')}"
+                msg = f"Licencia activa hasta {expiration_date.strftime('%d/%m/%Y')}"
+                if "WEB" in features:
+                    msg += " (Plan Web Activo)"
+                return 'ACTIVE', msg
             except Exception as e:
                 return 'INVALID', "Error al leer licencia"
 
@@ -105,13 +134,14 @@ class LicenseController:
 
     def activate_license(self, key):
         """Activate a license key"""
-        is_valid, days = self.validate_key(key)
+        is_valid, days, features = self.validate_key(key)
         if is_valid:
             data = {
                 'key': key,
                 'activation_date': datetime.datetime.now().isoformat(),
                 'days': days,
-                'hardware_id': self.get_hardware_id()
+                'hardware_id': self.get_hardware_id(),
+                'features': features
             }
             with open(self.license_file, 'w') as f:
                 json.dump(data, f)

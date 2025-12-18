@@ -1,0 +1,4 @@
+streamlit run web_dashboard/app.py
+python ferreteria_refactor\scripts\build_update.py
+python ferreteria_refactor/frontend_caja/src/main.py
+uvicorn ferreteria_refactor.backend_api.main:app --reload
