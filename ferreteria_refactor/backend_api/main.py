@@ -24,6 +24,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# --- ROUTERS ---
 app.include_router(products.router, prefix="/api/v1")
 app.include_router(customers.router, prefix="/api/v1")
 app.include_router(quotes.router, prefix="/api/v1")
@@ -54,21 +55,58 @@ def startup_event():
     finally:
         db.close()
 
-# --- SERVIR FRONTEND ---
+# --- SERVIR FRONTEND REACT (MODO HÍBRIDO CON DEBUG) ---
 current_dir = os.path.dirname(os.path.abspath(__file__))
-# SUBIR SOLO UN NIVEL (CORREGIDO)
-frontend_dist = os.path.join(current_dir, "..", "frontend_web", "dist")
+# Calculamos la ruta base subiendo un nivel
+base_path = os.path.abspath(os.path.join(current_dir, ".."))
+frontend_dist = os.path.join(base_path, "frontend_web", "dist")
+
+# IMPRIMIMOS EL DIAGNÓSTICO EN CONSOLA
+print("\n" + "="*40)
+print("🔍 DIAGNÓSTICO DE RUTAS DE FRONTEND")
+print("="*40)
+print(f"1. Archivo main.py en: {current_dir}")
+print(f"2. Base del proyecto:   {base_path}")
+print(f"3. Buscando 'dist' en:  {frontend_dist}")
 
 if os.path.exists(frontend_dist):
+    print(f"✅ ¡CARPETA ENCONTRADA!")
+    try:
+        contenido = os.listdir(frontend_dist)
+        print(f"   Contenido: {contenido}")
+    except:
+        print("   (No se pudo leer contenido)")
+
+    # Montar assets
     app.mount("/assets", StaticFiles(directory=os.path.join(frontend_dist, "assets")), name="assets")
+    
+    # Catch-all para React
     @app.get("/{full_path:path}")
     async def serve_react_app(full_path: str):
-        if full_path.startswith("api"):
+        # Si es una llamada a la API, dejarla pasar (retornar 404 de API si no existe)
+        if full_path.startswith("api") or full_path.startswith("docs") or full_path.startswith("openapi"):
             return {"error": "Endpoint not found"}
+        # Para todo lo demás, devolver index.html
         return FileResponse(os.path.join(frontend_dist, "index.html"))
+
 else:
-    print(f"⚠️ NO SE ENCUENTRA EL FRONTEND EN: {frontend_dist}")
+    print("❌ CARPETA NO ENCONTRADA")
+    print(f"   Intentando listar {base_path}:")
+    try:
+        print(f"   {os.listdir(base_path)}")
+    except Exception as e:
+        print(f"   Error listando directorio base: {e}")
+
+print("="*40 + "\n")
+
 
 @app.get("/")
 def read_root():
-    return {"message": "API Running - Frontend not found"}
+    return {
+        "message": "Ferreteria API Running",
+        "debug_info": {
+            "frontend_found": os.path.exists(frontend_dist),
+            "searched_path": frontend_dist,
+            "base_path_content": os.listdir(base_path) if os.path.exists(base_path) else "Error reading base"
+        }
+    }
