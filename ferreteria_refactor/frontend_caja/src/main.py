@@ -108,7 +108,7 @@ class MainWindow(QMainWindow):
             header_layout.addWidget(lbl_logo)
 
         title = QLabel(f"🏪 {self.business_info['name'].upper()}")
-        title.setStyleSheet("color: #00FF00; font-size: 28pt; font-weight: bold;")
+        title.setStyleSheet("color: #FFFF00; font-size: 28pt; font-weight: bold;")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header_layout.addWidget(title)
 

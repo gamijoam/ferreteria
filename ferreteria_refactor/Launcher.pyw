@@ -111,12 +111,28 @@ class UpdateThread(QThread):
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                 # Custom extraction to respect launcher locking
                 file_list = zip_ref.namelist()
-                for file_info in file_list:
+                total_files = len(file_list)
+                
+                for idx, file_info in enumerate(file_list):
+                    # Update progress
+                    if total_files > 0:
+                        progress = int((idx / total_files) * 100)
+                        self.progress.emit(progress)
+                    
                     # Skip Launcher.exe if we couldn't rename the running one
                     if file_info.lower() == "launcher.exe" and not launcher_writable:
                         print("Skipping Launcher.exe update (File locked)")
                         continue
-                        
+                    
+                    # Force overwrite: Delete existing file first
+                    target_path = os.path.join(BASE_DIR, file_info)
+                    if os.path.exists(target_path) and not os.path.isdir(target_path):
+                        try:
+                            os.remove(target_path)
+                        except Exception as e:
+                            print(f"Warning: Could not delete {target_path}: {e}")
+                    
+                    # Extract
                     zip_ref.extract(file_info, BASE_DIR)
                 
             # 5. Cleanup
