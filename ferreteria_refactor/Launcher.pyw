@@ -43,11 +43,6 @@ class UpdateThread(QThread):
             with urllib.request.urlopen(UPDATE_URL_JSON) as url:
                 data = json.loads(url.read().decode())
                 remote_version = data.get("version")
-                download_url_rel = data.get("download_url")
-                # Construct absolute URL assuming relative to JSON
-                # If json is at domain.com/version.json, download is at domain.com/downloads/file.zip
-                base_url = UPDATE_URL_JSON.rsplit('/', 1)[0]
-                download_url = f"{base_url}/{download_url_rel}"
 
             # 2. Check Local Version
             local_version = "0.0.0"
@@ -61,92 +56,33 @@ class UpdateThread(QThread):
 
             if remote_version == local_version:
                 self.status.emit("Sistema actualizado.")
-                self.finished.emit(False, "No hay actualizaciones") # False means no update performed
+                self.finished.emit(False, "No hay actualizaciones")
                 return
 
-            self.status.emit(f"Actualizando a v{remote_version}...")
+            # NEW APPROACH: Download external updater script
+            self.status.emit(f"Descargando actualizador v{remote_version}...")
+            self.progress.emit(10)
             
-            # 3. Download Zip
-            zip_path = os.path.join(BASE_DIR, "update_temp.zip")
+            # Download updater.py from server
+            updater_url = "https://inventariosoft.netlify.app/updater.py"
+            updater_path = os.path.join(BASE_DIR, "updater.py")
             
-            def report(blocknum, blocksize, totalsize):
-                read = blocknum * blocksize
-                if totalsize > 0:
-                    percent = int(read * 100 / totalsize)
-                    self.progress.emit(percent)
-            
-            urllib.request.urlretrieve(download_url, zip_path, report)
-            
-            # 4. Extract
-            self.status.emit("Instalando actualización...")
-            self.progress.emit(0)
-            
-            # Extract to BASE_DIR (Project Root)
-            # Zip contains "Client/" and "Server/" folder structures AND "Launcher.exe"
-            
-            # 4. Extract
-            self.status.emit("Instalando actualización...")
-            self.progress.emit(0)
-            
-            # Extract to BASE_DIR (Project Root)
-            import time
-            
-            # HANDLE SELF-UPDATE (Windows locking)
-            launcher_path = os.path.join(BASE_DIR, "Launcher.exe")
-            launcher_writable = True
-            
-            if os.path.exists(launcher_path):
-                try:
-                    old_launcher = launcher_path + ".old"
-                    if os.path.exists(old_launcher):
-                        os.remove(old_launcher)
-                    
-                    # Try rename
-                    os.rename(launcher_path, old_launcher)
-                    time.sleep(1.0) # Allow OS to release handle
-                except Exception as e:
-                    print(f"Warning: Could not rename Launcher: {e}")
-                    launcher_writable = False
-            
-            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                # Custom extraction to respect launcher locking
-                file_list = zip_ref.namelist()
-                total_files = len(file_list)
-                
-                for idx, file_info in enumerate(file_list):
-                    # Update progress
-                    if total_files > 0:
-                        progress = int((idx / total_files) * 100)
-                        self.progress.emit(progress)
-                    
-                    # Skip Launcher.exe if we couldn't rename the running one
-                    if file_info.lower() == "launcher.exe" and not launcher_writable:
-                        print("Skipping Launcher.exe update (File locked)")
-                        continue
-                    
-                    # Force overwrite: Delete existing file first
-                    target_path = os.path.join(BASE_DIR, file_info)
-                    if os.path.exists(target_path) and not os.path.isdir(target_path):
-                        try:
-                            os.remove(target_path)
-                        except Exception as e:
-                            print(f"Warning: Could not delete {target_path}: {e}")
-                    
-                    # Extract
-                    zip_ref.extract(file_info, BASE_DIR)
-                
-            # 5. Cleanup
             try:
-                os.remove(zip_path)
-            except:
-                pass
+                urllib.request.urlretrieve(updater_url, updater_path)
+            except Exception as e:
+                # Fallback: use bundled updater if download fails
+                print(f"Could not download updater: {e}, using bundled version")
+                bundled_updater = os.path.join(os.path.dirname(__file__), "updater.py")
+                if os.path.exists(bundled_updater):
+                    shutil.copy(bundled_updater, updater_path)
+                else:
+                    raise Exception("No se pudo obtener el actualizador")
             
-            # 6. Update Local Version File
-            with open(LOCAL_VERSION_FILE, 'w') as f:
-                json.dump({"version": remote_version}, f)
-                
-            self.status.emit("Actualización completada.")
-            self.finished.emit(True, f"Actualizado a v{remote_version}")
+            self.progress.emit(50)
+            self.status.emit("Preparando actualización...")
+            
+            # Signal that we need to launch external updater
+            self.finished.emit(True, f"EXTERNAL_UPDATE:{remote_version}")
             
         except Exception as e:
             self.finished.emit(False, str(e))
@@ -224,9 +160,28 @@ class Launcher(QDialog):
         self.thread.start()
 
     def on_finished(self, updated, msg):
+        # Check if we need to launch external updater
+        if msg.startswith("EXTERNAL_UPDATE:"):
+            version = msg.split(":")[1]
+            self.status_label.setText(f"Iniciando actualización externa...")
+            QApplication.processEvents()
+            
+            # Launch external updater
+            updater_path = os.path.join(BASE_DIR, "updater.py")
+            python_exe = sys.executable if not getattr(sys, 'frozen', False) else "python"
+            
+            # Launch in new console window so user can see progress
+            subprocess.Popen(
+                [python_exe, updater_path, BASE_DIR],
+                creationflags=subprocess.CREATE_NEW_CONSOLE
+            )
+            
+            # Exit this launcher immediately
+            QApplication.quit()
+            sys.exit(0)
+        
         if "Error" in msg:
             if "HTTP Error 404" in str(msg):
-                 # Network error or version check failed -> Launch anyway (offline mode possibility)
                  self.status_label.setText("Modo Offline / Error Update")
             else:
                 QMessageBox.warning(self, "Error de Actualización", f"No se pudo actualizar: {msg}\nIniciando versión actual.")

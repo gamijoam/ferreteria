@@ -22,7 +22,7 @@ BUILD_LAUNCHER = False  # Re-compile Launcher.exe
 
 # Set this to False if old clients are crashing during update.
 # This keeps the old Launcher but updates the App.
-INCLUDE_LAUNCHER_IN_ZIP = False
+INCLUDE_LAUNCHER_IN_ZIP = True
 # ---------------------
 
 EXCLUDES = [
@@ -182,6 +182,19 @@ def main():
                     zipf.write(file_path, rel_path)
         else:
             print("Warning: web_dashboard folder not found!")
+            
+        # Add updater.py (Standalone updater script)
+        updater_src = os.path.join(PROJECT_ROOT, "updater.py")
+        if os.path.exists(updater_src):
+            print("Adding updater.py...")
+            zipf.write(updater_src, "updater.py")
+            
+            # Also copy to landing_page for Netlify hosting
+            updater_dest = os.path.join(LANDING_PAGE_DIR, "updater.py")
+            shutil.copy(updater_src, updater_dest)
+            print(f"Copied updater.py to {updater_dest}")
+        else:
+            print("Warning: updater.py not found!")
             
         # Add version.json (Updated)
         print("Adding version.json...")
