@@ -32,7 +32,7 @@ const cashService = {
         if (filters.startDate) params.start_date = filters.startDate;
         if (filters.endDate) params.end_date = filters.endDate;
 
-        const response = await apiClient.get('/cash/sessions', { params });
+        const response = await apiClient.get('/cash/history', { params });
         return response.data;
     }
 };

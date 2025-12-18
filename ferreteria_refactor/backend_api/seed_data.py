@@ -54,7 +54,7 @@ def seed_data():
             # Deactivate old ones if we were strict, but let's just create/get
             existing = db.query(models.ExchangeRate).filter(
                 models.ExchangeRate.currency_code == c["code"],
-                models.ExchangeRate.name == "Tasa Oficial" if not c["is_anchor"] else "Base"
+                models.ExchangeRate.name == ("Tasa Oficial" if not c["is_anchor"] else "Base")
             ).first()
             
             if not existing:
@@ -64,8 +64,7 @@ def seed_data():
                     currency_symbol=c["symbol"],
                     rate=c["rate"],
                     is_active=True,
-                    is_default=True, # Simplification
-                    is_anchor=c["is_anchor"]
+                    is_default=True # Simplification
                 )
                 db.add(rate)
                 db.flush()
@@ -102,7 +101,6 @@ def seed_data():
                     name=s["name"], 
                     email=s["email"], 
                     phone=s["phone"],
-                    rif=f"J-{random.randint(10000000, 99999999)}",
                     address="Zona Industrial",
                     payment_terms=30
                 )
@@ -156,12 +154,10 @@ def seed_data():
                     stock=p_data["stock"],
                     min_stock=5,
                     sku=f"SKU-{random.randint(1000, 9999)}",
-                    barcode=f"750{random.randint(100000000, 999999999)}",
                     is_active=True,
                     category_id=cat_objs[p_data["cat_idx"]].id,
                     supplier_id=random.choice(suppliers).id,
-                    exchange_rate_id=rate_id,
-                    iva_rate=16.0
+                    exchange_rate_id=rate_id
                 )
                 db.add(prod)
                 db.flush()
@@ -200,17 +196,16 @@ def seed_data():
         ]
         
         for c in customers_data:
-            cust = db.query(models.Customer).filter(models.Customer.dni == c["dni"]).first()
+            cust = db.query(models.Customer).filter(models.Customer.id_number == c["dni"]).first()
             if not cust:
                 cust = models.Customer(
                     name=c["name"],
-                    dni=c["dni"],
+                    id_number=c["dni"],
                     email=f"cliente{random.randint(1,100)}@mail.com",
                     phone="555-0000",
                     address="Ciudad",
                     credit_limit=c["limit"],
-                    payment_term_days=c["term"],
-                    is_active=True
+                    payment_term_days=c["term"]
                 )
                 db.add(cust)
         db.commit()

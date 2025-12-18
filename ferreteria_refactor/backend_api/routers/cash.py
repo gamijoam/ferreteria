@@ -91,11 +91,36 @@ def get_current_session(user_id: int, db: Session = Depends(get_db)):
     return active
 
 @router.get("/history", response_model=List[schemas.CashSessionRead])
-def get_session_history(skip: int = 0, limit: int = 20, db: Session = Depends(get_db)):
-    """Get closed session history"""
-    sessions = db.query(models.CashSession).filter(
+def get_session_history(
+    skip: int = 0, 
+    limit: int = 20, 
+    start_date: str = None,
+    end_date: str = None,
+    db: Session = Depends(get_db)
+):
+    """Get closed session history with date filtering"""
+    query = db.query(models.CashSession).filter(
         models.CashSession.status == "CLOSED"
-    ).order_by(models.CashSession.end_time.desc()).offset(skip).limit(limit).all()
+    )
+    
+    if start_date:
+        # Assuming YYYY-MM-DD format
+        try:
+            start_dt = datetime.datetime.strptime(start_date, "%Y-%m-%d")
+            query = query.filter(models.CashSession.end_time >= start_dt)
+        except ValueError:
+            pass # Ignore invalid dates
+            
+    if end_date:
+        try:
+            end_dt = datetime.datetime.strptime(end_date, "%Y-%m-%d")
+            # Set to end of day
+            end_dt = end_dt.replace(hour=23, minute=59, second=59)
+            query = query.filter(models.CashSession.end_time <= end_dt)
+        except ValueError:
+            pass
+
+    sessions = query.order_by(models.CashSession.end_time.desc()).offset(skip).limit(limit).all()
     return sessions
 
 def calculate_session_totals(session, db):

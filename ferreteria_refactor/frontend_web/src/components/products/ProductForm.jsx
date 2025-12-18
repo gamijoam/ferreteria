@@ -347,11 +347,7 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
                                             placeholder="0.00"
                                         />
                                     </div>
-                                    <div className="mt-2 text-xs text-gray-500 space-y-1">
-                                        {getActiveCurrencies().map(curr => !curr.is_anchor && (
-                                            <div key={curr.id}>≈ {convertPrice(formData.cost, curr.symbol).toFixed(2)} {curr.symbol}</div>
-                                        ))}
-                                    </div>
+
                                 </div>
                                 <div>
                                     <label className="block text-sm font-bold text-green-700 mb-1">Precio de Venta ({anchorCurrency.symbol})</label>
@@ -366,11 +362,7 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
                                             placeholder="0.00"
                                         />
                                     </div>
-                                    <div className="mt-2 text-xs text-gray-500 space-y-1">
-                                        {getActiveCurrencies().map(curr => !curr.is_anchor && (
-                                            <div key={curr.id}>≈ {convertPrice(formData.price, curr.symbol).toFixed(2)} {curr.symbol}</div>
-                                        ))}
-                                    </div>
+
                                 </div>
                             </div>
 
