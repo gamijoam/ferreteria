@@ -15,7 +15,12 @@ const Dashboard = () => {
         setLoading(true);
         try {
             const params = {};
-            const today = new Date().toISOString().split('T')[0];
+            // FIX: Use local date instead of UTC to avoid "tomorrow" date late in day
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const today = `${year}-${month}-${day}`;
 
             if (dateRange === 'today') {
                 params.start_date = today;
@@ -23,12 +28,18 @@ const Dashboard = () => {
             } else if (dateRange === 'week') {
                 const weekAgo = new Date();
                 weekAgo.setDate(weekAgo.getDate() - 7);
-                params.start_date = weekAgo.toISOString().split('T')[0];
+                const wYear = weekAgo.getFullYear();
+                const wMonth = String(weekAgo.getMonth() + 1).padStart(2, '0');
+                const wDay = String(weekAgo.getDate()).padStart(2, '0');
+                params.start_date = `${wYear}-${wMonth}-${wDay}`; // Local week ago
                 params.end_date = today;
             } else if (dateRange === 'month') {
                 const monthAgo = new Date();
                 monthAgo.setMonth(monthAgo.getMonth() - 1);
-                params.start_date = monthAgo.toISOString().split('T')[0];
+                const mYear = monthAgo.getFullYear();
+                const mMonth = String(monthAgo.getMonth() + 1).padStart(2, '0');
+                const mDay = String(monthAgo.getDate()).padStart(2, '0');
+                params.start_date = `${mYear}-${mMonth}-${mDay}`; // Local month ago
                 params.end_date = today;
             }
 
@@ -85,8 +96,8 @@ const Dashboard = () => {
                 <button
                     onClick={() => setDateRange('today')}
                     className={`px-4 py-2 rounded-lg font-medium transition-colors ${dateRange === 'today'
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-white text-gray-700 hover:bg-gray-100'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-100'
                         }`}
                 >
                     Hoy
@@ -94,8 +105,8 @@ const Dashboard = () => {
                 <button
                     onClick={() => setDateRange('week')}
                     className={`px-4 py-2 rounded-lg font-medium transition-colors ${dateRange === 'week'
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-white text-gray-700 hover:bg-gray-100'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-100'
                         }`}
                 >
                     Última Semana
@@ -103,8 +114,8 @@ const Dashboard = () => {
                 <button
                     onClick={() => setDateRange('month')}
                     className={`px-4 py-2 rounded-lg font-medium transition-colors ${dateRange === 'month'
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-white text-gray-700 hover:bg-gray-100'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-100'
                         }`}
                 >
                     Último Mes

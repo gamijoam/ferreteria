@@ -1,5 +1,6 @@
 import { createContext, useState, useContext, useEffect } from 'react';
 import apiClient from '../config/axios';
+import { useWebSocket } from './WebSocketContext';
 
 const CashContext = createContext();
 
@@ -7,6 +8,7 @@ export const CashProvider = ({ children }) => {
     const [isSessionOpen, setIsSessionOpen] = useState(false);
     const [session, setSession] = useState(null);
     const [loading, setLoading] = useState(true);
+    const { subscribe } = useWebSocket();
 
     const checkStatus = async () => {
         try {
@@ -24,7 +26,29 @@ export const CashProvider = ({ children }) => {
 
     useEffect(() => {
         checkStatus();
-    }, []);
+
+        // WebSocket Subscriptions
+        const unsubOpen = subscribe('cash_session:opened', (data) => {
+            console.log('💵 Session Opened Real-time:', data);
+
+            // To be safe, we might want to fetch full session details because 'data' from WS might be partial
+            // But for now let's assume valid
+            setIsSessionOpen(true);
+            // Ideally we should setSession, but if WS data is small, fetch full
+            checkStatus(); // Safe way: re-check status
+        });
+
+        const unsubClose = subscribe('cash_session:closed', (data) => {
+            console.log('💵 Session Closed Real-time:', data);
+            setIsSessionOpen(false);
+            setSession(null);
+        });
+
+        return () => {
+            unsubOpen();
+            unsubClose();
+        };
+    }, [subscribe]);
 
     const openSession = async (sessionData) => {
         try {

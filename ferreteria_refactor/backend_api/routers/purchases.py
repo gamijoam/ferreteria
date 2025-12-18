@@ -5,6 +5,8 @@ from ..database.db import get_db
 from ..models import models
 from .. import schemas
 from datetime import datetime
+from ..websocket.manager import manager
+from ..websocket.events import WebSocketEvents
 
 router = APIRouter(
     prefix="/purchases",
@@ -12,7 +14,7 @@ router = APIRouter(
 )
 
 @router.post("/", response_model=schemas.PurchaseOrderResponse)
-def create_purchase_order(order_data: schemas.PurchaseOrderCreate, db: Session = Depends(get_db)):
+async def create_purchase_order(order_data: schemas.PurchaseOrderCreate, db: Session = Depends(get_db)):
     """
     Create a new purchase order with automatic:
     - Stock updates
@@ -44,6 +46,8 @@ def create_purchase_order(order_data: schemas.PurchaseOrderCreate, db: Session =
         db.add(purchase)
         db.flush()  # Get purchase ID
         
+        updated_products_info = []
+
         # Process items
         for item in order_data.items:
             product = db.query(models.Product).filter(models.Product.id == item.product_id).first()
@@ -72,6 +76,15 @@ def create_purchase_order(order_data: schemas.PurchaseOrderCreate, db: Session =
                 date=purchase_date
             )
             db.add(kardex)
+            
+            # Collect info for broadcast
+            updated_products_info.append({
+                "id": product.id,
+                "name": product.name,
+                "price": product.price,
+                "stock": product.stock,
+                "exchange_rate_id": product.exchange_rate_id
+            })
         
         # Update supplier balance if credit purchase
         if order_data.payment_type == 'CREDIT':
@@ -83,6 +96,15 @@ def create_purchase_order(order_data: schemas.PurchaseOrderCreate, db: Session =
         
         db.commit()
         db.refresh(purchase)
+        
+        # Emission of events
+        for p_info in updated_products_info:
+            await manager.broadcast(WebSocketEvents.PRODUCT_UPDATED, p_info)
+            await manager.broadcast(WebSocketEvents.PRODUCT_STOCK_UPDATED, {
+                "id": p_info["id"], 
+                "stock": p_info["stock"]
+            })
+
         return purchase
     except Exception as e:
         db.rollback()

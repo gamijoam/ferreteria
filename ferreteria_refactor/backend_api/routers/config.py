@@ -5,6 +5,8 @@ from ..database.db import get_db
 from ..models import models
 from .. import schemas
 from ..dependencies import admin_only
+from ..websocket.manager import manager
+from ..websocket.events import WebSocketEvents
 
 router = APIRouter(
     prefix="/config",
@@ -33,7 +35,7 @@ def get_exchange_rates(
 
 
 @router.post("/exchange-rates", response_model=schemas.ExchangeRateRead)
-def create_exchange_rate(
+async def create_exchange_rate(
     rate_data: schemas.ExchangeRateCreate,
     db: Session = Depends(get_db),
     user: Any = Depends(admin_only)  # Protect mutation
@@ -50,6 +52,17 @@ def create_exchange_rate(
     db.add(new_rate)
     db.commit()
     db.refresh(new_rate)
+    
+    # Broadcast event
+    await manager.broadcast(WebSocketEvents.EXCHANGE_RATE_CREATED, {
+        "id": new_rate.id,
+        "name": new_rate.name,
+        "rate": new_rate.rate,
+        "currency_code": new_rate.currency_code,
+        "is_default": new_rate.is_default,
+        "is_active": new_rate.is_active
+    })
+    
     return new_rate
 
 
@@ -63,7 +76,7 @@ def get_exchange_rate_by_id(id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/exchange-rates/{id}", response_model=schemas.ExchangeRateRead)
-def update_exchange_rate(
+async def update_exchange_rate(
     id: int,
     rate_data: schemas.ExchangeRateUpdate,
     db: Session = Depends(get_db),
@@ -88,11 +101,22 @@ def update_exchange_rate(
     
     db.commit()
     db.refresh(rate)
+    
+    # Broadcast event
+    await manager.broadcast(WebSocketEvents.EXCHANGE_RATE_UPDATED, {
+        "id": rate.id,
+        "name": rate.name,
+        "rate": rate.rate, # Float
+        "currency_code": rate.currency_code,
+        "is_default": rate.is_default,
+        "is_active": rate.is_active
+    })
+    
     return rate
 
 
 @router.delete("/exchange-rates/{id}")
-def delete_exchange_rate(
+async def delete_exchange_rate(
     id: int,
     db: Session = Depends(get_db),
     user: Any = Depends(admin_only)  # Protect mutation
@@ -110,11 +134,61 @@ def delete_exchange_rate(
     
     rate.is_active = False
     db.commit()
+    
+    # Broadcast event
+    await manager.broadcast(WebSocketEvents.EXCHANGE_RATE_DELETED, {
+        "id": rate.id
+    })
+    
     return {"message": "Exchange rate deactivated successfully"}
 
 # ========================================
 # BUSINESS CONFIGURATION (GENERIC)
 # ========================================
+
+@router.get("/business", response_model=schemas.BusinessInfo)
+def get_business_info(db: Session = Depends(get_db)):
+    """Get aggregated business information"""
+    keys = ["business_name", "business_doc", "business_address", "business_phone", "business_email"]
+    configs = db.query(models.BusinessConfig).filter(models.BusinessConfig.key.in_(keys)).all()
+    config_dict = {c.key: c.value for c in configs}
+    
+    return schemas.BusinessInfo(
+        name=config_dict.get("business_name", ""),
+        document_id=config_dict.get("business_doc", ""),
+        address=config_dict.get("business_address", ""),
+        phone=config_dict.get("business_phone", ""),
+        email=config_dict.get("business_email", "")
+    )
+
+@router.put("/business", response_model=schemas.BusinessInfo)
+def update_business_info(
+    info: schemas.BusinessInfo, 
+    db: Session = Depends(get_db),
+    user: Any = Depends(admin_only)
+):
+    """Update aggregated business information"""
+    mapping = {
+        "business_name": info.name,
+        "business_doc": info.document_id,
+        "business_address": info.address,
+        "business_phone": info.phone,
+        "business_email": info.email
+    }
+    
+    for key, value in mapping.items():
+        if value is not None:
+            config = db.query(models.BusinessConfig).get(key)
+            if not config:
+                config = models.BusinessConfig(key=key, value=value)
+                db.add(config)
+            else:
+                config.value = value
+    
+    db.commit()
+    
+    # Return updated info
+    return get_business_info(db)
 
 @router.get("/", response_model=List[schemas.BusinessConfigRead])
 def get_all_configs(db: Session = Depends(get_db)):

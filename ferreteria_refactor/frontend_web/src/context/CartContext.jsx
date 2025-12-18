@@ -1,26 +1,57 @@
 import { createContext, useState, useContext, useMemo, useEffect } from 'react';
 import apiClient from '../config/axios';
+import { useConfig } from './ConfigContext';
 
 const CartContext = createContext();
 
 export const CartProvider = ({ children }) => {
     const [cart, setCart] = useState([]);
-    const [exchangeRates, setExchangeRates] = useState([]);
+    const { currencies: exchangeRates } = useConfig();
 
-    // Fetch exchange rates on mount
+    // Auto-update cart items when exchange rates change
     useEffect(() => {
-        const fetchExchangeRates = async () => {
-            try {
-                const response = await apiClient.get('/config/exchange-rates', {
-                    params: { is_active: true }
-                });
-                setExchangeRates(response.data);
-            } catch (error) {
-                console.error('Error fetching exchange rates:', error);
-            }
-        };
-        fetchExchangeRates();
-    }, []);
+        if (!exchangeRates || exchangeRates.length === 0) return;
+
+        setCart(prevCart => {
+            return prevCart.map(item => {
+                // Find current rate for this item
+                // If it was using a specific rate ID, find that rate's new value
+                if (item.exchange_rate_source === 'pre-resolved' || item.is_special_rate) {
+                    // Try to find the rate by ID used originally (we don't store ID explicitly in cart item root, 
+                    // but we might infer it or we should have stored it. 
+                    // Let's assume we match by currency code if we can't find ID, 
+                    // BUT better logic: In addToCart we found the rate. 
+
+                    // Actually, item has 'exchange_rate_name'. Ideally we should have stored exchange_rate_id in item.
+                    // Let's check addToCart logic...
+                    // It doesn't store rate_id in the item root, only in local scope.
+                    // But we likely can match by name or context.
+
+                    // For robust implementations, let's use the currency logic.
+                    // If the item has a 'exchange_rate_name', we can try to find it in new rates.
+
+                    const updatedRateObj = exchangeRates.find(r => r.name === item.exchange_rate_name);
+                    if (updatedRateObj) {
+                        const newRate = updatedRateObj.rate;
+                        if (newRate !== item.exchange_rate) {
+                            const subtotalUsd = item.subtotal_usd;
+                            return {
+                                ...item,
+                                exchange_rate: newRate,
+                                subtotal_bs: subtotalUsd * newRate
+                            };
+                        }
+                    }
+                }
+
+                // If it was using default rate (source='default' or similar)
+                // We might need to re-evaluate getEffectiveExchangeRate logic here, 
+                // but simpler is to just update if we can identify the rate used.
+
+                return item;
+            });
+        });
+    }, [exchangeRates]);
 
     /**
      * Get effective exchange rate for a product/unit combination

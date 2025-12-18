@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react';
 import { Plus, Search, Package } from 'lucide-react';
 import ProductForm from '../components/products/ProductForm';
 import { useConfig } from '../context/ConfigContext';
+import { useWebSocket } from '../context/WebSocketContext';
 
 import apiClient from '../config/axios';
 
 const Products = () => {
     const { getActiveCurrencies, convertPrice, convertProductPrice } = useConfig();
+    const { subscribe } = useWebSocket();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState(null); // For editing
 
@@ -27,7 +29,21 @@ const Products = () => {
 
     useEffect(() => {
         fetchProducts();
-    }, []);
+
+        // WebSocket Subscriptions
+        const unsubCreate = subscribe('product:created', (newProduct) => {
+            setProducts(prev => [newProduct, ...prev]);
+        });
+
+        const unsubUpdate = subscribe('product:updated', (updatedProduct) => {
+            setProducts(prev => prev.map(p => p.id === updatedProduct.id ? { ...p, ...updatedProduct } : p));
+        });
+
+        return () => {
+            unsubCreate();
+            unsubUpdate();
+        };
+    }, [subscribe]);
 
     return (
         <div className="container mx-auto">

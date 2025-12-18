@@ -6,6 +6,8 @@ from ..models import models
 from .. import schemas
 from datetime import datetime
 from ..dependencies import warehouse_or_admin
+from ..websocket.manager import manager
+from ..websocket.events import WebSocketEvents
 
 router = APIRouter(
     prefix="/inventory",
@@ -14,7 +16,7 @@ router = APIRouter(
 )
 
 @router.post("/add")
-def add_stock(adjustment: schemas.StockAdjustmentCreate, db: Session = Depends(get_db)):
+async def add_stock(adjustment: schemas.StockAdjustmentCreate, db: Session = Depends(get_db)):
     """Add stock (Purchase/Entry)"""
     product = db.query(models.Product).filter(models.Product.id == adjustment.product_id).first()
     if not product:
@@ -37,10 +39,23 @@ def add_stock(adjustment: schemas.StockAdjustmentCreate, db: Session = Depends(g
     db.commit()
     db.refresh(product)
     
+    await manager.broadcast(WebSocketEvents.PRODUCT_UPDATED, {
+        "id": product.id,
+        "name": product.name,
+        "price": product.price,
+        "stock": product.stock,
+        "exchange_rate_id": product.exchange_rate_id
+    })
+    
+    await manager.broadcast(WebSocketEvents.PRODUCT_STOCK_UPDATED, {
+        "id": product.id,
+        "stock": product.stock
+    })
+    
     return {"status": "success", "new_stock": product.stock, "product_id": product.id}
 
 @router.post("/remove")
-def remove_stock(adjustment: schemas.StockAdjustmentCreate, db: Session = Depends(get_db)):
+async def remove_stock(adjustment: schemas.StockAdjustmentCreate, db: Session = Depends(get_db)):
     """Remove stock (Adjustment/Loss)"""
     product = db.query(models.Product).filter(models.Product.id == adjustment.product_id).first()
     if not product:
@@ -65,6 +80,19 @@ def remove_stock(adjustment: schemas.StockAdjustmentCreate, db: Session = Depend
     db.add(kardex_entry)
     db.commit()
     db.refresh(product)
+    
+    await manager.broadcast(WebSocketEvents.PRODUCT_UPDATED, {
+        "id": product.id,
+        "name": product.name,
+        "price": product.price,
+        "stock": product.stock,
+        "exchange_rate_id": product.exchange_rate_id
+    })
+    
+    await manager.broadcast(WebSocketEvents.PRODUCT_STOCK_UPDATED, {
+        "id": product.id,
+        "stock": product.stock
+    })
     
     return {"status": "success", "new_stock": product.stock, "product_id": product.id}
 

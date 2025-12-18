@@ -26,6 +26,7 @@ import {
 
 const DashboardLayout = () => {
     const { user, logout } = useAuth();
+    const { business } = useConfig(); // Get business info
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -56,7 +57,9 @@ const DashboardLayout = () => {
             {/* Sidebar */}
             <aside className="w-64 bg-slate-800 text-white flex flex-col overflow-y-auto">
                 <div className="p-4 border-b border-slate-700">
-                    <h1 className="text-xl font-bold">Ferretería Pro</h1>
+                    <h1 className="text-xl font-bold truncate" title={business?.name || 'Ferretería Pro'}>
+                        {business?.name || 'Ferretería Pro'}
+                    </h1>
                 </div>
 
                 <nav className="flex-1 p-4 space-y-1">

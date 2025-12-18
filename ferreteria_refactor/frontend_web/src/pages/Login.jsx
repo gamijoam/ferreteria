@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useConfig } from '../context/ConfigContext';
 import { useNavigate } from 'react-router-dom';
 
 const Login = () => {
@@ -8,6 +9,7 @@ const Login = () => {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const { login } = useAuth();
+    const { business } = useConfig();
     const navigate = useNavigate();
 
     const handleSubmit = async (e) => {
@@ -27,7 +29,14 @@ const Login = () => {
     return (
         <div className="min-h-screen flex items-center justify-center bg-gray-100">
             <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
-                <h2 className="text-2xl font-bold mb-6 text-center text-gray-800">Iniciar Sesión</h2>
+                <div className="text-center mb-6">
+                    <h2 className="text-2xl font-bold text-gray-800">
+                        {business?.name || 'Iniciar Sesión'}
+                    </h2>
+                    {business?.document_id && (
+                        <p className="text-sm text-gray-500 mt-1">{business.document_id}</p>
+                    )}
+                </div>
 
                 {error && (
                     <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 text-sm">

@@ -6,6 +6,8 @@ from ..database.db import get_db
 from ..models import models
 from .. import schemas
 import datetime
+from ..websocket.manager import manager
+from ..websocket.events import WebSocketEvents
 
 router = APIRouter(
     prefix="/cash",
@@ -13,7 +15,7 @@ router = APIRouter(
 )
 
 @router.post("/open", response_model=schemas.CashSessionRead)
-def open_session(session_data: schemas.CashSessionCreate, db: Session = Depends(get_db)):
+async def open_session(session_data: schemas.CashSessionCreate, db: Session = Depends(get_db)):
     # Check if there's already an open session
     existing = db.query(models.CashSession).filter(
         models.CashSession.status == "OPEN"
@@ -43,6 +45,13 @@ def open_session(session_data: schemas.CashSessionCreate, db: Session = Depends(
     
     db.commit()
     db.refresh(new_session)
+    
+    await manager.broadcast(WebSocketEvents.CASH_SESSION_OPENED, {
+        "id": new_session.id, 
+        "user_id": new_session.user_id,
+        "status": "OPEN"
+    })
+    
     return new_session
 
 @router.get("/active", response_model=schemas.CashSessionRead)
@@ -211,7 +220,7 @@ def get_session_details(session_id: int, db: Session = Depends(get_db)):
     }
 
 @router.post("/{session_id}/close", response_model=schemas.CashSessionCloseResponse)
-def close_session(session_id: int, close_data: schemas.CashSessionClose, db: Session = Depends(get_db)):
+async def close_session(session_id: int, close_data: schemas.CashSessionClose, db: Session = Depends(get_db)):
     session = db.query(models.CashSession).filter(models.CashSession.id == session_id).first()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -303,12 +312,20 @@ def close_session(session_id: int, close_data: schemas.CashSessionClose, db: Ses
             "total_sales_invoiced": round(total_sales_invoiced, 2),
             "total_cash_collected": round(total_cash_collected, 2)
         }
+        
+        await manager.broadcast(WebSocketEvents.CASH_SESSION_CLOSED, {
+            "id": session.id,
+            "user_id": session.user_id,
+            "status": "CLOSED"
+        })
+        
+        return response_data
     except Exception as e:
         print(f"Error closing session: {e}")
         raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
 @router.post("/movements", response_model=schemas.CashMovementRead)
-def add_movement(movement: schemas.CashMovementCreate, db: Session = Depends(get_db)):
+async def add_movement(movement: schemas.CashMovementCreate, db: Session = Depends(get_db)):
     # Find active session if not provided
     if not movement.session_id:
         # Simplification: Assume current user ID 1 or passed in header (Future: Auth)
@@ -327,7 +344,14 @@ def add_movement(movement: schemas.CashMovementCreate, db: Session = Depends(get
         exchange_rate=1.0 # Default
     )
     db.add(new_movement)
-    db.commit()
     db.refresh(new_movement)
+    
+    await manager.broadcast(WebSocketEvents.CASH_SESSION_MOVEMENT, {
+        "id": new_movement.id,
+        "session_id": new_movement.session_id,
+        "amount": new_movement.amount,
+        "type": new_movement.type
+    })
+    
     return new_movement
 

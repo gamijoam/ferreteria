@@ -3,6 +3,7 @@ import { Search, ShoppingCart, Trash2, Plus, Minus, CreditCard, RotateCcw } from
 import { useCart } from '../context/CartContext';
 import { useCash } from '../context/CashContext';
 import { useConfig } from '../context/ConfigContext';
+import { useWebSocket } from '../context/WebSocketContext';
 import { Link } from 'react-router-dom';
 import UnitSelectionModal from '../components/pos/UnitSelectionModal';
 import EditItemModal from '../components/pos/EditItemModal';
@@ -19,6 +20,7 @@ const POS = () => {
     const { cart, addToCart, removeFromCart, updateQuantity, clearCart, totalUSD, totalBs, totalsByCurrency, exchangeRates } = useCart();
     const { isSessionOpen, openSession } = useCash();
     const { getActiveCurrencies, convertPrice, currencies } = useConfig();
+    const { subscribe } = useWebSocket(); // WebSocket Hook
     const anchorCurrency = currencies.find(c => c.is_anchor) || { symbol: '$' };
 
     // UI State
@@ -38,7 +40,7 @@ const POS = () => {
     // Refs
     const searchInputRef = useRef(null);
 
-    // Fetch Catalog and Categories
+    // Fetch Catalog and Categories on Mount
     useEffect(() => {
         const fetchData = async () => {
             try {
@@ -57,6 +59,27 @@ const POS = () => {
         };
         fetchData();
     }, []);
+
+    // WebSocket Subscriptions for Products
+    useEffect(() => {
+        const unsubUpdate = subscribe('product:updated', (updatedProduct) => {
+            console.log('📦 Real-time Product Update:', updatedProduct);
+            setCatalog(prev => prev.map(p => p.id === updatedProduct.id ? { ...p, ...updatedProduct } : p));
+        });
+
+        const unsubCreate = subscribe('product:created', (newProduct) => {
+            console.log('📦 Real-time Product Created:', newProduct);
+            setCatalog(prev => [...prev, newProduct]);
+        });
+
+        // If we implement specific stock event later, add here
+        // const unsubStock = subscribe('product:stock_updated', ...);
+
+        return () => {
+            unsubUpdate();
+            unsubCreate();
+        };
+    }, [subscribe]);
 
     // Filter by search and category
     const filteredCatalog = catalog.filter(p => {

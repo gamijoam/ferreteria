@@ -639,3 +639,13 @@ class SupplierStatsResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+class BusinessInfo(BaseModel):
+    name: Optional[str] = ""
+    document_id: Optional[str] = "" # RIF/NIT/Etc
+    address: Optional[str] = ""
+    phone: Optional[str] = ""
+    email: Optional[str] = ""
+    website: Optional[str] = ""
+    logo_url: Optional[str] = "" # URL for displayed logo
+

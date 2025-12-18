@@ -16,10 +16,13 @@ const CashClose = () => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (isSessionOpen && session) {
-            fetchSessionData();
+        if (isSessionOpen && session?.id) {
+            // Only fetch if first load or session different from loaded data
+            if (!sessionData || sessionData.id !== session.id) {
+                fetchSessionData();
+            }
         }
-    }, [isSessionOpen, session]);
+    }, [isSessionOpen, session?.id]);
 
     const fetchSessionData = async () => {
         try {
@@ -148,7 +151,7 @@ const CashClose = () => {
 
                                     {diff !== null && (
                                         <div className={`text-sm font-medium ${Math.abs(diff) < 0.01 ? 'text-green-600' :
-                                                diff > 0 ? 'text-blue-600' : 'text-red-600'
+                                            diff > 0 ? 'text-blue-600' : 'text-red-600'
                                             }`}>
                                             Diferencia: {diff > 0 ? '+' : ''}{diff.toFixed(2)}
                                             {Math.abs(diff) < 0.01 ? ' ✓ Cuadra' :

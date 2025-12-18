@@ -6,6 +6,8 @@ from ..models import models
 from .. import schemas
 from ..dependencies import has_role, get_current_active_user
 from ..models.models import UserRole
+from ..websocket.manager import manager
+from ..websocket.events import WebSocketEvents
 
 router = APIRouter(prefix="/products", tags=["products"])
 
@@ -15,35 +17,13 @@ def read_products(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)
     return products
 
 @router.post("/", response_model=schemas.ProductRead, dependencies=[Depends(has_role([UserRole.ADMIN, UserRole.WAREHOUSE]))])
-def create_product(product: schemas.ProductCreate, db: Session = Depends(get_db)):
-    # DEBUG: Log received data
-    print("=" * 60)
-    print("📦 CREATE PRODUCT - Received Data:")
-    print(f"   Name: {product.name}")
-    print(f"   Price: {product.price}")
-    print(f"   exchange_rate_id: {product.exchange_rate_id}")
-    print(f"   Type: {type(product.exchange_rate_id)}")
-    print("=" * 60)
-    
+async def create_product(product: schemas.ProductCreate, db: Session = Depends(get_db)):
     # Exclude 'units' from the main Product creation
     product_data = product.dict(exclude={"units"})
-    
-    # DEBUG: Log product_data dict
-    print(f"📋 Product Data Dict: {product_data}")
-    print(f"   exchange_rate_id in dict: {product_data.get('exchange_rate_id')}")
-    
     db_product = models.Product(**product_data)
-    
-    # DEBUG: Log before commit
-    print(f"🔍 Before commit - exchange_rate_id: {db_product.exchange_rate_id}")
-    
     db.add(db_product)
     db.commit()
     db.refresh(db_product)
-    
-    # DEBUG: Log after commit
-    print(f"✅ After commit - exchange_rate_id: {db_product.exchange_rate_id}")
-    print("=" * 60)
 
     # Process Units
     if product.units:
@@ -53,21 +33,25 @@ def create_product(product: schemas.ProductCreate, db: Session = Depends(get_db)
         db.commit()
         db.refresh(db_product)
         
+    # Simplify broadcast data to avoid serialization issues with complex objects
+    # Or just send ID and let frontend fetch? Better to send key data.
+    await manager.broadcast(WebSocketEvents.PRODUCT_CREATED, {
+        "id": db_product.id,
+        "name": db_product.name,
+        "price": db_product.price,
+        "stock": db_product.stock,
+        "exchange_rate_id": db_product.exchange_rate_id
+    })
+        
     return db_product
 
 @router.put("/{product_id}", response_model=schemas.ProductRead, dependencies=[Depends(has_role([UserRole.ADMIN, UserRole.WAREHOUSE]))])
-def update_product(product_id: int, product_update: schemas.ProductUpdate, db: Session = Depends(get_db)):
+async def update_product(product_id: int, product_update: schemas.ProductUpdate, db: Session = Depends(get_db)):
     db_product = db.query(models.Product).filter(models.Product.id == product_id).first()
     if not db_product:
         raise HTTPException(status_code=404, detail="Product not found")
     
-    # DEBUG: Log received data
-    print("=" * 60)
-    print(f"🔄 UPDATE PRODUCT ID {product_id} - Received Data:")
     update_data = product_update.dict(exclude_unset=True)
-    print(f"   Update Data: {update_data}")
-    print(f"   exchange_rate_id: {update_data.get('exchange_rate_id')}")
-    print("=" * 60)
     
     # Separate units data if present
     units_data = None
@@ -75,11 +59,7 @@ def update_product(product_id: int, product_update: schemas.ProductUpdate, db: S
         units_data = update_data.pop("units")
 
     for key, value in update_data.items():
-        print(f"   Setting {key} = {value}")
         setattr(db_product, key, value)
-    
-    # DEBUG: Log before commit
-    print(f"🔍 Before commit - exchange_rate_id: {db_product.exchange_rate_id}")
     
     # Handle Units Update (Snapshot Strategy: Delete all old, create new)
     if units_data is not None:
@@ -88,18 +68,19 @@ def update_product(product_id: int, product_update: schemas.ProductUpdate, db: S
         
         # Add new units
         for unit in units_data:
-            # We use unit (dict) from the popped data
-            # Note: unit is already a dict if we used .dict(), or we might need to handle Pydantic objects if we didn't
-            # update_data comes from product_update.dict(), so 'units' is a list of dicts.
             db_unit = models.ProductUnit(**unit, product_id=product_id)
             db.add(db_unit)
 
     db.commit()
     db.refresh(db_product)
     
-    # DEBUG: Log after commit
-    print(f"✅ After commit - exchange_rate_id: {db_product.exchange_rate_id}")
-    print("=" * 60)
+    await manager.broadcast(WebSocketEvents.PRODUCT_UPDATED, {
+        "id": db_product.id,
+        "name": db_product.name,
+        "price": db_product.price,
+        "stock": db_product.stock,
+        "exchange_rate_id": db_product.exchange_rate_id
+    })
     
     return db_product
 
@@ -182,9 +163,11 @@ def delete_price_rule(rule_id: int, db: Session = Depends(get_db)):
     return {"status": "success"}
 
 @router.post("/sales/")
-def create_sale(sale_data: schemas.SaleCreate, db: Session = Depends(get_db)):
+async def create_sale(sale_data: schemas.SaleCreate, db: Session = Depends(get_db)):
     from datetime import datetime, timedelta
     from sqlalchemy import func
+    
+    updated_products_info = []
     
     # Credit Validation for Credit Sales
     if sale_data.is_credit and sale_data.customer_id:
@@ -297,6 +280,15 @@ def create_sale(sale_data: schemas.SaleCreate, db: Session = Depends(get_db)):
         # Update Stock
         product.stock -= units_to_deduct
         
+        # Collect info for broadcast
+        updated_products_info.append({
+            "id": product.id,
+            "name": product.name,
+            "price": product.price,
+            "stock": product.stock,
+            "exchange_rate_id": product.exchange_rate_id
+        })
+        
         # Register Kardex Movement
         kardex_entry = models.Kardex(
             product_id=product.id,
@@ -330,6 +322,25 @@ def create_sale(sale_data: schemas.SaleCreate, db: Session = Depends(get_db)):
         db.add(fallback_payment)
 
     db.commit()
+    
+    # Emit Stock Update Events
+    for p_info in updated_products_info:
+        await manager.broadcast(WebSocketEvents.PRODUCT_UPDATED, p_info)
+        await manager.broadcast(WebSocketEvents.PRODUCT_STOCK_UPDATED, {
+            "id": p_info["id"], 
+            "stock": p_info["stock"]
+        })
+    
+    # Emit Sale Event
+    await manager.broadcast(WebSocketEvents.SALE_COMPLETED, {
+        "id": new_sale.id,
+        "total_amount": new_sale.total_amount,
+        "currency": new_sale.currency,
+        "payment_method": new_sale.payment_method,
+        "customer_id": new_sale.customer_id,
+        "date": new_sale.date.isoformat() if new_sale.date else None
+    })
+        
     return {"status": "success", "sale_id": new_sale.id}
 
 @router.post("/sales/payments")
