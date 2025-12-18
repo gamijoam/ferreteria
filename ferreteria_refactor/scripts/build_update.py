@@ -3,6 +3,7 @@ import shutil
 import json
 import zipfile
 import re
+import sys
 
 # CONFIGURATION
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) # ferreteria_refactor
@@ -12,6 +13,17 @@ LANDING_PAGE_DIR = os.path.join(REPO_ROOT, "landing_page")
 DOWNLOADS_DIR = os.path.join(LANDING_PAGE_DIR, "downloads")
 VERSION_FILE = os.path.join(LANDING_PAGE_DIR, "version.json")
 ZIP_NAME = "update_ferreteria.zip"
+
+# --- BUILD OPTIONS ---
+# Set these to True/False to control what gets re-compiled
+BUILD_CLIENT = True    # Re-compile Ferreteria.exe
+BUILD_SERVER = False    # Re-compile Server.exe (Set to True if you changed Backend)
+BUILD_LAUNCHER = False  # Re-compile Launcher.exe
+
+# Set this to False if old clients are crashing during update.
+# This keeps the old Launcher but updates the App.
+INCLUDE_LAUNCHER_IN_ZIP = False
+# ---------------------
 
 EXCLUDES = [
     r"__pycache__",
@@ -61,15 +73,36 @@ def main():
         return
 
     # 0. Compile Logic
-    print("Compiling Source Code...")
-    import subprocess
-    build_script = os.path.join(os.path.dirname(__file__), "build_exe.py")
-    subprocess.run(["python", build_script], check=True)
+    print("--- Checking Build Configuration ---")
+    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+    import build_exe
     
+    # We must ensure directories exist (build_exe.clean might remove them if called unconditionally)
+    # So we only call clean if we are building something?
+    # Better: Let's assume user manages clean or we modify build_exe later.
+    # For now, just call the functions.
+    
+    if BUILD_CLIENT:
+        build_exe.build_frontend()
+    else:
+        print("[SKIP] Client Build (Ferreteria.exe)")
+        
+    if BUILD_SERVER:
+        build_exe.build_backend()
+    else:
+        print("[SKIP] Server Build (Server.exe)")
+
+    if BUILD_LAUNCHER:
+        build_exe.build_launcher()
+    else:
+        print("[SKIP] Launcher Build (Launcher.exe)")
+        
+
     COMPILED_DIR = os.path.join(PROJECT_ROOT, "dist", "Ferreteria")
     
-    if not os.path.exists(COMPILED_DIR):
-        print("Error: Compiled dir not found. Compilation failed?")
+    # Validation
+    if BUILD_CLIENT and not os.path.exists(COMPILED_DIR):
+        print("Error: Client build failed or not found.")
         return
 
     # 1. Read Version
@@ -123,12 +156,15 @@ def main():
             print("Warning: Server build not found!")
             
         # Add Launcher.exe
-        launcher_exe = os.path.join(PROJECT_ROOT, "dist", "Launcher.exe")
-        if os.path.exists(launcher_exe):
-            print("Adding Launcher.exe...")
-            zipf.write(launcher_exe, "Launcher.exe")
+        if INCLUDE_LAUNCHER_IN_ZIP:
+            launcher_exe = os.path.join(PROJECT_ROOT, "dist", "Launcher.exe")
+            if os.path.exists(launcher_exe):
+                print("Adding Launcher.exe...")
+                zipf.write(launcher_exe, "Launcher.exe")
+            else:
+                print("Warning: Launcher.exe not found in dist!")
         else:
-            print("Warning: Launcher.exe not found in dist!")
+            print("[SKIP] Launcher.exe exclusion (Safe Update Mode)")
             
         # Add Web Dashboard (Source)
         web_dashboard_src = os.path.join(PROJECT_ROOT, "web_dashboard")
