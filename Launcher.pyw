@@ -64,7 +64,7 @@ def start_backend():
 
 def main():
     # 1. Intentar Auto-Update
-    # git_update() # DESHABILITADO POR EL ASISTENTE para preservar cambios locales de desarrollo
+    git_update()
     
     # 2. Iniciar el Backend (+ Frontend servido)
     server_process = start_backend()
