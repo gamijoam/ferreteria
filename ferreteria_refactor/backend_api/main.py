@@ -78,17 +78,43 @@ if os.path.exists(frontend_dist):
     except:
         print("   (No se pudo leer contenido)")
 
-    # Montar assets
+    # Montar assets (Intentar método estándar)
     app.mount("/assets", StaticFiles(directory=os.path.join(frontend_dist, "assets")), name="assets")
     
+    # Check what files are actually in assets
+    assets_dir = os.path.join(frontend_dist, "assets")
+    if os.path.exists(assets_dir):
+        print(f"📁 Archivos en assets detectados: {os.listdir(assets_dir)}")
+    else:
+        print("⚠️ Carpeta assets no encontrada en dist!")
+
     # Catch-all para React
-    # Catch-all via Exception Handler (Preserves redirects)
     from fastapi import Request
     from fastapi.responses import JSONResponse
+    import mimetypes
+    
+    # Fix for Windows Registry MIME types issues
+    mimetypes.init()
+    mimetypes.add_type('application/javascript', '.js')
+    mimetypes.add_type('text/css', '.css')
 
     @app.exception_handler(404)
     async def custom_404_handler(request: Request, exc):
         path = request.url.path
+        
+        # Debug logging (visible in console)
+        if path.startswith("/assets"):
+            print(f"⚠️ 404 Asset: {path} - Checking manually...")
+            # Fallback manual para assets (por si StaticFiles falla)
+            asset_filename = path.replace("/assets/", "")
+            asset_path = os.path.join(frontend_dist, "assets", asset_filename)
+            if os.path.exists(asset_path):
+                print(f"   ✅ Asset encontrado manualmente: {asset_path}")
+                media_type, _ = mimetypes.guess_type(asset_path)
+                return FileResponse(asset_path, media_type=media_type)
+            else:
+                print(f"   ❌ Asset NO encontrado en disco: {asset_path}")
+            
         # Si es una llamada a la API, retornar JSON 404 real
         if path.startswith("/api") or path.startswith("/docs") or path.startswith("/openapi"):
             return JSONResponse(status_code=404, content={"detail": "Endpoint not found"})

@@ -47,21 +47,24 @@ def start_backend():
     ]
     
     # En Windows, usamos flags para ocultar la ventana negra si ejecutamos pyw
+    # MODIFICACIÓN: Desactivar ocultamiento para ver logs de debug
     creation_flags = 0
-    if sys.platform == "win32":
-        creation_flags = subprocess.CREATE_NO_WINDOW
+    # if sys.platform == "win32":
+    #    creation_flags = subprocess.CREATE_NO_WINDOW
 
     # Lanzamos el proceso
     process = subprocess.Popen(
         cmd,
         cwd=os.path.dirname(os.path.abspath(__file__)), # Ejecutar desde la raíz
-        creationflags=creation_flags
+        creationflags=creation_flags,
+        stdout=sys.stdout,
+        stderr=sys.stderr
     )
     return process
 
 def main():
     # 1. Intentar Auto-Update
-    git_update()
+    # git_update() # DESHABILITADO POR EL ASISTENTE para preservar cambios locales de desarrollo
     
     # 2. Iniciar el Backend (+ Frontend servido)
     server_process = start_backend()
