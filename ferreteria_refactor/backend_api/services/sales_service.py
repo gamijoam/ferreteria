@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import datetime, timedelta
 from fastapi import HTTPException
+from decimal import Decimal  # NEW
 from ..models import models
 from .. import schemas
 from ..websocket.manager import manager
@@ -40,11 +41,12 @@ class SalesService:
                 )
             
             # 3. Check credit limit
+            # SQLAlchemy returns Decimal for Numeric columns, but scalar() might return None
             current_debt = db.query(func.sum(models.Sale.balance_pending)).filter(
                 models.Sale.customer_id == sale_data.customer_id,
                 models.Sale.is_credit == True,
                 models.Sale.paid == False
-            ).scalar() or 0.0
+            ).scalar() or Decimal("0.00")
             
             if (current_debt + sale_data.total_amount) > customer.credit_limit:
                 raise HTTPException(
@@ -89,6 +91,7 @@ class SalesService:
                 raise HTTPException(status_code=404, detail=f"Product {item.product_id} not found")
             
             # Calculate base units to deduct using conversion_factor
+            # item.conversion_factor and item.quantity are Decimals from schema
             units_to_deduct = item.quantity * item.conversion_factor
             
             # Check Stock
@@ -125,8 +128,8 @@ class SalesService:
             updated_products_info.append({
                 "id": product.id,
                 "name": product.name,
-                "price": product.price,
-                "stock": product.stock,
+                "price": float(product.price), # Cast to float for JSON
+                "stock": float(product.stock),
                 "exchange_rate_id": product.exchange_rate_id
             })
             
@@ -175,7 +178,7 @@ class SalesService:
         # Emit Sale Event
         await manager.broadcast(WebSocketEvents.SALE_COMPLETED, {
             "id": new_sale.id,
-            "total_amount": new_sale.total_amount,
+            "total_amount": float(new_sale.total_amount), # Cast for JSON
             "currency": new_sale.currency,
             "payment_method": new_sale.payment_method,
             "customer_id": new_sale.customer_id,

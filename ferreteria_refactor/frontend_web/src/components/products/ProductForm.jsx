@@ -382,7 +382,7 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
                                     <option value="">Usar Predeterminada (por moneda)</option>
                                     {exchangeRates.map(rate => (
                                         <option key={rate.id} value={rate.id}>
-                                            {rate.name} - {rate.currency_code} ({rate.rate.toFixed(2)})
+                                            {rate.name} - {rate.currency_code} ({Number(rate.rate).toFixed(2)})
                                         </option>
                                     ))}
                                 </select>
@@ -393,7 +393,7 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
                                         {(() => {
                                             const selectedRate = exchangeRates.find(r => r.id === parseInt(formData.exchange_rate_id));
                                             if (selectedRate) {
-                                                const convertedPrice = formData.price * selectedRate.rate;
+                                                const convertedPrice = formData.price * Number(selectedRate.rate);
                                                 return (
                                                     <p className="text-lg font-bold text-purple-900">
                                                         {convertedPrice.toFixed(2)} {selectedRate.currency_symbol}

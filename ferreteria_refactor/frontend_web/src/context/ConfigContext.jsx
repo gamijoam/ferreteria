@@ -90,7 +90,7 @@ export const ConfigProvider = ({ children }) => {
                     }
                 }
 
-                setCurrencies(Array.isArray(currData) ? currData : []);
+                setCurrencies(Array.isArray(currData) ? currData.map(c => ({ ...c, rate: parseFloat(c.rate) })) : []);
             } catch (apiError) {
                 console.warn("Using mock config data due to API error:", apiError);
                 // Fallback Mock Data
@@ -130,7 +130,7 @@ export const ConfigProvider = ({ children }) => {
             normalize(c.currency_symbol) === target ||
             normalize(c.currency_code) === target
         );
-        return curr ? curr.rate : 1;
+        return curr ? parseFloat(curr.rate) : 1;
     };
 
     const getActiveCurrencies = () => {

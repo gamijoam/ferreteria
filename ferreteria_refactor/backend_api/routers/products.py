@@ -33,14 +33,22 @@ async def create_product(product: schemas.ProductCreate, db: Session = Depends(g
         db.commit()
         db.refresh(db_product)
         
-    # Simplify broadcast data to avoid serialization issues with complex objects
-    # Or just send ID and let frontend fetch? Better to send key data.
+    # Broadcast product created with complete data
     await manager.broadcast(WebSocketEvents.PRODUCT_CREATED, {
         "id": db_product.id,
         "name": db_product.name,
-        "price": db_product.price,
-        "stock": db_product.stock,
-        "exchange_rate_id": db_product.exchange_rate_id
+        "price": float(db_product.price),
+        "stock": float(db_product.stock),
+        "exchange_rate_id": db_product.exchange_rate_id,
+        "units": [
+            {
+                "id": u.id,
+                "unit_name": u.unit_name,
+                "conversion_factor": float(u.conversion_factor),
+                "price_usd": float(u.price_usd) if u.price_usd else None,
+                "barcode": u.barcode
+            } for u in db_product.units
+        ] if db_product.units else []
     })
         
     return db_product
@@ -113,12 +121,23 @@ async def update_product(product_id: int, product_update: schemas.ProductUpdate,
         log_action(db, user_id=1, action="UPDATE", table_name="products", record_id=db_product.id, changes=json.dumps(changes, default=str))
 
 
+
+    # Broadcast with complete product data including units
     await manager.broadcast(WebSocketEvents.PRODUCT_UPDATED, {
         "id": db_product.id,
         "name": db_product.name,
-        "price": db_product.price,
-        "stock": db_product.stock,
-        "exchange_rate_id": db_product.exchange_rate_id
+        "price": float(db_product.price),
+        "stock": float(db_product.stock),
+        "exchange_rate_id": db_product.exchange_rate_id,
+        "units": [
+            {
+                "id": u.id,
+                "unit_name": u.unit_name,
+                "conversion_factor": float(u.conversion_factor),
+                "price_usd": float(u.price_usd) if u.price_usd else None,
+                "barcode": u.barcode
+            } for u in db_product.units
+        ] if db_product.units else []
     })
     
     return db_product
@@ -133,7 +152,7 @@ def read_product(product_id: int, db: Session = Depends(get_db)):
     return product
 
 @router.delete("/{product_id}", dependencies=[Depends(has_role([UserRole.ADMIN]))])
-def delete_product(product_id: int, db: Session = Depends(get_db)):
+async def delete_product(product_id: int, db: Session = Depends(get_db)):
     product = db.query(models.Product).filter(models.Product.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
@@ -141,6 +160,13 @@ def delete_product(product_id: int, db: Session = Depends(get_db)):
     # Soft delete (set inactive)
     product.is_active = False
     db.commit()
+    
+    # Broadcast product deleted/deactivated
+    await manager.broadcast(WebSocketEvents.PRODUCT_DELETED, {
+        "id": product.id,
+        "name": product.name
+    })
+    
     return {"status": "success", "message": "Product deactivated"}
 
 # ========================================

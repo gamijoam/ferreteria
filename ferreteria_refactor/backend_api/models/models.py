@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Float, Text, DateTime, Enum
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Numeric, Text, DateTime, Enum
 from sqlalchemy.orm import relationship
 from ..database.db import Base
 import datetime
@@ -46,8 +46,8 @@ class Supplier(Base):
     created_at = Column(DateTime, default=datetime.datetime.now)
     
     # Financial fields for Accounts Payable
-    current_balance = Column(Float, default=0.0)  # Current debt
-    credit_limit = Column(Float, nullable=True)  # Optional credit limit
+    current_balance = Column(Numeric(12, 2), default=0.00)  # Current debt
+    credit_limit = Column(Numeric(12, 2), nullable=True)  # Optional credit limit
     payment_terms = Column(Integer, default=30)  # Payment terms in days
 
     products = relationship("Product", back_populates="supplier")
@@ -67,7 +67,7 @@ class ExchangeRate(Base):
     name = Column(String, nullable=False)  # "BCV", "Paralelo", "Preferencial"
     currency_code = Column(String, nullable=False)  # "VES", "COP", "PEN"
     currency_symbol = Column(String, nullable=False)  # "Bs", "COP", "S/"
-    rate = Column(Float, nullable=False)  # Exchange rate to USD
+    rate = Column(Numeric(14, 4), nullable=False)  # Exchange rate to USD
     is_default = Column(Boolean, default=False)  # Default rate for this currency
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.datetime.now)
@@ -87,12 +87,12 @@ class Product(Base):
     name = Column(String, index=True, nullable=False)
     sku = Column(String, unique=True, index=True, nullable=True) # Barcode
     description = Column(Text, nullable=True)
-    price = Column(Float, nullable=False, default=0.0)
-    price_mayor_1 = Column(Float, default=0.0) # Wholesale Price 1
-    price_mayor_2 = Column(Float, default=0.0) # Wholesale Price 2
-    cost_price = Column(Float, default=0.0)  # NEW: Cost for profit margin calculation
-    stock = Column(Float, default=0.0) # Base units
-    min_stock = Column(Float, default=5.0) # Low stock alert threshold
+    price = Column(Numeric(12, 2), nullable=False, default=0.00)
+    price_mayor_1 = Column(Numeric(12, 2), default=0.00) # Wholesale Price 1
+    price_mayor_2 = Column(Numeric(12, 2), default=0.00) # Wholesale Price 2
+    cost_price = Column(Numeric(14, 4), default=0.0000)  # NEW: Cost for profit margin calculation
+    stock = Column(Numeric(12, 3), default=0.000) # Base units
+    min_stock = Column(Numeric(12, 3), default=5.000) # Low stock alert threshold
     is_active = Column(Boolean, default=True) # Logical delete
 
     # Core Logic for Hardware Store
@@ -120,9 +120,9 @@ class ProductUnit(Base):
     id = Column(Integer, primary_key=True, index=True)
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
     unit_name = Column(String, nullable=False)  # Ej: "Saco", "Caja", "Gramo"
-    conversion_factor = Column(Float, nullable=False) # Ej: 50.0 (Saco), 0.001 (Gramo)
+    conversion_factor = Column(Numeric(14, 4), nullable=False) # Ej: 50.0 (Saco), 0.001 (Gramo)
     barcode = Column(String, nullable=True) # Código específico de la presentación
-    price_usd = Column(Float, nullable=True) # Precio específico (opcional)
+    price_usd = Column(Numeric(12, 2), nullable=True) # Precio específico (opcional)
     is_default = Column(Boolean, default=False)
     exchange_rate_id = Column(Integer, ForeignKey("exchange_rates.id"), nullable=True)  # Unit-specific rate
 
@@ -139,8 +139,8 @@ class Kardex(Base):
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
     date = Column(DateTime, default=datetime.datetime.now)
     movement_type = Column(Enum(MovementType), nullable=False)
-    quantity = Column(Float, nullable=False) # Positive or Negative
-    balance_after = Column(Float, nullable=False)
+    quantity = Column(Numeric(12, 3), nullable=False) # Positive or Negative
+    balance_after = Column(Numeric(12, 3), nullable=False)
     description = Column(Text, nullable=True)
 
     product = relationship("Product")
@@ -153,20 +153,20 @@ class Sale(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     date = Column(DateTime, default=datetime.datetime.now, index=True)
-    total_amount = Column(Float, nullable=False)
+    total_amount = Column(Numeric(12, 2), nullable=False)
     payment_method = Column(String, default="Efectivo") # Efectivo, Tarjeta, Credito
     
     # Dual Currency Support
     currency = Column(String, default="USD") # USD or BS
-    exchange_rate_used = Column(Float, default=1.0) # Rate at time of sale
-    total_amount_bs = Column(Float, nullable=True) # Amount in Bs if applicable
+    exchange_rate_used = Column(Numeric(14, 4), default=1.0000) # Rate at time of sale
+    total_amount_bs = Column(Numeric(12, 2), nullable=True) # Amount in Bs if applicable
     
     # Credit Sales
     customer_id = Column(Integer, ForeignKey("customers.id"), nullable=True)
     is_credit = Column(Boolean, default=False)
     paid = Column(Boolean, default=True) # False for credit sales
     due_date = Column(DateTime, nullable=True)  # Payment deadline for credit sales
-    balance_pending = Column(Float, nullable=True)  # Remaining balance for partial payments
+    balance_pending = Column(Numeric(12, 2), nullable=True)  # Remaining balance for partial payments
     
     # Sale Notes
     notes = Column(Text, nullable=True)  # Special observations or instructions
@@ -183,10 +183,10 @@ class SalePayment(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     sale_id = Column(Integer, ForeignKey("sales.id"), nullable=False)
-    amount = Column(Float, nullable=False)
+    amount = Column(Numeric(12, 2), nullable=False)
     currency = Column(String, default="USD") # USD or Bs
     payment_method = Column(String, default="Efectivo") # Efectivo, Tarjeta, etc.
-    exchange_rate = Column(Float, default=1.0) # Rate used for this specific payment
+    exchange_rate = Column(Numeric(14, 4), default=1.0000) # Rate used for this specific payment
 
     sale = relationship("Sale", back_populates="payments")
 
@@ -196,14 +196,14 @@ class SaleDetail(Base):
     id = Column(Integer, primary_key=True, index=True)
     sale_id = Column(Integer, ForeignKey("sales.id"), nullable=False)
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
-    quantity = Column(Float, nullable=False) # Units sold
-    unit_price = Column(Float, nullable=False) # Price at moment of sale
+    quantity = Column(Numeric(12, 3), nullable=False) # Units sold
+    unit_price = Column(Numeric(12, 2), nullable=False) # Price at moment of sale
     
     # Discount Support
-    discount = Column(Float, default=0.0)  # Discount amount or percentage
+    discount = Column(Numeric(12, 2), default=0.00)  # Discount amount or percentage
     discount_type = Column(String, default="NONE")  # NONE, PERCENT, FIXED
     
-    subtotal = Column(Float, nullable=False)
+    subtotal = Column(Numeric(12, 2), nullable=False)
     is_box_sale = Column(Boolean, default=False) # Was it sold as a box?
 
     sale = relationship("Sale", back_populates="details")
@@ -219,14 +219,14 @@ class CashSession(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     start_time = Column(DateTime, default=datetime.datetime.now)
     end_time = Column(DateTime, nullable=True)
-    initial_cash = Column(Float, default=0.0)
-    initial_cash_bs = Column(Float, default=0.0) # Initial amount in Bs
-    final_cash_reported = Column(Float, nullable=True) # What user counted (USD)
-    final_cash_reported_bs = Column(Float, nullable=True) # What user counted (Bs)
-    final_cash_expected = Column(Float, nullable=True) # Calculated (USD)
-    final_cash_expected_bs = Column(Float, nullable=True) # Calculated (Bs)
-    difference = Column(Float, nullable=True) # USD difference
-    difference_bs = Column(Float, nullable=True) # Bs difference
+    initial_cash = Column(Numeric(12, 2), default=0.00)
+    initial_cash_bs = Column(Numeric(12, 2), default=0.00) # Initial amount in Bs
+    final_cash_reported = Column(Numeric(12, 2), nullable=True) # What user counted (USD)
+    final_cash_reported_bs = Column(Numeric(12, 2), nullable=True) # What user counted (Bs)
+    final_cash_expected = Column(Numeric(12, 2), nullable=True) # Calculated (USD)
+    final_cash_expected_bs = Column(Numeric(12, 2), nullable=True) # Calculated (Bs)
+    difference = Column(Numeric(12, 2), nullable=True) # USD difference
+    difference_bs = Column(Numeric(12, 2), nullable=True) # Bs difference
     status = Column(String, default="OPEN") # OPEN, CLOSED
 
     movements = relationship("CashMovement", back_populates="session")
@@ -242,10 +242,10 @@ class CashSessionCurrency(Base):
     id = Column(Integer, primary_key=True, index=True)
     session_id = Column(Integer, ForeignKey("cash_sessions.id"), nullable=False)
     currency_symbol = Column(String, nullable=False)
-    initial_amount = Column(Float, default=0.0)
-    final_reported = Column(Float, nullable=True)
-    final_expected = Column(Float, nullable=True)
-    difference = Column(Float, nullable=True)
+    initial_amount = Column(Numeric(12, 2), default=0.00)
+    final_reported = Column(Numeric(12, 2), nullable=True)
+    final_expected = Column(Numeric(12, 2), nullable=True)
+    difference = Column(Numeric(12, 2), nullable=True)
     
     session = relationship("CashSession", back_populates="currencies")
     
@@ -259,9 +259,9 @@ class CashMovement(Base):
     id = Column(Integer, primary_key=True, index=True)
     session_id = Column(Integer, ForeignKey("cash_sessions.id"), nullable=False)
     type = Column(String, nullable=False) # EXPENSE, WITHDRAWAL, DEPOSIT
-    amount = Column(Float, nullable=False)
+    amount = Column(Numeric(12, 2), nullable=False)
     currency = Column(String, default="USD") # USD or BS
-    exchange_rate = Column(Float, default=1.0)
+    exchange_rate = Column(Numeric(14, 4), default=1.0000)
     description = Column(Text, nullable=True)
     date = Column(DateTime, default=datetime.datetime.now)
 
@@ -296,7 +296,7 @@ class Return(Base):
     id = Column(Integer, primary_key=True, index=True)
     sale_id = Column(Integer, ForeignKey("sales.id"), nullable=False)
     date = Column(DateTime, default=datetime.datetime.now)
-    total_refunded = Column(Float, nullable=False)
+    total_refunded = Column(Numeric(12, 2), nullable=False)
     reason = Column(Text, nullable=True)
 
     sale = relationship("Sale")
@@ -311,8 +311,8 @@ class ReturnDetail(Base):
     id = Column(Integer, primary_key=True, index=True)
     return_id = Column(Integer, ForeignKey("returns.id"), nullable=False)
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
-    quantity = Column(Float, nullable=False) # Units returned
-    unit_price = Column(Float, default=0.0)  # Price at time of return
+    quantity = Column(Numeric(12, 3), nullable=False) # Units returned
+    unit_price = Column(Numeric(12, 2), default=0.00)  # Price at time of return
 
     return_obj = relationship("Return", back_populates="details")
     product = relationship("Product")
@@ -329,7 +329,7 @@ class Customer(Base):
     phone = Column(String, nullable=True)
     email = Column(String, nullable=True)
     address = Column(Text, nullable=True)
-    credit_limit = Column(Float, default=0.0)
+    credit_limit = Column(Numeric(12, 2), default=0.00)
     payment_term_days = Column(Integer, default=15)  # Default payment term in days
     is_blocked = Column(Boolean, default=False)  # Manual credit block flag
 
@@ -344,14 +344,14 @@ class Payment(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     customer_id = Column(Integer, ForeignKey("customers.id"), nullable=False)
-    amount = Column(Float, nullable=False)
+    amount = Column(Numeric(12, 2), nullable=False)
     date = Column(DateTime, default=datetime.datetime.now)
     description = Column(Text, nullable=True)
     
     # Dual Currency Support
     currency = Column(String, default="USD") # USD or BS
-    exchange_rate_used = Column(Float, default=1.0) # Rate at time of payment
-    amount_bs = Column(Float, nullable=True) # Amount in Bs if applicable
+    exchange_rate_used = Column(Numeric(14, 4), default=1.0000) # Rate at time of payment
+    amount_bs = Column(Numeric(12, 2), nullable=True) # Amount in Bs if applicable
     payment_method = Column(String, default="Efectivo") # Efectivo, Transferencia, Tarjeta
 
     customer = relationship("Customer", back_populates="payments")
@@ -365,8 +365,8 @@ class PriceRule(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
-    min_quantity = Column(Float, nullable=False)  # Minimum qty to apply this price
-    price = Column(Float, nullable=False)  # Special price for this tier
+    min_quantity = Column(Numeric(12, 3), nullable=False)  # Minimum qty to apply this price
+    price = Column(Numeric(12, 2), nullable=False)  # Special price for this tier
 
     product = relationship("Product", back_populates="price_rules")
 
@@ -379,7 +379,7 @@ class Quote(Base):
     id = Column(Integer, primary_key=True, index=True)
     customer_id = Column(Integer, ForeignKey("customers.id"), nullable=True)
     date = Column(DateTime, default=datetime.datetime.now)
-    total_amount = Column(Float, nullable=False)
+    total_amount = Column(Numeric(12, 2), nullable=False)
     status = Column(String, default="PENDING")  # PENDING, CONVERTED, EXPIRED
     notes = Column(Text, nullable=True)
 
@@ -395,9 +395,9 @@ class QuoteDetail(Base):
     id = Column(Integer, primary_key=True, index=True)
     quote_id = Column(Integer, ForeignKey("quotes.id"), nullable=False)
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
-    quantity = Column(Float, nullable=False)
-    unit_price = Column(Float, nullable=False)
-    subtotal = Column(Float, nullable=False)
+    quantity = Column(Numeric(12, 3), nullable=False)
+    unit_price = Column(Numeric(12, 2), nullable=False)
+    subtotal = Column(Numeric(12, 2), nullable=False)
     is_box_sale = Column(Boolean, default=False)
 
     quote = relationship("Quote", back_populates="details")
@@ -425,7 +425,7 @@ class Currency(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
     symbol = Column(String, nullable=False)
-    rate = Column(Float, default=1.0)
+    rate = Column(Numeric(14, 4), default=1.0000)
     is_anchor = Column(Boolean, default=False)
     is_active = Column(Boolean, default=True)
     
@@ -443,8 +443,8 @@ class PurchaseOrder(Base):
     due_date = Column(DateTime, nullable=True)  # Calculated from purchase_date + payment_terms
     
     # Payment tracking
-    total_amount = Column(Float, default=0.0)
-    paid_amount = Column(Float, default=0.0)
+    total_amount = Column(Numeric(12, 2), default=0.00)
+    paid_amount = Column(Numeric(12, 2), default=0.00)
     payment_status = Column(Enum(PaymentStatus), default=PaymentStatus.PENDING)
     
     # Additional info
@@ -463,7 +463,7 @@ class PurchasePayment(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     purchase_id = Column(Integer, ForeignKey("purchase_orders.id"), nullable=False)
-    amount = Column(Float, nullable=False)
+    amount = Column(Numeric(12, 2), nullable=False)
     payment_date = Column(DateTime, default=datetime.datetime.now)
     payment_method = Column(String, default="Efectivo")  # Efectivo, Transferencia, Cheque
     reference = Column(String, nullable=True)  # Transfer/check number

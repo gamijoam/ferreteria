@@ -118,10 +118,10 @@ const Purchases = () => {
                                     <td className="p-4 font-medium">{purchase.supplier?.name || 'N/A'}</td>
                                     <td className="p-4">{purchase.invoice_number || '-'}</td>
                                     <td className="p-4 text-right font-bold">
-                                        ${purchase.total_amount?.toFixed(2)}
+                                        ${Number(purchase.total_amount || 0).toFixed(2)}
                                     </td>
                                     <td className="p-4 text-right text-green-600 font-medium">
-                                        ${purchase.paid_amount?.toFixed(2)}
+                                        ${Number(purchase.paid_amount || 0).toFixed(2)}
                                     </td>
                                     <td className="p-4 text-center">
                                         {getStatusBadge(purchase.payment_status)}

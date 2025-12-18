@@ -90,7 +90,7 @@ const UnitSelectionModal = ({ isOpen, onClose, product, onSelect }) => {
 
                             {/* Price Primary */}
                             <div className="mt-2 text-2xl font-bold text-gray-900">
-                                ${opt.price.toFixed(2)}
+                                ${Number(opt.price).toFixed(2)}
                             </div>
 
                             {/* Secondary Currencies */}

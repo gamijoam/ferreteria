@@ -1,7 +1,8 @@
-from pydantic import BaseModel, Field
-from typing import Optional, List, Dict
+from pydantic import BaseModel, Field, condecimal
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
+from decimal import Decimal
 
 # Item Condition Enum for Returns
 class ItemCondition(str, Enum):
@@ -11,16 +12,16 @@ class ItemCondition(str, Enum):
 class ProductBase(BaseModel):
     name: str = Field(..., description="Nombre comercial del producto", example="Taladro Percutor 500W")
     sku: Optional[str] = Field(None, description="Código único de inventario (SKU)", example="TAL-001")
-    price: float = Field(..., description="Precio de venta al público en USD", gt=0, example=45.99)
-    price_mayor_1: Optional[float] = Field(0.0, description="Precio mayorista nivel 1", example=42.00)
-    price_mayor_2: Optional[float] = Field(0.0, description="Precio mayorista nivel 2", example=40.00)
-    stock: float = Field(..., description="Cantidad actual en inventario físico", example=10)
+    price: Decimal = Field(..., description="Precio de venta al público en USD", gt=0, example="45.99")
+    price_mayor_1: Optional[Decimal] = Field(Decimal("0.00"), description="Precio mayorista nivel 1", example="42.00")
+    price_mayor_2: Optional[Decimal] = Field(Decimal("0.00"), description="Precio mayorista nivel 2", example="40.00")
+    stock: Decimal = Field(..., description="Cantidad actual en inventario físico", example="10.000")
     description: Optional[str] = Field(None, description="Descripción detallada del producto", example="Incluye maletín y brocas")
-    cost_price: Optional[float] = Field(0.0, description="Costo de adquisición en USD", example=25.00)
-    min_stock: Optional[float] = Field(5.0, description="Nivel mínimo para alerta de reabastecimiento", example=5)
+    cost_price: Optional[Decimal] = Field(Decimal("0.0000"), description="Costo de adquisición en USD", example="25.0000")
+    min_stock: Optional[Decimal] = Field(Decimal("5.000"), description="Nivel mínimo para alerta de reabastecimiento", example="5.000")
     unit_type: Optional[str] = Field("Unidad", description="Unidad de medida base", example="Unidad")
     is_box: bool = Field(False, description="Indica si es vendido por caja (Legacy)")
-    conversion_factor: int = Field(1, description="Factor de conversión si es caja", example=1)
+    conversion_factor: Decimal = Field(Decimal("1.0"), description="Factor de conversión", example="1.0")
     category_id: Optional[int] = Field(None, description="ID de la categoría a la que pertenece", example=3)
     supplier_id: Optional[int] = Field(None, description="ID del proveedor principal", example=1)
     location: Optional[str] = Field(None, description="Ubicación física en almacén", example="Pasillo 4, Estante B")
@@ -32,7 +33,7 @@ class ExchangeRateBase(BaseModel):
     name: str
     currency_code: str
     currency_symbol: str
-    rate: float
+    rate: Decimal
     is_default: bool = False
     is_active: bool = True
 
@@ -41,7 +42,7 @@ class ExchangeRateCreate(ExchangeRateBase):
 
 class ExchangeRateUpdate(BaseModel):
     name: Optional[str] = None
-    rate: Optional[float] = None
+    rate: Optional[Decimal] = None
     is_default: Optional[bool] = None
     is_active: Optional[bool] = None
 
@@ -55,9 +56,9 @@ class ExchangeRateRead(ExchangeRateBase):
 
 class ProductUnitBase(BaseModel):
     unit_name: str
-    conversion_factor: float
+    conversion_factor: Decimal
     barcode: Optional[str] = None
-    price_usd: Optional[float] = None
+    price_usd: Optional[Decimal] = None
     is_default: bool = False
     exchange_rate_id: Optional[int] = None  # NEW: Specific rate for this unit
 
@@ -78,15 +79,15 @@ class ProductCreate(ProductBase):
 class ProductUpdate(BaseModel):
     name: Optional[str] = None
     sku: Optional[str] = None
-    price: Optional[float] = None
-    price_mayor_1: Optional[float] = None
-    price_mayor_2: Optional[float] = None
-    stock: Optional[float] = None
+    price: Optional[Decimal] = None
+    price_mayor_1: Optional[Decimal] = None
+    price_mayor_2: Optional[Decimal] = None
+    stock: Optional[Decimal] = None
     description: Optional[str] = None
-    cost_price: Optional[float] = None
-    min_stock: Optional[float] = None
+    cost_price: Optional[Decimal] = None
+    min_stock: Optional[Decimal] = None
     is_box: Optional[bool] = None
-    conversion_factor: Optional[int] = None
+    conversion_factor: Optional[Decimal] = None
     category_id: Optional[int] = None
     supplier_id: Optional[int] = None
     location: Optional[str] = None
@@ -99,14 +100,14 @@ class ProductUpdate(BaseModel):
 
 class PriceRuleCreate(BaseModel):
     product_id: int
-    min_quantity: float
-    price: float
+    min_quantity: Decimal
+    price: Decimal
 
 class PriceRuleRead(BaseModel):
     id: int
     product_id: int
-    min_quantity: float
-    price: float
+    min_quantity: Decimal
+    price: Decimal
 
     class Config:
         from_attributes = True
@@ -121,43 +122,37 @@ class ProductRead(ProductBase):
 
 class SaleDetailCreate(BaseModel):
     product_id: int
-    quantity: float  # Quantity of THIS unit (e.g., 2 Kilos, 3 Sacos)
-    unit_price_usd: float  # Price per unit sold (e.g., $4 per Kilo)
-    conversion_factor: float = 1.0  # How many base units this represents (e.g., 1 Kilo = 1kg base)
-    discount: float = 0.0
+    quantity: Decimal
+    unit_price_usd: Decimal
+    conversion_factor: Decimal = Decimal("1.0")
+    discount: Decimal = Decimal("0.00")
     discount_type: str = "NONE"  # NONE, PERCENT, FIXED
 
 class SalePaymentCreate(BaseModel):
-    amount: float
-    currency: str
-    payment_method: str
-    exchange_rate: float = 1.0
+    sale_id: Optional[int] = None # Optional for inline creation
+    amount: Decimal
+    currency: str = "USD"
+    payment_method: str = "Efectivo"
+    exchange_rate: Decimal = Decimal("1.0")
 
 class SaleCreate(BaseModel):
     customer_id: Optional[int] = Field(None, description="ID del cliente (Opcional)", example=5)
     payment_method: str = Field("Efectivo", description="Método de pago principal", example="Efectivo")
     payments: List[SalePaymentCreate] = Field([], description="Lista de pagos desglosados (Multi-moneda)")
     items: List[SaleDetailCreate] = Field(..., description="Lista de productos a vender")
-    total_amount: float = Field(..., description="Monto total de la venta en USD", gt=0, example=150.50)
+    total_amount: Decimal = Field(..., description="Monto total de la venta en USD", gt=0, example="150.50")
     currency: str = Field("USD", description="Moneda de referencia de la venta", example="USD")
-    exchange_rate: float = Field(1.0, description="Tasa de cambio aplicada", example=35.5)
+    exchange_rate: Decimal = Field(Decimal("1.0"), description="Tasa de cambio aplicada", example="35.5")
     notes: Optional[str] = Field(None, description="Notas adicionales o observaciones", example="Entregar en puerta trasera")
     is_credit: bool = Field(False, description="Indica si es una venta a crédito")
 
-# Sale Payment Schema
-class SalePaymentCreate(BaseModel):
-    sale_id: int
-    amount: float
-    currency: str = "USD"
-    payment_method: str = "Efectivo"
-    exchange_rate: float = 1.0
 
 class SalePaymentRead(BaseModel):
     id: int
-    amount: float
+    amount: Decimal
     currency: str
     payment_method: str
-    exchange_rate: float
+    exchange_rate: Decimal
     
     class Config:
         from_attributes = True
@@ -165,13 +160,13 @@ class SalePaymentRead(BaseModel):
 class SaleRead(BaseModel):
     id: int
     date: datetime
-    total_amount: float
+    total_amount: Decimal
     payment_method: str
     customer_id: Optional[int]
     customer: Optional['CustomerRead'] = None
     payments: List[SalePaymentRead] = []  # ✅ Include payments
     due_date: Optional[datetime] = None
-    balance_pending: Optional[float] = None
+    balance_pending: Optional[Decimal] = None
     is_credit: bool = False  # ✅ CRITICAL: Missing field added
     paid: bool = True  # ✅ CRITICAL: Missing field added
     
@@ -184,7 +179,7 @@ class CustomerBase(BaseModel):
     phone: Optional[str] = Field(None, description="Teléfono de contacto principal", example="+58 412 5555555")
     email: Optional[str] = Field(None, description="Correo electrónico para facturación", example="compras@global.com")
     address: Optional[str] = Field(None, description="Dirección fiscal o de entrega", example="Av. Principal, Edif. Azul")
-    credit_limit: float = Field(0.0, description="Límite máximo de crédito permitido en USD", ge=0)
+    credit_limit: Decimal = Field(Decimal("0.00"), description="Límite máximo de crédito permitido en USD", ge=0)
     payment_term_days: int = Field(15, description="Días de crédito otorgados", ge=0)
     is_blocked: bool = Field(False, description="Bloqueo administrativo para impedir nuevas ventas")
 
@@ -192,15 +187,11 @@ class CustomerCreate(CustomerBase):
     pass
 
 class CustomerPaymentCreate(BaseModel):
-    amount: float
+    amount: Decimal
     description: Optional[str] = None
     payment_method: str = "Efectivo"
     currency: str = "USD"
-    exchange_rate: float = 1.0
-
-
-
-
+    exchange_rate: Decimal = Decimal("1.0")
 
 class CustomerRead(CustomerBase):
     id: int
@@ -210,23 +201,23 @@ class CustomerRead(CustomerBase):
 
 class QuoteDetailCreate(BaseModel):
     product_id: int
-    quantity: float
+    quantity: Decimal
     is_box: bool = False
-    unit_price: float 
-    subtotal: float
+    unit_price: Decimal 
+    subtotal: Decimal
 
 class QuoteCreate(BaseModel):
     customer_id: Optional[int] = None
     items: List[QuoteDetailCreate]
-    total_amount: float
+    total_amount: Decimal
     notes: Optional[str] = None
 
 class QuoteDetailRead(BaseModel):
     id: int
     product_id: int
-    quantity: float
-    unit_price: float
-    subtotal: float
+    quantity: Decimal
+    unit_price: Decimal
+    subtotal: Decimal
     is_box_sale: bool
     product: Optional[ProductRead] = None # Include product info for display
 
@@ -237,7 +228,7 @@ class QuoteRead(BaseModel):
     id: int
     date: datetime
     customer_id: Optional[int]
-    total_amount: float
+    total_amount: Decimal
     status: str = "PENDING"
     notes: Optional[str]
     customer: Optional[CustomerRead] = None
@@ -255,7 +246,7 @@ class QuoteReadWithDetails(QuoteRead):
 
 
 class CashMovementCreate(BaseModel):
-    amount: float
+    amount: Decimal
     type: str # IN, OUT
     currency: str = "USD"
     description: str
@@ -271,38 +262,41 @@ class CashMovementRead(CashMovementCreate):
 # Cash Session Schemas
 class CashSessionCurrencyCreate(BaseModel):
     currency_symbol: str
-    initial_amount: float
+    initial_amount: Decimal
 
 class CashSessionCurrencyRead(BaseModel):
     id: int
     currency_symbol: str
-    initial_amount: float
-    final_reported: Optional[float] = None
-    final_expected: Optional[float] = None
-    difference: Optional[float] = None
+    initial_amount: Decimal
+    final_reported: Optional[Decimal] = None
+    final_expected: Optional[Decimal] = None
+    difference: Optional[Decimal] = None
     
     class Config:
         from_attributes = True
 
 class CashSessionCreate(BaseModel):
-    initial_cash: float = 0.0
-    initial_cash_bs: float = 0.0
+    initial_cash: Decimal = Decimal("0.00")
+    initial_cash_bs: Decimal = Decimal("0.00")
     currencies: List[CashSessionCurrencyCreate] = []
 
 class CashSessionClose(BaseModel):
-    final_cash_reported: float
-    final_cash_reported_bs: float
+    final_cash_reported: Decimal
+    final_cash_reported_bs: Decimal
     currencies: List[Dict] = []  # [{"symbol": "USD", "amount": 100}, ...]
+    # Note: currencies list items will need manual parsing if generic Dict, 
+    # but we can trust API consumer to send numbers which Pydantic might parse if defined.
+    # Leaving as Dict for flexibility but values should be cast to Decimal in logic.
 
 class CashSessionRead(BaseModel):
     id: int
     start_time: datetime
     end_time: Optional[datetime]
-    initial_cash: float
-    initial_cash_bs: float
-    final_cash_reported: Optional[float]
-    final_cash_reported_bs: Optional[float]
-    final_cash_expected: Optional[float]
+    initial_cash: Decimal
+    initial_cash_bs: Decimal
+    final_cash_reported: Optional[Decimal]
+    final_cash_reported_bs: Optional[Decimal]
+    final_cash_expected: Optional[Decimal]
     status: str
     user: Optional['UserRead'] = None  # Include user details
     movements: List[CashMovementRead] = []
@@ -312,36 +306,35 @@ class CashSessionRead(BaseModel):
         from_attributes = True
 
 class CashCloseDetails(BaseModel):
-    initial_usd: float
-    initial_bs: float
-    sales_total: float
+    initial_usd: Decimal
+    initial_bs: Decimal
+    sales_total: Decimal
     sales_by_method: dict
-    expenses_usd: float
-    expenses_bs: float
-    deposits_usd: float
-    deposits_bs: float
+    expenses_usd: Decimal
+    expenses_bs: Decimal
+    deposits_usd: Decimal
+    deposits_bs: Decimal
     # New: per-currency breakdown
-    cash_by_currency: Optional[Dict[str, float]] = {}
-    transfers_by_currency: Optional[Dict[str, Dict[str, float]]] = {}  # {currency: {method: amount}}
+    cash_by_currency: Optional[Dict[str, Decimal]] = {}
+    transfers_by_currency: Optional[Dict[str, Dict[str, Decimal]]] = {}  # {currency: {method: amount}}
 
 class CashSessionCloseResponse(BaseModel):
     session: CashSessionRead
     details: CashCloseDetails
-    expected_usd: float
-    expected_bs: float
-    diff_usd: float
-    diff_bs: float
+    expected_usd: Decimal
+    expected_bs: Decimal
+    diff_usd: Decimal
+    diff_bs: Decimal
     # New: per-currency expected/diff
-    expected_by_currency: Optional[Dict[str, float]] = {}
-    diff_by_currency: Optional[Dict[str, float]] = {}
-
-
-
+    expected_by_currency: Optional[Dict[str, Decimal]] = {}
+    diff_by_currency: Optional[Dict[str, Decimal]] = {}
+    total_sales_invoiced: Optional[Decimal] = None
+    total_cash_collected: Optional[Decimal] = None
 
 
 class ReturnItemCreate(BaseModel):
     product_id: int
-    quantity: float
+    quantity: Decimal
     condition: ItemCondition = ItemCondition.GOOD  # Default to GOOD condition
     product: Optional[ProductRead] = None
 
@@ -349,17 +342,17 @@ class ReturnItemCreate(BaseModel):
         from_attributes = True
 
 class ReturnCreate(BaseModel):
-    sale_id: int # Often implicit in URL but good to have
+    sale_id: int 
     items: List[ReturnItemCreate]
     reason: Optional[str] = None
     refund_currency: str = "USD"
-    exchange_rate: float = 1.0
+    exchange_rate: Decimal = Decimal("1.0")
 
 class ReturnDetailRead(BaseModel):
     id: int
     product_id: int
-    quantity: float
-    unit_price: float
+    quantity: Decimal
+    unit_price: Decimal
     product: Optional[ProductRead] = None
 
     class Config:
@@ -369,7 +362,7 @@ class ReturnRead(BaseModel):
     id: int
     sale_id: int
     date: datetime
-    total_refunded: float
+    total_refunded: Decimal
     reason: Optional[str]
     details: List[ReturnDetailRead] = []
 
@@ -426,7 +419,7 @@ class BulkImportResult(BaseModel):
 class CurrencyBase(BaseModel):
     name: str
     symbol: str
-    rate: float
+    rate: Decimal
     is_anchor: bool = False
     is_active: bool = True
 
@@ -436,7 +429,7 @@ class CurrencyCreate(CurrencyBase):
 class CurrencyUpdate(BaseModel):
     name: Optional[str] = None
     symbol: Optional[str] = None
-    rate: Optional[float] = None
+    rate: Optional[Decimal] = None
     is_anchor: Optional[bool] = None
     is_active: Optional[bool] = None
 
@@ -450,7 +443,7 @@ class CurrencyRead(CurrencyBase):
 class StockAdjustmentCreate(BaseModel):
     product_id: int
     type: str  # ADJUSTMENT_IN, ADJUSTMENT_OUT, DAMAGED, INTERNAL_USE
-    quantity: float  # Already in base units
+    quantity: Decimal  # Already in base units
     reason: str
 
 class KardexRead(BaseModel):
@@ -458,8 +451,8 @@ class KardexRead(BaseModel):
     product_id: int
     date: datetime
     movement_type: str
-    quantity: float
-    balance_after: float
+    quantity: Decimal
+    balance_after: Decimal
     description: Optional[str] = None
     product: Optional['ProductRead'] = None
     
@@ -496,7 +489,7 @@ class SupplierBase(BaseModel):
     address: Optional[str] = None
     notes: Optional[str] = None
     payment_terms: Optional[int] = 30
-    credit_limit: Optional[float] = None
+    credit_limit: Optional[Decimal] = None
 
 class SupplierCreate(SupplierBase):
     pass
@@ -505,7 +498,7 @@ class SupplierRead(SupplierBase):
     id: int
     is_active: bool
     created_at: datetime
-    current_balance: float = 0.0
+    current_balance: Decimal = Decimal("0.00")
     
     class Config:
         from_attributes = True
@@ -519,12 +512,12 @@ class PurchaseOrderBase(BaseModel):
 
 class PurchaseItemCreate(BaseModel):
     product_id: int
-    quantity: float
-    unit_cost: float
+    quantity: Decimal
+    unit_cost: Decimal
     update_cost: bool = False
 
 class PurchaseOrderCreate(PurchaseOrderBase):
-    total_amount: float
+    total_amount: Decimal
     items: List[PurchaseItemCreate] = []
     payment_type: str = "CREDIT"  # CASH or CREDIT
 
@@ -536,8 +529,8 @@ class PurchaseOrderResponse(PurchaseOrderBase):
     id: int
     purchase_date: datetime
     due_date: Optional[datetime] = None
-    total_amount: float
-    paid_amount: float
+    total_amount: Decimal
+    paid_amount: Decimal
     payment_status: str
     supplier: Optional['SupplierRead'] = None  # Include supplier details
     
@@ -545,7 +538,7 @@ class PurchaseOrderResponse(PurchaseOrderBase):
         from_attributes = True
 
 class PurchasePaymentCreate(BaseModel):
-    amount: float
+    amount: Decimal
     payment_method: str = "Efectivo"
     reference: Optional[str] = None
     notes: Optional[str] = None
@@ -553,7 +546,7 @@ class PurchasePaymentCreate(BaseModel):
 class PurchasePaymentResponse(BaseModel):
     id: int
     purchase_id: int
-    amount: float
+    amount: Decimal
     payment_date: datetime
     payment_method: str
     reference: Optional[str] = None
@@ -565,8 +558,8 @@ class PurchasePaymentResponse(BaseModel):
 class SupplierStatsResponse(BaseModel):
     supplier_id: int
     supplier_name: str
-    current_balance: float
-    credit_limit: Optional[float] = None
+    current_balance: Decimal
+    credit_limit: Optional[Decimal] = None
     pending_purchases: int
     total_purchases: int
     
@@ -604,4 +597,3 @@ class AuditLogRead(AuditLogBase):
 
     class Config:
         from_attributes = True
-

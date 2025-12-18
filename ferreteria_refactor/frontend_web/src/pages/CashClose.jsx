@@ -27,7 +27,7 @@ const CashClose = () => {
     const fetchSessionData = async () => {
         try {
             // Get session details with calculations
-            const response = await apiClient.get(`/cash/history/${session.id}`);
+            const response = await apiClient.get(`/cash/sessions/${session.id}/details`);
             setSessionData(response.data);
 
             // Initialize physical counts to 0
@@ -131,7 +131,7 @@ const CashClose = () => {
                                     <div className="flex justify-between items-center mb-2">
                                         <span className="font-bold text-gray-800">{curr.currency_symbol}</span>
                                         <span className="text-sm text-gray-600">
-                                            Esperado: {expected.toFixed(2)}
+                                            Esperado: {Number(expected).toFixed(2)}
                                         </span>
                                     </div>
 
@@ -185,7 +185,7 @@ const CashClose = () => {
                                     {Object.entries(methods).map(([method, amount]) => (
                                         <div key={method} className="flex justify-between text-sm mb-1">
                                             <span className="text-gray-600">{method}</span>
-                                            <span className="font-medium">{amount.toFixed(2)}</span>
+                                            <span className="font-medium">{Number(amount).toFixed(2)}</span>
                                         </div>
                                     ))}
                                 </div>

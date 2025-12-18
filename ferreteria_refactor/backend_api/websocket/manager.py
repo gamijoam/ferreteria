@@ -6,7 +6,7 @@ from typing import List, Dict, Any
 from fastapi import WebSocket
 import json
 from datetime import datetime
-
+from decimal import Decimal
 
 class ConnectionManager:
     def __init__(self):
@@ -34,6 +34,14 @@ class ConnectionManager:
             print(f"Error sending personal message: {e}")
             self.disconnect(websocket)
 
+    def _json_serializer(self, obj):
+        """Custom JSON serializer for special types"""
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        if isinstance(obj, Decimal):
+            return str(obj) # Send as string to preserve precision
+        raise TypeError(f"Type {type(obj)} not serializable")
+
     async def broadcast(self, event_type: str, data: Dict[str, Any]):
         """
         Broadcast an event to all connected clients
@@ -46,7 +54,7 @@ class ConnectionManager:
             "type": event_type,
             "data": data,
             "timestamp": datetime.now().isoformat()
-        })
+        }, default=self._json_serializer)
         
         print(f"📡 Broadcasting event: {event_type} to {len(self.active_connections)} clients")
         

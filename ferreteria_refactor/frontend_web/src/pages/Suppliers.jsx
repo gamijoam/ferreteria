@@ -120,7 +120,7 @@ const Suppliers = () => {
                                     </td>
                                     <td className="p-4 text-right">
                                         <span className={`font-bold ${supplier.current_balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                            ${supplier.current_balance?.toFixed(2) || '0.00'}
+                                            ${Number(supplier.current_balance || 0).toFixed(2)}
                                         </span>
                                     </td>
                                     <td className="p-4">

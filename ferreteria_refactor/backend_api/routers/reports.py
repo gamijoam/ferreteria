@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import Optional
 from datetime import datetime, date
+from decimal import Decimal
 from ..database.db import get_db
 from ..models import models
 from ..dependencies import admin_only
@@ -62,19 +63,19 @@ def get_dashboard_financials(
     
     # Format sales by currency
     sales_by_currency = []
-    total_sales_base_usd = 0.0
+    total_sales_base_usd = Decimal("0.00")
     
     for currency, total_collected, count in results:
         sales_by_currency.append({
             "currency": currency or "USD",
-            "total_collected": round(total_collected, 2),
+            "total_collected": float(round(total_collected, 2)),
             "count": count
         })
         
         # Convert to USD for base total
         # If currency is USD, add directly; otherwise use exchange rate
         if currency == "USD":
-            total_sales_base_usd += total_collected
+            total_sales_base_usd += Decimal(str(total_collected))
         else:
             # Get average exchange rate for the period
             avg_rate = db.query(func.avg(models.SalePayment.exchange_rate)).filter(
@@ -82,10 +83,10 @@ def get_dashboard_financials(
             ).join(models.Sale).filter(
                 models.Sale.date >= start_dt,
                 models.Sale.date <= end_dt
-            ).scalar() or 1.0
+            ).scalar() or Decimal("1.0")
             
             # Convert to USD
-            total_sales_base_usd += total_collected / avg_rate
+            total_sales_base_usd += Decimal(str(total_collected)) / Decimal(str(avg_rate))
     
     # Calculate profit estimation (Sales - Costs)
     # Get all sale details for the period (excluding voided sales)
@@ -99,20 +100,20 @@ def get_dashboard_financials(
     
     sale_details = sale_details_query.all()
     
-    total_cost = 0.0
-    total_revenue = 0.0
+    total_cost = Decimal("0.00")
+    total_revenue = Decimal("0.00")
     
     for detail in sale_details:
         total_revenue += detail.subtotal
         if detail.product and detail.product.cost_price:
-            total_cost += detail.product.cost_price * detail.quantity
+            total_cost += Decimal(str(detail.product.cost_price)) * Decimal(str(detail.quantity))
     
     profit_estimated = total_revenue - total_cost
     
     return {
         "sales_by_currency": sales_by_currency,
-        "total_sales_base_usd": round(total_sales_base_usd, 2),
-        "profit_estimated": round(profit_estimated, 2)
+        "total_sales_base_usd": float(round(total_sales_base_usd, 2)),
+        "profit_estimated": float(round(profit_estimated, 2))
     }
 
 @router.get("/dashboard/cashflow")

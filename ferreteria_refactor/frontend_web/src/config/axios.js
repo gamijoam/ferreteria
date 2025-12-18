@@ -28,13 +28,23 @@ apiClient.interceptors.response.use(
         const status = error.response ? error.response.status : null;
 
         if (status === 401) {
-            // Unauthorized: Clear token and redirect
-            localStorage.removeItem('token');
-            localStorage.removeItem('user'); // If you store user info
-            toast.error('Sesión expirada. Por favor inicie sesión.');
-            setTimeout(() => {
-                window.location.href = '/login';
-            }, 1500);
+            // Avoid redirect loop if already on login page or if error is from login attempt
+            const isLoginRequest = error.config.url.includes('/auth/token');
+            const isLoginPage = window.location.pathname === '/login';
+
+            if (!isLoginRequest && !isLoginPage) {
+                // Unauthorized: Clear token and redirect
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                toast.error('Sesión expirada. Por favor inicie sesión.');
+                setTimeout(() => {
+                    window.location.href = '/login';
+                }, 1500);
+            } else if (isLoginRequest) {
+                // For login failure, just clear potential stale tokens, but let the component handle the error display
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+            }
         } else if (status === 403) {
             // Forbidden
             toast.error('No tienes permisos para realizar esta acción.');

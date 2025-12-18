@@ -12,7 +12,7 @@ export const CashProvider = ({ children }) => {
 
     const checkStatus = async () => {
         try {
-            const response = await apiClient.get('/cash/active');
+            const response = await apiClient.get('/cash/sessions/current');
             setIsSessionOpen(true);
             setSession(response.data);
         } catch (error) {
@@ -52,7 +52,7 @@ export const CashProvider = ({ children }) => {
 
     const openSession = async (sessionData) => {
         try {
-            const response = await apiClient.post('/cash/open', sessionData);
+            const response = await apiClient.post('/cash/sessions/open', sessionData);
             setIsSessionOpen(true);
             setSession(response.data);
             return true;
@@ -66,7 +66,7 @@ export const CashProvider = ({ children }) => {
     const closeSession = async (closeData) => {
         try {
             if (!session) return false;
-            await apiClient.post(`/cash/${session.id}/close`, closeData);
+            await apiClient.post(`/cash/sessions/${session.id}/close`, closeData);
             setIsSessionOpen(false);
             setSession(null);
             return true;

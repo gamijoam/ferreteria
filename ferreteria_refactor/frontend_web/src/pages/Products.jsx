@@ -6,6 +6,12 @@ import { useWebSocket } from '../context/WebSocketContext';
 
 import apiClient from '../config/axios';
 
+// Helper to format stock: show as integer if whole number, otherwise show decimals
+const formatStock = (stock) => {
+    const num = Number(stock);
+    return num % 1 === 0 ? num.toFixed(0) : num.toFixed(3).replace(/\.?0+$/, '');
+};
+
 const Products = () => {
     const { getActiveCurrencies, convertPrice, convertProductPrice } = useConfig();
     const { subscribe } = useWebSocket();
@@ -39,9 +45,14 @@ const Products = () => {
             setProducts(prev => prev.map(p => p.id === updatedProduct.id ? { ...p, ...updatedProduct } : p));
         });
 
+        const unsubDelete = subscribe('product:deleted', (deletedProduct) => {
+            setProducts(prev => prev.filter(p => p.id !== deletedProduct.id));
+        });
+
         return () => {
             unsubCreate();
             unsubUpdate();
+            unsubDelete();
         };
     }, [subscribe]);
 
@@ -112,7 +123,7 @@ const Products = () => {
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{product.sku}</td>
                                 <td className="px-6 py-4 whitespace-nowrap">
-                                    <div className="text-sm font-semibold text-gray-900">${product.price.toFixed(2)}</div>
+                                    <div className="text-sm font-semibold text-gray-900">${Number(product.price).toFixed(2)}</div>
                                     <div className="text-xs text-gray-500 flex flex-col">
                                         {getActiveCurrencies().map(currency => (
                                             <span key={currency.id}>
@@ -123,7 +134,7 @@ const Products = () => {
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${product.stock > 10 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                                        {product.stock}
+                                        {formatStock(product.stock)}
                                     </span>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 cursor-pointer hover:underline">

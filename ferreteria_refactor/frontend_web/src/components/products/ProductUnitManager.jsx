@@ -248,7 +248,7 @@ const ProductUnitManager = ({ units, onUnitsChange, baseUnitType, basePrice, exc
                                 {unit.price_usd > 0 && (
                                     <div className="flex justify-between text-green-700">
                                         <span>Precio Fijo USD:</span>
-                                        <span className="font-bold">${unit.price_usd.toFixed(2)}</span>
+                                        <span className="font-bold">${Number(unit.price_usd).toFixed(2)}</span>
                                     </div>
                                 )}
                                 {unit.barcode && (

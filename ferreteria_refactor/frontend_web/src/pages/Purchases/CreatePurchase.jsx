@@ -3,6 +3,12 @@ import { Search, Plus, Trash2, Save, X, AlertCircle, Package, DollarSign, Calend
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../../config/axios';
 
+// Helper to format stock: show as integer if whole number, otherwise show decimals
+const formatStock = (stock) => {
+    const num = Number(stock);
+    return num % 1 === 0 ? num.toFixed(0) : num.toFixed(3).replace(/\.?0+$/, '');
+};
+
 const CreatePurchase = () => {
     const navigate = useNavigate();
     const searchInputRef = useRef(null);
@@ -228,7 +234,7 @@ const CreatePurchase = () => {
                             <strong>{selectedSupplier.name}</strong>
                             {selectedSupplier.current_balance > 0 && (
                                 <span className="ml-2 text-red-600">
-                                    Deuda actual: ${selectedSupplier.current_balance.toFixed(2)}
+                                    Deuda actual: ${Number(selectedSupplier.current_balance).toFixed(2)}
                                 </span>
                             )}
                         </div>
@@ -293,7 +299,7 @@ const CreatePurchase = () => {
                                     <div>
                                         <div className="font-medium">{product.name}</div>
                                         <div className="text-xs text-gray-500">
-                                            Stock: {product.stock} | Costo: ${product.cost_price?.toFixed(2) || '0.00'}
+                                            Stock: {formatStock(product.stock)} | Costo: ${Number(product.cost_price || 0).toFixed(2)}
                                         </div>
                                     </div>
                                     <Plus size={20} className="text-blue-600" />
@@ -357,7 +363,7 @@ const CreatePurchase = () => {
                                                 />
                                             </td>
                                             <td className="p-3 text-right font-bold text-lg">
-                                                ${item.subtotal.toFixed(2)}
+                                                ${Number(item.subtotal).toFixed(2)}
                                             </td>
                                             <td className="p-3">
                                                 <button
@@ -392,8 +398,8 @@ const CreatePurchase = () => {
                             <button
                                 onClick={() => setPaymentType('CASH')}
                                 className={`p-3 rounded-lg font-medium transition-all ${paymentType === 'CASH'
-                                        ? 'bg-green-600 text-white shadow-md'
-                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                    ? 'bg-green-600 text-white shadow-md'
+                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                     }`}
                             >
                                 💵 Contado
@@ -401,8 +407,8 @@ const CreatePurchase = () => {
                             <button
                                 onClick={() => setPaymentType('CREDIT')}
                                 className={`p-3 rounded-lg font-medium transition-all ${paymentType === 'CREDIT'
-                                        ? 'bg-blue-600 text-white shadow-md'
-                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                    ? 'bg-blue-600 text-white shadow-md'
+                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                     }`}
                             >
                                 📋 Crédito
@@ -414,7 +420,7 @@ const CreatePurchase = () => {
                     <div className="bg-blue-50 p-4 rounded-lg border-2 border-blue-200">
                         <div className="text-sm text-gray-600 mb-1">Total a Pagar</div>
                         <div className="text-3xl font-bold text-blue-700">
-                            ${total.toFixed(2)}
+                            ${Number(total).toFixed(2)}
                         </div>
                         <div className="text-xs text-gray-500 mt-1">
                             {purchaseItems.length} producto(s)

@@ -2,37 +2,32 @@ import apiClient from '../config/axios';
 
 const cashService = {
     getStatus: async () => {
-        // GET /cash/session/current
-        // Should return { is_open: boolean, session: { id, initial_cash, ... } }
-        const response = await apiClient.get('/cash/session/current');
+        const response = await apiClient.get('/cash/sessions/current');
         return response.data;
     },
 
     openSession: async (data) => {
-        // data: { initial_cash: number }
-        const response = await apiClient.post('/cash/session/open', data);
+        const response = await apiClient.post('/cash/sessions/open', data);
         return response.data;
     },
 
-    closeSession: async (data) => {
-        // data: { final_count: number, notes: string }
-        const response = await apiClient.post('/cash/session/close', data);
+    closeSession: async (sessionId, data) => {
+        // Needs sessionId now
+        const response = await apiClient.post(`/cash/sessions/${sessionId}/close`, data);
         return response.data;
     },
 
     addMovement: async (data) => {
-        // data: { type: 'EXPENSE'|'WITHDRAWAL', amount: number, reason: string }
-        const response = await apiClient.post('/cash/movement', data);
+        const response = await apiClient.post('/cash/movements', data);
         return response.data;
     },
 
     getHistory: async (filters = {}) => {
-        // filters: { startDate: string (YYYY-MM-DD), endDate: string (YYYY-MM-DD) }
         const params = {};
         if (filters.startDate) params.start_date = filters.startDate;
         if (filters.endDate) params.end_date = filters.endDate;
 
-        const response = await apiClient.get('/cash/history', { params });
+        const response = await apiClient.get('/cash/sessions/history', { params });
         return response.data;
     }
 };

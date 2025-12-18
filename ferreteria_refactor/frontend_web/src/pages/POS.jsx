@@ -12,13 +12,19 @@ import CashOpeningModal from '../components/cash/CashOpeningModal';
 import CashMovementModal from '../components/cash/CashMovementModal';
 import SaleSuccessModal from '../components/pos/SaleSuccessModal';
 
-import apiClient from '../config/axios'; // Ensure import
+import apiClient from '../config/axios';
+
+// Helper to format stock: show as integer if whole number, otherwise show decimals
+const formatStock = (stock) => {
+    const num = Number(stock);
+    return num % 1 === 0 ? num.toFixed(0) : num.toFixed(3).replace(/\.?0+$/, '');
+}; // Ensure import
 
 // ... imports
 
 const POS = () => {
     const { cart, addToCart, removeFromCart, updateQuantity, clearCart, totalUSD, totalBs, totalsByCurrency, exchangeRates } = useCart();
-    const { isSessionOpen, openSession } = useCash();
+    const { isSessionOpen, openSession, loading } = useCash();
     const { getActiveCurrencies, convertPrice, currencies } = useConfig();
     const { subscribe } = useWebSocket(); // WebSocket Hook
     const anchorCurrency = currencies.find(c => c.is_anchor) || { symbol: '$' };
@@ -72,12 +78,15 @@ const POS = () => {
             setCatalog(prev => [...prev, newProduct]);
         });
 
-        // If we implement specific stock event later, add here
-        // const unsubStock = subscribe('product:stock_updated', ...);
+        const unsubDelete = subscribe('product:deleted', (deletedProduct) => {
+            console.log('📦 Real-time Product Deleted:', deletedProduct);
+            setCatalog(prev => prev.filter(p => p.id !== deletedProduct.id));
+        });
 
         return () => {
             unsubUpdate();
             unsubCreate();
+            unsubDelete();
         };
     }, [subscribe]);
 
@@ -325,12 +334,12 @@ const POS = () => {
                             <div>
                                 <h3 className="font-bold text-gray-800 leading-tight mb-1">{product.name}</h3>
                                 <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
-                                    Stock: {product.stock || 0}
+                                    Stock: {formatStock(product.stock || 0)}
                                 </span>
                             </div>
                             <div className="mt-2 self-end">
                                 <span className="block text-right text-lg font-bold text-blue-600">
-                                    ${product.price.toFixed(2)}
+                                    ${Number(product.price).toFixed(2)}
                                 </span>
                                 {product.units?.length > 0 && (
                                     <span className="block text-right text-xs text-orange-500 font-medium">
@@ -390,7 +399,7 @@ const POS = () => {
                                     <span className="bg-blue-100 text-blue-700 px-1.5 rounded">
                                         {item.unit_name} {item.unit_id ? <span>(x{item.conversion_factor})</span> : null}
                                     </span>
-                                    <span>${(item.unit_price_usd || 0).toFixed(2)}</span>
+                                    <span>${Number(item.unit_price_usd || 0).toFixed(2)}</span>
 
                                     {/* NEW: Special Rate Indicator */}
                                     {item.is_special_rate && (
@@ -406,7 +415,7 @@ const POS = () => {
                             </div>
                             <div className="flex flex-col items-end">
                                 <span className="text-lg font-bold text-gray-800">x{item.quantity}</span>
-                                <span className="font-bold text-blue-600">${(item.subtotal_usd || 0).toFixed(2)}</span>
+                                <span className="font-bold text-blue-600">${Number(item.subtotal_usd || 0).toFixed(2)}</span>
                             </div>
                         </div>
                     ))}
@@ -418,7 +427,7 @@ const POS = () => {
                         {/* Base Currency (Anchor) */}
                         <div className="flex justify-between items-end border-b pb-2">
                             <span className="text-gray-500 text-sm font-medium">Total ({anchorCurrency.symbol})</span>
-                            <span className="text-3xl font-bold text-gray-800">{anchorCurrency.symbol}{totalUSD.toFixed(2)}</span>
+                            <span className="text-3xl font-bold text-gray-800">{anchorCurrency.symbol}{Number(totalUSD).toFixed(2)}</span>
                         </div>
                         {/* Other Currencies */}
                         {getActiveCurrencies().map(curr => {
@@ -441,7 +450,7 @@ const POS = () => {
                         disabled={cart.length === 0}
                         className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl shadow-lg transform active:scale-95 transition-all text-xl"
                     >
-                        COBRAR ${totalUSD.toFixed(2)}
+                        COBRAR ${Number(totalUSD).toFixed(2)}
                     </button>
                 </div>
             </div>
@@ -483,7 +492,8 @@ const POS = () => {
                 onClose={handleSuccessClose}
             />
 
-            {/* Cash Opening Modal if session closed */}{!isSessionOpen && (
+            {/* Cash Opening Modal - only show after loading and if session is closed */}
+            {!loading && !isSessionOpen && (
                 <CashOpeningModal onOpen={openSession} />
             )}
         </div>

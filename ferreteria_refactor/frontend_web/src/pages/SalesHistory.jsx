@@ -193,7 +193,7 @@ const SalesHistory = () => {
             // Fallback to old display
             return (
                 <div>
-                    <div className="font-bold">${sale.total_amount.toFixed(2)}</div>
+                    <div className="font-bold">${Number(sale.total_amount).toFixed(2)}</div>
                     <div className="text-xs text-gray-500">USD</div>
                 </div>
             );
@@ -210,7 +210,7 @@ const SalesHistory = () => {
                     </div>
                     <div className="text-xs text-gray-500">{payment.currency}</div>
                     {payment.currency !== 'USD' && (
-                        <div className="text-xs text-gray-400">Ref: ${sale.total_amount.toFixed(2)}</div>
+                        <div className="text-xs text-gray-400">Ref: ${Number(sale.total_amount).toFixed(2)}</div>
                     )}
                 </div>
             );
@@ -227,13 +227,13 @@ const SalesHistory = () => {
                     {sale.payments.map((payment, idx) => (
                         <div key={idx} className="flex justify-between py-1 border-b border-gray-700 last:border-0">
                             <span>{payment.currency}</span>
-                            <span>{getCurrencySymbol(payment.currency)} {payment.amount.toFixed(2)}</span>
+                            <span>{getCurrencySymbol(payment.currency)} {Number(payment.amount).toFixed(2)}</span>
                         </div>
                     ))}
                     <div className="mt-2 pt-2 border-t border-gray-700 font-semibold">
                         <div className="flex justify-between">
                             <span>Total USD:</span>
-                            <span>${sale.total_amount.toFixed(2)}</span>
+                            <span>${Number(sale.total_amount).toFixed(2)}</span>
                         </div>
                     </div>
                 </div>
@@ -435,8 +435,8 @@ const SalesHistory = () => {
                                         <tr key={index}>
                                             <td className="p-3">{detail.product?.name || 'N/A'}</td>
                                             <td className="p-3 text-center">{detail.quantity}</td>
-                                            <td className="p-3 text-right">${detail.unit_price.toFixed(2)}</td>
-                                            <td className="p-3 text-right font-bold">${detail.subtotal.toFixed(2)}</td>
+                                            <td className="p-3 text-right">${Number(detail.unit_price).toFixed(2)}</td>
+                                            <td className="p-3 text-right font-bold">${Number(detail.subtotal).toFixed(2)}</td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -444,7 +444,7 @@ const SalesHistory = () => {
                                     <tr>
                                         <td colSpan="3" className="p-3 text-right font-bold">Total:</td>
                                         <td className="p-3 text-right font-bold text-lg text-green-600">
-                                            ${selectedSale.total_amount.toFixed(2)}
+                                            ${Number(selectedSale.total_amount).toFixed(2)}
                                         </td>
                                     </tr>
                                 </tfoot>
