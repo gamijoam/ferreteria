@@ -84,24 +84,46 @@ class UpdateThread(QThread):
             # Extract to BASE_DIR (Project Root)
             # Zip contains "Client/" and "Server/" folder structures AND "Launcher.exe"
             
+            # 4. Extract
+            self.status.emit("Instalando actualización...")
+            self.progress.emit(0)
+            
+            # Extract to BASE_DIR (Project Root)
+            import time
+            
             # HANDLE SELF-UPDATE (Windows locking)
             launcher_path = os.path.join(BASE_DIR, "Launcher.exe")
+            launcher_writable = True
+            
             if os.path.exists(launcher_path):
                 try:
-                    # Rename running exe to allow overwrite
                     old_launcher = launcher_path + ".old"
                     if os.path.exists(old_launcher):
                         os.remove(old_launcher)
+                    
+                    # Try rename
                     os.rename(launcher_path, old_launcher)
+                    time.sleep(1.0) # Allow OS to release handle
                 except Exception as e:
-                    print(f"Warning: Could not rename Launcher for update: {e}")
-                    # Continue anyway, extraction might fail for Launcher.exe but succeed for others
+                    print(f"Warning: Could not rename Launcher: {e}")
+                    launcher_writable = False
             
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                zip_ref.extractall(BASE_DIR)
+                # Custom extraction to respect launcher locking
+                file_list = zip_ref.namelist()
+                for file_info in file_list:
+                    # Skip Launcher.exe if we couldn't rename the running one
+                    if file_info.lower() == "launcher.exe" and not launcher_writable:
+                        print("Skipping Launcher.exe update (File locked)")
+                        continue
+                        
+                    zip_ref.extract(file_info, BASE_DIR)
                 
             # 5. Cleanup
-            os.remove(zip_path)
+            try:
+                os.remove(zip_path)
+            except:
+                pass
             
             # 6. Update Local Version File
             with open(LOCAL_VERSION_FILE, 'w') as f:
