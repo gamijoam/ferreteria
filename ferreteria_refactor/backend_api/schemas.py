@@ -319,6 +319,7 @@ class CashSessionRead(BaseModel):
     final_cash_reported_bs: Optional[float]
     final_cash_expected: Optional[float]
     status: str
+    user: Optional['UserRead'] = None  # Include user details
     movements: List[CashMovementRead] = []
     currencies: List[CashSessionCurrencyRead] = []
 

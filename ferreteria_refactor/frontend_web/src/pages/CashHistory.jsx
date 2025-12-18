@@ -62,10 +62,11 @@ const CashHistory = () => {
     };
 
     const formatCurrency = (amount, currency = 'USD') => {
-        if (currency === 'USD') {
-            return `$${parseFloat(amount || 0).toFixed(2)}`;
+        const value = parseFloat(amount || 0);
+        if (currency === 'USD' || currency === '$') {
+            return `$${value.toFixed(2)}`;
         }
-        return `Bs ${parseFloat(amount || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        return `${currency} ${value.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     };
 
     const calculateDifference = (session) => {
@@ -210,7 +211,7 @@ const CashHistory = () => {
                                                     <div className="flex flex-wrap gap-4 text-sm text-gray-600">
                                                         <div className="flex items-center gap-1">
                                                             <User size={14} />
-                                                            <span>{session.user_name || `Usuario #${session.user_id}`}</span>
+                                                            <span>{session.user?.full_name || session.user?.username || `Usuario #${session.user_id}`}</span>
                                                         </div>
                                                         <div className="flex items-center gap-1">
                                                             <Clock size={14} />
@@ -258,46 +259,91 @@ const CashHistory = () => {
                                     {/* Expanded Details */}
                                     {isExpanded && (
                                         <div className="border-t-2 border-gray-100 bg-gray-50 p-6">
-                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                                {/* Initial Cash */}
-                                                <div className="bg-white rounded-xl p-4 border-2 border-blue-100">
-                                                    <p className="text-xs font-bold text-gray-500 uppercase mb-2">Efectivo Inicial</p>
-                                                    <p className="text-2xl font-black text-blue-600">
-                                                        {formatCurrency(session.initial_cash)}
-                                                    </p>
-                                                    {session.initial_cash_bs && (
-                                                        <p className="text-sm text-gray-600 mt-1">
-                                                            {formatCurrency(session.initial_cash_bs, 'BS')}
+                                            {session.currencies && session.currencies.length > 0 ? (
+                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                                    {session.currencies.map((curr) => {
+                                                        const diff = curr.difference || 0;
+                                                        const hasDiff = Math.abs(diff) >= 0.01;
+
+                                                        return (
+                                                            <div key={curr.id} className="bg-white rounded-xl p-4 border-2 border-gray-100 shadow-sm">
+                                                                <div className="flex justify-between items-center mb-3 pb-2 border-b border-gray-100">
+                                                                    <span className="font-bold text-gray-700">{curr.currency_symbol}</span>
+                                                                    {isClosed && hasDiff && (
+                                                                        <span className={`text-xs font-bold px-2 py-1 rounded-full ${diff > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                                                            {diff > 0 ? 'Sobró' : 'Faltó'}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+
+                                                                <div className="space-y-3">
+                                                                    <div>
+                                                                        <p className="text-xs text-gray-500 uppercase">Inicial</p>
+                                                                        <p className="font-mono font-bold text-gray-800">{formatCurrency(curr.initial_amount, curr.currency_symbol)}</p>
+                                                                    </div>
+
+                                                                    {isClosed && (
+                                                                        <>
+                                                                            <div>
+                                                                                <p className="text-xs text-gray-500 uppercase">Esperado</p>
+                                                                                <p className="font-mono font-bold text-blue-600">{formatCurrency(curr.final_expected, curr.currency_symbol)}</p>
+                                                                            </div>
+                                                                            <div>
+                                                                                <p className="text-xs text-gray-500 uppercase">Reportado (Cierre)</p>
+                                                                                <p className="font-mono font-bold text-purple-600">{formatCurrency(curr.final_reported, curr.currency_symbol)}</p>
+                                                                            </div>
+                                                                            {hasDiff && (
+                                                                                <div className={`mt-2 p-2 rounded-lg ${diff > 0 ? 'bg-green-50' : 'bg-red-50'}`}>
+                                                                                    <p className="text-xs text-gray-500 uppercase">Diferencia</p>
+                                                                                    <p className={`font-mono font-bold ${diff > 0 ? 'text-green-700' : 'text-red-700'}`}>
+                                                                                        {diff > 0 ? '+' : ''}{formatCurrency(diff, curr.currency_symbol)}
+                                                                                    </p>
+                                                                                </div>
+                                                                            )}
+                                                                        </>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            ) : (
+                                                /* Fallback for old sessions without concurrency data */
+                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                                    {/* Initial Cash */}
+                                                    <div className="bg-white rounded-xl p-4 border-2 border-blue-100">
+                                                        <p className="text-xs font-bold text-gray-500 uppercase mb-2">Efectivo Inicial</p>
+                                                        <p className="text-2xl font-black text-blue-600">
+                                                            {formatCurrency(session.initial_cash)}
                                                         </p>
+                                                        {session.initial_cash_bs && (
+                                                            <p className="text-sm text-gray-600 mt-1">
+                                                                {formatCurrency(session.initial_cash_bs, 'BS')}
+                                                            </p>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Expected Cash */}
+                                                    {isClosed && (
+                                                        <div className="bg-white rounded-xl p-4 border-2 border-purple-100">
+                                                            <p className="text-xs font-bold text-gray-500 uppercase mb-2">Efectivo Esperado</p>
+                                                            <p className="text-2xl font-black text-purple-600">
+                                                                {formatCurrency(session.final_cash_expected ?? session.expected_cash)}
+                                                            </p>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Final Cash */}
+                                                    {isClosed && (
+                                                        <div className="bg-white rounded-xl p-4 border-2 border-green-100">
+                                                            <p className="text-xs font-bold text-gray-500 uppercase mb-2">Efectivo Contado</p>
+                                                            <p className="text-2xl font-black text-green-600">
+                                                                {formatCurrency(session.final_cash_reported ?? session.final_cash)}
+                                                            </p>
+                                                        </div>
                                                     )}
                                                 </div>
-
-                                                {/* Expected Cash */}
-                                                {isClosed && (
-                                                    <div className="bg-white rounded-xl p-4 border-2 border-purple-100">
-                                                        <p className="text-xs font-bold text-gray-500 uppercase mb-2">Efectivo Esperado</p>
-                                                        <p className="text-2xl font-black text-purple-600">
-                                                            {formatCurrency(session.expected_cash)}
-                                                        </p>
-                                                        <p className="text-xs text-gray-500 mt-1">
-                                                            Basado en ventas y movimientos
-                                                        </p>
-                                                    </div>
-                                                )}
-
-                                                {/* Final Cash */}
-                                                {isClosed && (
-                                                    <div className="bg-white rounded-xl p-4 border-2 border-green-100">
-                                                        <p className="text-xs font-bold text-gray-500 uppercase mb-2">Efectivo Contado</p>
-                                                        <p className="text-2xl font-black text-green-600">
-                                                            {formatCurrency(session.final_cash)}
-                                                        </p>
-                                                        <p className="text-xs text-gray-500 mt-1">
-                                                            Conteo físico al cierre
-                                                        </p>
-                                                    </div>
-                                                )}
-                                            </div>
+                                            )}
 
                                             {/* Notes */}
                                             {session.notes && (

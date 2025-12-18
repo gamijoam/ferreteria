@@ -99,7 +99,11 @@ def get_session_history(
     db: Session = Depends(get_db)
 ):
     """Get closed session history with date filtering"""
-    query = db.query(models.CashSession).filter(
+    from sqlalchemy.orm import joinedload
+    query = db.query(models.CashSession).options(
+        joinedload(models.CashSession.user),
+        joinedload(models.CashSession.currencies)
+    ).filter(
         models.CashSession.status == "CLOSED"
     )
     
