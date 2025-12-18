@@ -4,7 +4,6 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import os
 
-# Importamos tus módulos existentes
 from .models import models
 from .database.db import engine
 from .routers import (
@@ -13,18 +12,9 @@ from .routers import (
     config, auth, categories, websocket
 )
 
-# Crear tablas (si no existen)
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Ferreteria API", version="2.0.0")
-
-# --- MIDDLEWARES ---
-@app.middleware("http")
-async def log_requests(request, call_next):
-    # Log simple para ver tráfico en consola
-    # print(f"📡 {request.method} {request.url}") 
-    response = await call_next(request)
-    return response
 
 app.add_middleware(
     CORSMiddleware,
@@ -34,7 +24,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- API ROUTERS (Prefijo /api/v1) ---
 app.include_router(products.router, prefix="/api/v1")
 app.include_router(customers.router, prefix="/api/v1")
 app.include_router(quotes.router, prefix="/api/v1")
@@ -50,7 +39,6 @@ app.include_router(auth.router, prefix="/api/v1")
 app.include_router(categories.router, prefix="/api/v1")
 app.include_router(websocket.router, prefix="/api/v1")
 
-# --- STARTUP EVENTS ---
 @app.on_event("startup")
 def startup_event():
     from .database.db import SessionLocal
@@ -60,40 +48,27 @@ def startup_event():
     try:
         init_admin_user(db)
         init_exchange_rates(db)
-        print("✅ Inicialización de sistema completa")
+        print("✅ Inicialización completa")
     except Exception as e:
-        print(f"⚠️ Error en inicialización: {e}")
+        print(f"⚠️ Error startup: {e}")
     finally:
         db.close()
 
-# --- SERVIR FRONTEND REACT (MODO HÍBRIDO) ---
-# Buscamos la carpeta 'dist' subiendo 2 niveles desde este archivo
+# --- SERVIR FRONTEND ---
 current_dir = os.path.dirname(os.path.abspath(__file__))
-# Ajuste de ruta: backend_api -> ferreteria_refactor -> frontend_web -> dist
+# SUBIR SOLO UN NIVEL (CORREGIDO)
 frontend_dist = os.path.join(current_dir, "..", "frontend_web", "dist")
 
 if os.path.exists(frontend_dist):
-    print(f"🖥️  Frontend detectado en: {frontend_dist}")
-    
-    # 1. Montar assets estáticos (JS, CSS, Imágenes)
     app.mount("/assets", StaticFiles(directory=os.path.join(frontend_dist, "assets")), name="assets")
-    
-    # 2. Ruta raíz y Catch-All para React Router (SPA)
-    # Cualquier ruta que NO sea /api/... será manejada por React
     @app.get("/{full_path:path}")
     async def serve_react_app(full_path: str):
-        if full_path.startswith("api") or full_path.startswith("docs") or full_path.startswith("openapi.json"):
-            # Dejar pasar errores 404 de API reales
+        if full_path.startswith("api"):
             return {"error": "Endpoint not found"}
-        
-        # Servir index.html para todo lo demás (Dashboard, Login, etc)
         return FileResponse(os.path.join(frontend_dist, "index.html"))
 else:
-    print(f"⚠️ AVISO: No se encontró carpeta 'dist' en {frontend_dist}")
-    print("   El sistema funcionará solo como API Backend.")
+    print(f"⚠️ NO SE ENCUENTRA EL FRONTEND EN: {frontend_dist}")
 
 @app.get("/")
 def read_root():
-    # Si existe el frontend, esta ruta será sobreescrita por el catch-all de arriba,
-    # pero si no existe, mostramos este mensaje.
-    return {"message": "Ferreteria API Running (Frontend not found)"}
+    return {"message": "API Running - Frontend not found"}
