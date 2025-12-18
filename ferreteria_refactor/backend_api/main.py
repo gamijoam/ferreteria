@@ -109,8 +109,14 @@ print("="*40 + "\n")
 
 @app.get("/")
 def read_root():
+    # Attempt to serve index.html if it exists
+    index_path = os.path.join(frontend_dist, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+        
+    # Fallback to JSON if frontend is not built
     return {
-        "message": "Ferreteria API Running",
+        "message": "Ferreteria API Running (Frontend not found)",
         "debug_info": {
             "frontend_found": os.path.exists(frontend_dist),
             "searched_path": frontend_dist,
