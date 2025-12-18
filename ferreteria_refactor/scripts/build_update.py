@@ -61,10 +61,10 @@ def main():
         return
 
     # 0. Compile Logic
-    # print("Compiling Source Code...")
-    # import subprocess
-    # build_script = os.path.join(os.path.dirname(__file__), "build_exe.py")
-    # subprocess.run(["python", build_script], check=True)
+    print("Compiling Source Code...")
+    import subprocess
+    build_script = os.path.join(os.path.dirname(__file__), "build_exe.py")
+    subprocess.run(["python", build_script], check=True)
     
     COMPILED_DIR = os.path.join(PROJECT_ROOT, "dist", "Ferreteria")
     
