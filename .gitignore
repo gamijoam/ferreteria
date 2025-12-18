@@ -38,3 +38,9 @@ deployment/build/
 
 # Node
 node_modules/
+
+# License files (CRITICAL - Never commit these!)
+license.key
+*.pem
+ferreteria_refactor/scripts/*.pem
+ferreteria_refactor/license.key
