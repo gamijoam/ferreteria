@@ -38,19 +38,58 @@ def main():
         
         print(f"   Versión disponible: {remote_version}")
         
-        # 2. Download ZIP
+        # 2. Download ZIP with retry logic
         print(f"\n[2/5] Descargando actualización...")
         zip_path = os.path.join(BASE_DIR, "update_temp.zip")
         
-        def report(blocknum, blocksize, totalsize):
-            read = blocknum * blocksize
-            if totalsize > 0:
-                percent = int(read * 100 / totalsize)
-                if percent % 10 == 0:  # Print every 10%
-                    print(f"   Progreso: {percent}%")
+        def download_with_retry(url, dest, max_retries=3):
+            """Download file with retry logic and chunked reading"""
+            for attempt in range(max_retries):
+                try:
+                    print(f"   Intento {attempt + 1}/{max_retries}...")
+                    
+                    # Open connection
+                    req = urllib.request.Request(url)
+                    response = urllib.request.urlopen(req, timeout=30)
+                    total_size = int(response.headers.get('Content-Length', 0))
+                    
+                    print(f"   Tamaño total: {total_size / (1024*1024):.1f} MB")
+                    
+                    # Download in chunks
+                    chunk_size = 8192  # 8KB chunks
+                    downloaded = 0
+                    last_percent = 0
+                    
+                    with open(dest, 'wb') as f:
+                        while True:
+                            chunk = response.read(chunk_size)
+                            if not chunk:
+                                break
+                            
+                            f.write(chunk)
+                            downloaded += len(chunk)
+                            
+                            # Show progress every 5%
+                            if total_size > 0:
+                                percent = int(downloaded * 100 / total_size)
+                                if percent >= last_percent + 5:
+                                    print(f"   Progreso: {percent}% ({downloaded / (1024*1024):.1f} MB)")
+                                    last_percent = percent
+                    
+                    print("   ✓ Descarga completa")
+                    return True
+                    
+                except Exception as e:
+                    print(f"   ✗ Error en intento {attempt + 1}: {e}")
+                    if attempt < max_retries - 1:
+                        print(f"   Reintentando en 3 segundos...")
+                        time.sleep(3)
+                    else:
+                        raise Exception(f"Descarga falló después de {max_retries} intentos: {e}")
+            
+            return False
         
-        urllib.request.urlretrieve(download_url, zip_path, report)
-        print("   ✓ Descarga completa")
+        download_with_retry(download_url, zip_path)
         
         # 3. Wait for processes to close
         print(f"\n[3/5] Esperando cierre de procesos...")
