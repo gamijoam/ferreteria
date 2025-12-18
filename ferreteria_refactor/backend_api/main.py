@@ -9,8 +9,9 @@ from .database.db import engine
 from .routers import (
     products, customers, quotes, cash, suppliers, 
     inventory, returns, reports, purchases, users, 
-    config, auth, categories, websocket, audit
+    config, auth, categories, websocket, audit, system
 )
+from .middleware.license_guard import LicenseGuardMiddleware
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -30,6 +31,9 @@ app = FastAPI(
         "email": "admin@ferreteria.local",
     },
 )
+
+# License Guard Middleware (DEBE IR PRIMERO)
+app.add_middleware(LicenseGuardMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
@@ -55,6 +59,7 @@ app.include_router(auth.router, prefix="/api/v1", tags=["Autenticación"])
 app.include_router(categories.router, prefix="/api/v1", tags=["Categorías"])
 app.include_router(websocket.router, prefix="/api/v1", tags=["WebSocket Events"])
 app.include_router(audit.router, prefix="/api/v1", tags=["Auditoría"])
+app.include_router(system.router, prefix="/api/v1", tags=["Sistema y Licencias"])
 
 @app.on_event("startup")
 def startup_event():
