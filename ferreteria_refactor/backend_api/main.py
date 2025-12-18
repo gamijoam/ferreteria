@@ -70,7 +70,7 @@ def startup_event():
 # Buscamos la carpeta 'dist' subiendo 2 niveles desde este archivo
 current_dir = os.path.dirname(os.path.abspath(__file__))
 # Ajuste de ruta: backend_api -> ferreteria_refactor -> frontend_web -> dist
-frontend_dist = os.path.join(current_dir, "..", "..", "frontend_web", "dist")
+frontend_dist = os.path.join(current_dir, "..", "frontend_web", "dist")
 
 if os.path.exists(frontend_dist):
     print(f"🖥️  Frontend detectado en: {frontend_dist}")
