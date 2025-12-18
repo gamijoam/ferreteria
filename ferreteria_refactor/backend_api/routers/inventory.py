@@ -12,10 +12,10 @@ from ..websocket.events import WebSocketEvents
 router = APIRouter(
     prefix="/inventory",
     tags=["inventory"],
-    dependencies=[Depends(warehouse_or_admin)]  # 🔒 WAREHOUSE or ADMIN - Inventory control
+    dependencies=[]  # Dependencies moved to individual endpoints
 )
 
-@router.post("/add")
+@router.post("/add", dependencies=[Depends(warehouse_or_admin)])
 async def add_stock(adjustment: schemas.StockAdjustmentCreate, db: Session = Depends(get_db)):
     """Add stock (Purchase/Entry)"""
     product = db.query(models.Product).filter(models.Product.id == adjustment.product_id).first()
@@ -58,7 +58,7 @@ async def add_stock(adjustment: schemas.StockAdjustmentCreate, db: Session = Dep
     
     return {"status": "success", "new_stock": product.stock, "product_id": product.id}
 
-@router.post("/remove")
+@router.post("/remove", dependencies=[Depends(warehouse_or_admin)])
 async def remove_stock(adjustment: schemas.StockAdjustmentCreate, db: Session = Depends(get_db)):
     """Remove stock (Adjustment/Loss)"""
     product = db.query(models.Product).filter(models.Product.id == adjustment.product_id).first()
@@ -104,7 +104,9 @@ async def remove_stock(adjustment: schemas.StockAdjustmentCreate, db: Session = 
     
     return {"status": "success", "new_stock": product.stock, "product_id": product.id}
 
-@router.get("/kardex", response_model=List[schemas.KardexRead])
+from ..dependencies import any_authenticated
+
+@router.get("/kardex", response_model=List[schemas.KardexRead], dependencies=[any_authenticated])
 def get_kardex(product_id: Optional[int] = None, limit: int = 100, db: Session = Depends(get_db)):
     from sqlalchemy.orm import joinedload
     query = db.query(models.Kardex).options(joinedload(models.Kardex.product))

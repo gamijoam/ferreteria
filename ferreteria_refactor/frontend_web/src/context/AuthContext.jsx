@@ -41,6 +41,13 @@ export const AuthProvider = ({ children }) => {
                 headers: { Authorization: `Bearer ${authToken}` }
             });
 
+            console.log('User Profile Response:', response.data);
+
+            if (!Array.isArray(response.data)) {
+                console.warn('Expected array of users, got:', response.data);
+                throw new Error('Invalid response format from /users');
+            }
+
             // Find current user by username from token
             const currentUser = response.data.find(u => u.username === decoded.sub);
 
@@ -104,9 +111,10 @@ export const AuthProvider = ({ children }) => {
         initAuth();
     }, [token]);
 
-    // Axios Interceptor
+    // Axios Interceptors
     useEffect(() => {
-        const interceptor = apiClient.interceptors.request.use(
+        // Request Interceptor: Attach Token
+        const reqInterceptor = apiClient.interceptors.request.use(
             (config) => {
                 if (token) {
                     config.headers.Authorization = `Bearer ${token}`;
@@ -116,8 +124,21 @@ export const AuthProvider = ({ children }) => {
             (error) => Promise.reject(error)
         );
 
+        // Response Interceptor: Handle 401 (Expired Token)
+        const resInterceptor = apiClient.interceptors.response.use(
+            (response) => response,
+            (error) => {
+                if (error.response && error.response.status === 401) {
+                    console.warn('Session expired or unauthorized. Logging out...');
+                    logout();
+                }
+                return Promise.reject(error);
+            }
+        );
+
         return () => {
-            apiClient.interceptors.request.eject(interceptor);
+            apiClient.interceptors.request.eject(reqInterceptor);
+            apiClient.interceptors.response.eject(resInterceptor);
         };
     }, [token]);
 

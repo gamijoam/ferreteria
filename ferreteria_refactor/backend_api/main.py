@@ -9,7 +9,7 @@ from .database.db import engine
 from .routers import (
     products, customers, quotes, cash, suppliers, 
     inventory, returns, reports, purchases, users, 
-    config, auth, categories, websocket
+    config, auth, categories, websocket, audit
 )
 
 models.Base.metadata.create_all(bind=engine)
@@ -39,6 +39,7 @@ app.include_router(config.router, prefix="/api/v1")
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(categories.router, prefix="/api/v1")
 app.include_router(websocket.router, prefix="/api/v1")
+app.include_router(audit.router, prefix="/api/v1")
 
 @app.on_event("startup")
 def startup_event():
@@ -81,12 +82,18 @@ if os.path.exists(frontend_dist):
     app.mount("/assets", StaticFiles(directory=os.path.join(frontend_dist, "assets")), name="assets")
     
     # Catch-all para React
-    @app.get("/{full_path:path}")
-    async def serve_react_app(full_path: str):
-        # Si es una llamada a la API, dejarla pasar (retornar 404 de API si no existe)
-        if full_path.startswith("api") or full_path.startswith("docs") or full_path.startswith("openapi"):
-            return {"error": "Endpoint not found"}
-        # Para todo lo demás, devolver index.html
+    # Catch-all via Exception Handler (Preserves redirects)
+    from fastapi import Request
+    from fastapi.responses import JSONResponse
+
+    @app.exception_handler(404)
+    async def custom_404_handler(request: Request, exc):
+        path = request.url.path
+        # Si es una llamada a la API, retornar JSON 404 real
+        if path.startswith("/api") or path.startswith("/docs") or path.startswith("/openapi"):
+            return JSONResponse(status_code=404, content={"detail": "Endpoint not found"})
+        
+        # Para todo lo demás (SPA routing), devolver index.html
         return FileResponse(os.path.join(frontend_dist, "index.html"))
 
 else:

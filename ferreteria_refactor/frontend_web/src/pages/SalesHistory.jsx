@@ -55,13 +55,18 @@ const SalesHistory = () => {
     };
 
     const applyFilters = () => {
+        if (!Array.isArray(sales)) {
+            console.warn('Sales is not an array:', sales);
+            return;
+        }
+
         let filtered = [...sales];
 
         // Search filter
         if (searchQuery) {
             filtered = filtered.filter(sale =>
                 sale.id.toString().includes(searchQuery) ||
-                sale.customer?.name.toLowerCase().includes(searchQuery.toLowerCase())
+                sale.customer?.name?.toLowerCase().includes(searchQuery.toLowerCase())
             );
         }
 
