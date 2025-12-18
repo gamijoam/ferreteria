@@ -61,10 +61,10 @@ def main():
         return
 
     # 0. Compile Logic
-    print("Compiling Source Code...")
-    import subprocess
-    build_script = os.path.join(os.path.dirname(__file__), "build_exe.py")
-    subprocess.run(["python", build_script], check=True)
+    # print("Compiling Source Code...")
+    # import subprocess
+    # build_script = os.path.join(os.path.dirname(__file__), "build_exe.py")
+    # subprocess.run(["python", build_script], check=True)
     
     COMPILED_DIR = os.path.join(PROJECT_ROOT, "dist", "Ferreteria")
     
@@ -129,6 +129,23 @@ def main():
             zipf.write(launcher_exe, "Launcher.exe")
         else:
             print("Warning: Launcher.exe not found in dist!")
+            
+        # Add Web Dashboard (Source)
+        web_dashboard_src = os.path.join(PROJECT_ROOT, "web_dashboard")
+        if os.path.exists(web_dashboard_src):
+            print("Adding Web Dashboard sources...")
+            for root, dirs, files in os.walk(web_dashboard_src):
+                # Filter exclusions
+                dirs[:] = [d for d in dirs if not is_excluded(os.path.join(root, d))]
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    if is_excluded(file_path): 
+                        continue
+                    
+                    rel_path = os.path.relpath(file_path, PROJECT_ROOT) # e.g. web_dashboard/app.py
+                    zipf.write(file_path, rel_path)
+        else:
+            print("Warning: web_dashboard folder not found!")
             
         # Add version.json (Updated)
         print("Adding version.json...")

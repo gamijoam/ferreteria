@@ -1,6 +1,6 @@
 {
-    "version": "1.0.31",
+    "version": "1.0.33",
     "update_url": "https://inventariosoft.netlify.app/version.json",
     "download_url": "downloads/update_ferreteria.zip",
-    "release_notes": "Update to 1.0.31"
+    "release_notes": "Update to 1.0.33"
 }
