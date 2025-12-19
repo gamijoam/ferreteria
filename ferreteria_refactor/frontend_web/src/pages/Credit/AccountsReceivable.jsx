@@ -299,12 +299,12 @@ const AccountsReceivable = () => {
                                             }
                                         </td>
                                         <td className="p-4 text-right font-semibold">
-                                            ${invoice.total_amount.toFixed(2)}
+                                            ${Number(invoice.total_amount).toFixed(2)}
                                         </td>
                                         <td className="p-4 text-right">
                                             <span className={`font-bold ${invoice.paid ? 'text-green-600' : 'text-red-600'
                                                 }`}>
-                                                ${balancePending.toFixed(2)}
+                                                ${Number(balancePending).toFixed(2)}
                                             </span>
                                         </td>
                                         <td className="p-4 text-center">
@@ -369,7 +369,7 @@ const AccountsReceivable = () => {
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="bg-gray-50 rounded-lg p-4">
                                     <p className="text-sm text-gray-600">Monto Original</p>
-                                    <p className="font-bold text-lg">${selectedInvoice.total_amount.toFixed(2)}</p>
+                                    <p className="font-bold text-lg">${Number(selectedInvoice.total_amount).toFixed(2)}</p>
                                 </div>
                                 <div className="bg-red-50 rounded-lg p-4">
                                     <p className="text-sm text-gray-600">Saldo Pendiente</p>
