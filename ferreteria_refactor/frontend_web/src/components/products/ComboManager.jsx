@@ -18,13 +18,25 @@ const ComboManager = ({ productId, initialComboItems = [], onChange }) => {
         const fetchProducts = async () => {
             try {
                 const response = await apiClient.get('/products');
-                // Filter out the current product and other combos
-                const filtered = response.data.filter(p =>
-                    p.id !== productId && !p.is_combo
-                );
+                console.log('📦 All products:', response.data);
+                console.log('🔍 Current productId:', productId);
+
+                // Filter: exclude current product (if editing) and other combos
+                const filtered = response.data.filter(p => {
+                    // If creating new product (no productId), just exclude combos
+                    if (!productId) {
+                        return !p.is_combo;
+                    }
+                    // If editing, exclude current product AND combos
+                    return p.id !== productId && !p.is_combo;
+                });
+
+                console.log('✅ Filtered products (available for combo):', filtered);
+                console.log('🎁 Combos filtered out:', response.data.filter(p => p.is_combo));
+
                 setAvailableProducts(filtered);
             } catch (error) {
-                console.error('Error fetching products:', error);
+                console.error('❌ Error fetching products:', error);
             }
         };
         fetchProducts();
@@ -35,7 +47,8 @@ const ComboManager = ({ productId, initialComboItems = [], onChange }) => {
         if (onChange) {
             onChange(comboItems);
         }
-    }, [comboItems, onChange]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [comboItems]); // Only depend on comboItems, not onChange
 
     const handleAddItem = () => {
         if (!selectedProductId || !quantity) {
