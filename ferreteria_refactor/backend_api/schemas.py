@@ -180,6 +180,20 @@ class SalePaymentRead(BaseModel):
     class Config:
         from_attributes = True
 
+# NEW: Sale Detail Read Schema (for invoice detail view)
+class SaleDetailRead(BaseModel):
+    id: int
+    product_id: int
+    quantity: Decimal
+    unit_price: Decimal
+    subtotal: Decimal
+    discount: Decimal = Decimal("0.00")
+    discount_type: str = "NONE"
+    product: Optional['ProductRead'] = None  # Include product info
+    
+    class Config:
+        from_attributes = True
+
 class SaleRead(BaseModel):
     id: int
     date: datetime
@@ -187,11 +201,14 @@ class SaleRead(BaseModel):
     payment_method: str
     customer_id: Optional[int]
     customer: Optional['CustomerRead'] = None
-    payments: List[SalePaymentRead] = []  # ✅ Include payments
+    payments: List[SalePaymentRead] = []  # Include payments
+    details: List[SaleDetailRead] = []  # NEW: Include sale items
     due_date: Optional[datetime] = None
     balance_pending: Optional[Decimal] = None
-    is_credit: bool = False  # ✅ CRITICAL: Missing field added
-    paid: bool = True  # ✅ CRITICAL: Missing field added
+    is_credit: bool = False
+    paid: bool = True
+    currency: str = "USD"  # NEW: Include currency
+    exchange_rate_used: Decimal = Decimal("1.0")  # NEW: Include exchange rate
     
     class Config:
         from_attributes = True

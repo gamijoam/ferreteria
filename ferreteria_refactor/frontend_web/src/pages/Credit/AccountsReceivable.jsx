@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { DollarSign, Calendar, AlertCircle, CheckCircle, X, Filter } from 'lucide-react';
+import { DollarSign, Calendar, AlertCircle, CheckCircle, X, Filter, Eye } from 'lucide-react';
 import apiClient from '../../config/axios';
 import { useConfig } from '../../context/ConfigContext';
+import InvoiceDetailModal from '../../components/credit/InvoiceDetailModal';
 
 const AccountsReceivable = () => {
     const { getExchangeRate, currencies, getActiveCurrencies } = useConfig();
@@ -23,6 +24,11 @@ const AccountsReceivable = () => {
     const [paymentAmount, setPaymentAmount] = useState(0);
     const [paymentMethod, setPaymentMethod] = useState('Efectivo');
     const [paymentCurrency, setPaymentCurrency] = useState('USD');
+
+    // NEW: Invoice Detail Modal
+    const [showDetailModal, setShowDetailModal] = useState(false);
+    const [detailSale, setDetailSale] = useState(null);
+    const [loadingDetail, setLoadingDetail] = useState(false);
 
     useEffect(() => {
         fetchInvoices();
@@ -102,6 +108,22 @@ const AccountsReceivable = () => {
         setPaymentMethod('Efectivo');
         setPaymentCurrency('USD');
         setShowPaymentModal(true);
+    };
+
+    // NEW: Handle view invoice detail
+    const handleViewDetail = async (invoice) => {
+        setLoadingDetail(true);
+        setShowDetailModal(true);
+        try {
+            const response = await apiClient.get(`/products/sales/${invoice.id}`);
+            setDetailSale(response.data);
+        } catch (error) {
+            console.error('Error fetching sale detail:', error);
+            alert('Error al cargar el detalle de la factura');
+            setShowDetailModal(false);
+        } finally {
+            setLoadingDetail(false);
+        }
     };
 
     const handleSavePayment = async () => {
@@ -323,15 +345,26 @@ const AccountsReceivable = () => {
                                             )}
                                         </td>
                                         <td className="p-4 text-center">
-                                            {!invoice.paid && (
+                                            <div className="flex items-center justify-center gap-2">
+                                                {/* NEW: View Detail Button */}
                                                 <button
-                                                    onClick={() => handleRegisterPayment(invoice)}
-                                                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2 mx-auto"
+                                                    onClick={() => handleViewDetail(invoice)}
+                                                    className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+                                                    title="Ver detalle de factura"
                                                 >
-                                                    <DollarSign size={16} />
-                                                    Registrar Abono
+                                                    <Eye size={16} />
+                                                    Ver Detalle
                                                 </button>
-                                            )}
+                                                {!invoice.paid && (
+                                                    <button
+                                                        onClick={() => handleRegisterPayment(invoice)}
+                                                        className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+                                                    >
+                                                        <DollarSign size={16} />
+                                                        Registrar Abono
+                                                    </button>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 );
@@ -454,6 +487,16 @@ const AccountsReceivable = () => {
                     </div>
                 </div>
             )}
+
+            {/* NEW: Invoice Detail Modal */}
+            <InvoiceDetailModal
+                isOpen={showDetailModal}
+                onClose={() => {
+                    setShowDetailModal(false);
+                    setDetailSale(null);
+                }}
+                sale={loadingDetail ? null : detailSale}
+            />
         </div>
     );
 };

@@ -294,6 +294,21 @@ def create_sale(sale_data: schemas.SaleCreate, background_tasks: BackgroundTasks
     # TODO: Get actual user_id from dependency
     return SalesService.create_sale(db, sale_data, user_id=1, background_tasks=background_tasks)
 
+# NEW: Get sale detail with items (for invoice detail view)
+@router.get("/sales/{sale_id}", response_model=schemas.SaleRead)
+def get_sale_detail(sale_id: int, db: Session = Depends(get_db)):
+    """Get sale with details (items/products) for invoice view"""
+    sale = db.query(models.Sale).options(
+        joinedload(models.Sale.details).joinedload(models.SaleDetail.product),
+        joinedload(models.Sale.customer),
+        joinedload(models.Sale.payments)
+    ).filter(models.Sale.id == sale_id).first()
+    
+    if not sale:
+        raise HTTPException(status_code=404, detail="Sale not found")
+    
+    return sale
+
 @router.post("/sales/payments")
 def register_sale_payment(
     payment_data: schemas.SalePaymentCreate,
