@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useHotkeys } from 'react-hotkeys-hook';
 import { Search, ShoppingCart, Trash2, Plus, Minus, CreditCard, RotateCcw } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useCash } from '../context/CashContext';
@@ -45,6 +46,82 @@ const POS = () => {
 
     // Refs
     const searchInputRef = useRef(null);
+
+    // ========================================
+    // KEYBOARD SHORTCUTS
+    // ========================================
+
+    // F3: Focus search input
+    useHotkeys('f3', (e) => {
+        e.preventDefault();
+        if (searchInputRef.current) {
+            searchInputRef.current.focus();
+            if (searchTerm) {
+                searchInputRef.current.select(); // Select all text for easy rewrite
+            }
+        }
+    }, { enableOnFormTags: true }); // Works even when focused on inputs
+
+    // F5: Open payment modal (Cobrar)
+    useHotkeys('f5', (e) => {
+        e.preventDefault();
+        if (cart.length > 0) {
+            setIsPaymentOpen(true);
+        }
+    });
+
+    // ESC: Cancel/Back cascade logic
+    useHotkeys('esc', (e) => {
+        e.preventDefault();
+
+        // Priority cascade
+        if (isPaymentOpen) {
+            setIsPaymentOpen(false);
+        } else if (isMovementOpen) {
+            setIsMovementOpen(false);
+        } else if (selectedProductForUnits) {
+            setSelectedProductForUnits(null);
+        } else if (selectedItemForEdit) {
+            setSelectedItemForEdit(null);
+        } else if (lastSaleData) {
+            handleSuccessClose();
+        } else {
+            // Nothing open, clear search and focus
+            setSearchTerm('');
+            if (searchInputRef.current) {
+                searchInputRef.current.focus();
+            }
+        }
+    });
+
+    // F2: New sale (clear cart with confirmation)
+    useHotkeys('f2', (e) => {
+        e.preventDefault();
+        if (cart.length > 0) {
+            if (window.confirm('¿Desea iniciar una nueva venta? Se perderá el carrito actual.')) {
+                clearCart();
+                setSearchTerm('');
+                if (searchInputRef.current) {
+                    searchInputRef.current.focus();
+                }
+            }
+        } else {
+            // Cart already empty, just clear search
+            setSearchTerm('');
+            if (searchInputRef.current) {
+                searchInputRef.current.focus();
+            }
+        }
+    });
+
+    // F4: Edit last item in cart
+    useHotkeys('f4', (e) => {
+        e.preventDefault();
+        if (cart.length > 0) {
+            const lastItem = cart[cart.length - 1];
+            setSelectedItemForEdit(lastItem);
+        }
+    });
 
     // Fetch Catalog and Categories on Mount
     useEffect(() => {
