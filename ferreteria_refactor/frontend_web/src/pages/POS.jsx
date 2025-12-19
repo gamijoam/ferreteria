@@ -38,6 +38,7 @@ const POS = () => {
     const [isPaymentOpen, setIsPaymentOpen] = useState(false);
     const [isMovementOpen, setIsMovementOpen] = useState(false);
     const [lastSaleData, setLastSaleData] = useState(null); // { cart, totalUSD, paymentData }
+    const [selectedProductIndex, setSelectedProductIndex] = useState(-1); // For keyboard navigation
 
     // Data State
     const [catalog, setCatalog] = useState([]);
@@ -122,6 +123,34 @@ const POS = () => {
             setSelectedItemForEdit(lastItem);
         }
     });
+
+    // Arrow Down: Navigate to next product in search results
+    useHotkeys('down', (e) => {
+        if (filteredCatalog.length > 0) {
+            e.preventDefault();
+            setSelectedProductIndex(prev =>
+                prev < filteredCatalog.length - 1 ? prev + 1 : prev
+            );
+        }
+    }, { enableOnFormTags: true });
+
+    // Arrow Up: Navigate to previous product in search results
+    useHotkeys('up', (e) => {
+        if (filteredCatalog.length > 0) {
+            e.preventDefault();
+            setSelectedProductIndex(prev => prev > 0 ? prev - 1 : 0);
+        }
+    }, { enableOnFormTags: true });
+
+    // Enter: Add selected product to cart
+    useHotkeys('enter', (e) => {
+        if (selectedProductIndex >= 0 && selectedProductIndex < filteredCatalog.length) {
+            e.preventDefault();
+            const selectedProduct = filteredCatalog[selectedProductIndex];
+            handleProductClick(selectedProduct);
+            setSelectedProductIndex(-1); // Reset selection
+        }
+    }, { enableOnFormTags: true });
 
     // Fetch Catalog and Categories on Mount
     useEffect(() => {
@@ -348,9 +377,18 @@ const POS = () => {
                         className="w-full text-xl pl-12 pr-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-0 outline-none shadow-sm"
                         placeholder="Buscar producto (F3)..."
                         value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
+                        onChange={(e) => {
+                            setSearchTerm(e.target.value);
+                            setSelectedProductIndex(-1); // Reset selection on search change
+                        }}
                         autoFocus
                     />
+                    {/* Keyboard hint */}
+                    <div className="absolute right-3 top-3 flex gap-1">
+                        <kbd className="px-2 py-1 text-xs font-semibold text-gray-600 bg-gray-100 border border-gray-300 rounded shadow-sm">F3</kbd>
+                        <kbd className="px-2 py-1 text-xs font-semibold text-gray-600 bg-gray-100 border border-gray-300 rounded shadow-sm">↑↓</kbd>
+                        <kbd className="px-2 py-1 text-xs font-semibold text-gray-600 bg-gray-100 border border-gray-300 rounded shadow-sm">Enter</kbd>
+                    </div>
                 </div>
 
                 {/* Category Filters */}
@@ -402,11 +440,14 @@ const POS = () => {
 
                 {/* Grid */}
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 overflow-y-auto pr-2 pb-20">
-                    {filteredCatalog.map(product => (
+                    {filteredCatalog.map((product, index) => (
                         <div
                             key={product.id}
                             onClick={() => handleProductClick(product)}
-                            className="bg-white p-4 rounded-xl shadow-sm hover:shadow-md cursor-pointer border border-transparent hover:border-blue-400 transition-all flex flex-col justify-between h-40"
+                            className={`bg-white p-4 rounded-xl shadow-sm hover:shadow-md cursor-pointer border transition-all flex flex-col justify-between h-40 ${index === selectedProductIndex
+                                ? 'border-blue-500 ring-2 ring-blue-300 bg-blue-50'
+                                : 'border-transparent hover:border-blue-400'
+                                }`}
                         >
                             <div>
                                 <h3 className="font-bold text-gray-800 leading-tight mb-1">{product.name}</h3>
@@ -436,8 +477,13 @@ const POS = () => {
                         <h2 className="text-xl font-bold flex items-center">
                             <ShoppingCart className="mr-2" /> Ticket
                         </h2>
-                        <button onClick={clearCart} className="text-xs bg-red-500 hover:bg-red-600 px-2 py-1 rounded transition">
+                        <button
+                            onClick={clearCart}
+                            className="text-xs bg-red-500 hover:bg-red-600 px-2 py-1 rounded transition flex items-center gap-1"
+                            title="Nueva Venta (F2)"
+                        >
                             Limpiar
+                            <kbd className="ml-1 px-1 py-0.5 text-[10px] bg-red-600 rounded">F2</kbd>
                         </button>
                     </div>
                     <div className="flex space-x-2">
@@ -525,9 +571,10 @@ const POS = () => {
                     <button
                         onClick={() => setIsPaymentOpen(true)}
                         disabled={cart.length === 0}
-                        className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl shadow-lg transform active:scale-95 transition-all text-xl"
+                        className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl shadow-lg transform active:scale-95 transition-all text-xl flex items-center justify-center gap-2"
                     >
                         COBRAR ${Number(totalUSD).toFixed(2)}
+                        <kbd className="px-2 py-1 text-sm font-semibold bg-blue-700 rounded shadow-sm">F5</kbd>
                     </button>
                 </div>
             </div>
