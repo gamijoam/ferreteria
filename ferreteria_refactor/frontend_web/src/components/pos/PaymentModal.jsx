@@ -199,7 +199,7 @@ const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onCon
                                 <div className="text-sm text-blue-300 mb-1">Cliente</div>
                                 <div className="text-lg font-bold text-blue-400">{selectedCustomer.name}</div>
                                 <div className="text-xs text-blue-300 mt-2">
-                                    Límite: ${selectedCustomer.credit_limit?.toFixed(2) || '0.00'}
+                                    Límite: ${Number(selectedCustomer.credit_limit || 0).toFixed(2)}
                                 </div>
                             </div>
                         </div>
@@ -255,7 +255,7 @@ const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onCon
                             {selectedCustomer && (
                                 <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded text-sm">
                                     <p className="font-semibold text-green-800">
-                                        Límite: ${selectedCustomer.credit_limit?.toFixed(2) || '0.00'}
+                                        Límite: ${Number(selectedCustomer.credit_limit || 0).toFixed(2)}
                                     </p>
                                     <p className="text-green-700">
                                         Plazo: {selectedCustomer.payment_term_days || 15} días

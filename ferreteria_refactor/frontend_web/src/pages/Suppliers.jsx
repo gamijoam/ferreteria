@@ -132,7 +132,7 @@ const Suppliers = () => {
                                         </span>
                                     </td>
                                     <td className="p-4 text-right font-medium">
-                                        {supplier.credit_limit ? `$${supplier.credit_limit.toFixed(2)}` : '-'}
+                                        {supplier.credit_limit ? `$${Number(supplier.credit_limit).toFixed(2)}` : '-'}
                                     </td>
                                     <td className="p-4 text-right">
                                         <span className={`font-bold ${supplier.current_balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
