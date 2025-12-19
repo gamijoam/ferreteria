@@ -69,6 +69,9 @@ const POS = () => {
         if (cart.length > 0) {
             setIsPaymentOpen(true);
         }
+    }, {
+        preventDefault: true,  // Critical: prevent browser refresh
+        enableOnFormTags: true
     });
 
     // ESC: Cancel/Back cascade logic
