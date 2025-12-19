@@ -98,15 +98,19 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
         const { name, value } = e.target;
         let newValue = value;
 
+        // For numeric fields, allow empty string (for better UX while typing)
+        // Convert to number only if value is not empty
         if (['cost', 'price', 'stock', 'min_stock'].includes(name)) {
-            newValue = parseFloat(value) || 0;
+            newValue = value === '' ? '' : parseFloat(value) || 0;
         }
 
         setFormData(prev => {
             const updated = { ...prev, [name]: newValue };
             if (name === 'cost' || name === 'price') {
-                if (updated.price > 0) {
-                    updated.margin = ((updated.price - updated.cost) / updated.price) * 100;
+                const cost = typeof updated.cost === 'number' ? updated.cost : parseFloat(updated.cost) || 0;
+                const price = typeof updated.price === 'number' ? updated.price : parseFloat(updated.price) || 0;
+                if (price > 0) {
+                    updated.margin = ((price - cost) / price) * 100;
                 } else {
                     updated.margin = 0;
                 }

@@ -6,6 +6,7 @@ import apiClient from '../config/axios';
 const Inventory = () => {
     const [kardex, setKardex] = useState([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');  // NEW: Search state
 
     // Fetch Kardex
     const fetchKardex = async () => {
@@ -64,6 +65,8 @@ const Inventory = () => {
                     <input
                         type="text"
                         placeholder="Buscar por producto..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
                         className="w-full pl-10 pr-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                 </div>
@@ -92,34 +95,40 @@ const Inventory = () => {
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                            {kardex.map(item => {
-                                const style = getMovementStyle(item.movement_type);
-                                return (
-                                    <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                                            {new Date(item.date).toLocaleString()}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className="font-medium text-gray-900">
-                                                {item.product ? item.product.name : `ID: ${item.product_id}`}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${style.bg} ${style.color}`}>
-                                                {style.icon}
-                                                {getLabel(item.movement_type)}
-                                            </span>
-                                        </td>
-                                        <td className={`px-6 py-4 whitespace-nowrap text-sm text-right font-bold ${style.color}`}>
-                                            {['SALE', 'ADJUSTMENT_OUT', 'DAMAGED', 'INTERNAL_USE'].includes(item.movement_type) ? '-' : '+'}{item.quantity}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-gray-900">
-                                            {item.balance_after}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 italic truncate max-w-xs">{item.description}</td>
-                                    </tr>
-                                );
-                            })}
+                            {kardex
+                                .filter(item => {
+                                    if (!searchQuery) return true;
+                                    const productName = item.product?.name || '';
+                                    return productName.toLowerCase().includes(searchQuery.toLowerCase());
+                                })
+                                .map(item => {
+                                    const style = getMovementStyle(item.movement_type);
+                                    return (
+                                        <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                                                {new Date(item.date).toLocaleString()}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <span className="font-medium text-gray-900">
+                                                    {item.product ? item.product.name : `ID: ${item.product_id}`}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${style.bg} ${style.color}`}>
+                                                    {style.icon}
+                                                    {getLabel(item.movement_type)}
+                                                </span>
+                                            </td>
+                                            <td className={`px-6 py-4 whitespace-nowrap text-sm text-right font-bold ${style.color}`}>
+                                                {['SALE', 'ADJUSTMENT_OUT', 'DAMAGED', 'INTERNAL_USE'].includes(item.movement_type) ? '-' : '+'}{item.quantity}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-gray-900">
+                                                {item.balance_after}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 italic truncate max-w-xs">{item.description}</td>
+                                        </tr>
+                                    );
+                                })}
                         </tbody>
                     </table>
                 </div>
