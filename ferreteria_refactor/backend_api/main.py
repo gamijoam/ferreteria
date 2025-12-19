@@ -93,6 +93,15 @@ def run_migrations():
 def startup_event():
     # 1. Run Migrations
     run_migrations()
+    
+    # 1.5 ENSURE ALL TABLES EXIST (for fresh databases)
+    print("🔧 Ensuring all database tables exist...")
+    try:
+        from .database.db import Base
+        Base.metadata.create_all(bind=engine)
+        print("✅ Database tables verified/created successfully.")
+    except Exception as e:
+        print(f"⚠️ Error ensuring tables: {e}")
 
     # 2. Existing startup items
     from .database.db import SessionLocal
