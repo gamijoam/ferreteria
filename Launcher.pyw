@@ -94,28 +94,65 @@ TQIDAQAB
 
     def validate_license():
         log("Validando licencia...")
+        
+        # 1. Verificar existencia
         if not LICENSE_FILE.exists():
+            log("   -> Archivo license.key no encontrado.")
             return False, "Archivo license.key no encontrado", None
         
+        # 2. Leer archivo
         try:
             with open(LICENSE_FILE, 'r') as f:
                 token = f.read().strip()
+            log(f"   -> Token leido: {token[:15]}...") 
         except Exception as e:
-            return False, f"Error leyendo: {e}", None
+            log(f"   -> Error leyendo licencia: {e}")
+            return False, f"Error leyendo archivo: {e}", None
         
+        # 3. Decodificar JWT (Verifica firma y estructura)
         try:
+            # IMPORTANTE: python-jose verifica 'exp' automaticamente por defecto.
+            # Sin embargo, agregamos logs para depuracion manual.
             payload = jwt.decode(token, PUBLIC_KEY, algorithms=["RS256"])
+            log("   -> Firma JWT valida.")
+        except jwt.ExpiredSignatureError:
+            log("   -> ERROR: Token expirado (detectado por libreria).")
+            return False, "Licencia expirada.", None
         except Exception as e:
+            log(f"   -> Error decodificando JWT: {e}")
             return False, f"Token invalido: {e}", None
             
-        # Validar Hardware ID
-        l_type = payload.get("type")
+        # 4. Verificacion Manual de Expiracion (Doble chequeo UTC)
+        exp_timestamp = payload.get("exp")
+        if exp_timestamp:
+            # Convertir timestamp (que es UTC) a objeto datetime UTC
+            exp_date = datetime.utcfromtimestamp(exp_timestamp)
+            now_utc = datetime.utcnow()
+            
+            log(f"   -> Expiracion (UTC): {exp_date}")
+            log(f"   -> Actual (UTC):     {now_utc}")
+            
+            if now_utc > exp_date:
+                log("   -> ERROR: Licencia expirada (Chequeo manual).")
+                return False, f"Licencia expirada el {exp_date.strftime('%Y-%m-%d %H:%M:%S')} UTC", None
+            else:
+                days = (exp_date - now_utc).days
+                log(f"   -> Validez OK. Dias restantes: {days}")
+                
+        # 5. Validar Hardware ID (Solo FULL)
+        l_type = payload.get("type", "UNKNOWN")
+        log(f"   -> Tipo Licencia: {l_type}")
+        
         if l_type == "FULL":
             hw_id = payload.get("hw_id")
             my_id = get_machine_id()
+            log(f"   -> HW Check: Licencia={hw_id} vs Maquina={my_id}")
+            
             if hw_id != my_id:
-                return False, f"ID Hardware incorrecto ({hw_id} != {my_id})", None
+                log("   -> ERROR: Hardware Mismatch")
+                return False, f"Hardware ID invalido. Licencia para: {hw_id}, Esta PC: {my_id}", None
                 
+        log("   -> Licencia TOTALMENTE VALIDA.")
         return True, "OK", payload
 
     def input_license_gui(error_msg):
