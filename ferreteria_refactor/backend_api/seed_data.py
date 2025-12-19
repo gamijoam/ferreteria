@@ -6,11 +6,21 @@ import random
 # Add parent directory to path to allow importing modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from backend_api.database.db import SessionLocal
+from backend_api.database.db import SessionLocal, engine
 from backend_api.models import models
 from backend_api.security import get_password_hash
+from backend_api.database.db import Base
 
 def seed_data():
+    # CREATE ALL TABLES FIRST
+    print("🔧 Creating database tables...")
+    try:
+        Base.metadata.create_all(bind=engine)
+        print("✅ Tables created successfully!")
+    except Exception as e:
+        print(f"⚠️ Error creating tables: {e}")
+        print("Continuing with seed data...")
+    
     db = SessionLocal()
     try:
         print("🌱 Seeding database...")
