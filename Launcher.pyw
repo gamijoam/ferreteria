@@ -1,14 +1,51 @@
-import os
+#!/usr/bin/env python3
 import sys
-import subprocess
-import time
-import webbrowser
+import os
 import tkinter as tk
-from tkinter import messagebox, simpledialog
+from tkinter import messagebox
 from pathlib import Path
-from jose import jwt, JWTError
 from datetime import datetime
-import uuid
+import traceback
+
+# --- CONFIGURACION DE LOGGING (CRITICO: ANTES DE TODO) ---
+try:
+    BASE_DIR = Path(__file__).parent
+except NameError:
+    BASE_DIR = Path(os.getcwd())
+
+LOG_FILE = BASE_DIR / "launcher.log"
+
+# Redirigir stdout/stderr a archivo si no hay consola (doble click)
+if sys.stdout is None or sys.stderr is None:
+    sys.stdout = open(LOG_FILE, "a")
+    sys.stderr = open(LOG_FILE, "a")
+
+print(f"\n--- Launcher Iniciado: {datetime.now()} ---")
+print(f"CWD: {os.getcwd()}")
+
+# --- IMPORTACIONES PROTEGIDAS ---
+try:
+    import subprocess
+    import webbrowser
+    import time
+    from tkinter import simpledialog
+    from jose import jwt, JWTError
+    import uuid
+except ImportError as e:
+    print(f"FATAL ERROR: Falta una dependencia: {e}")
+    traceback.print_exc()
+    # Intentar mostrar error grafico
+    try:
+        root = tk.Tk()
+        root.withdraw()
+        messagebox.showerror("Error Fatal", f"Faltan dependencias:\n{e}\n\nConsulte launcher.log")
+    except:
+        pass
+    sys.exit(1)
+except Exception as e:
+    print(f"FATAL ERROR en imports: {e}")
+    traceback.print_exc()
+    sys.exit(1)
 
 # --- CONFIGURACION ---
 REPO_URL = "https://github.com/gamijoam/ferreteria.git" 
@@ -18,11 +55,6 @@ APP_PORT = 8000
 PACKAGE_NAME = "ferreteria_refactor"
 
 # --- CONFIGURACION DE LICENCIAS ---
-try:
-    BASE_DIR = Path(__file__).parent
-except NameError:
-    BASE_DIR = Path(os.getcwd())
-
 LICENSE_FILE = BASE_DIR / "license.key"
 
 # Clave publica RSA
@@ -42,24 +74,29 @@ def get_machine_id():
 
 def validate_license():
     """Valida la licencia JWT."""
+    print("Validando licencia...")
     if not LICENSE_FILE.exists():
+        print("No existe archivo de licencia")
         return False, "No se encontro archivo de licencia", None
     
     try:
         with open(LICENSE_FILE, 'r') as f:
             token = f.read().strip()
     except Exception as e:
+        print(f"Error leyendo licencia: {e}")
         return False, f"Error al leer licencia: {str(e)}", None
     
     try:
         payload = jwt.decode(token, PUBLIC_KEY, algorithms=["RS256"])
     except JWTError as e:
+        print(f"Error decodificando JWT: {e}")
         return False, f"Licencia invalida: {str(e)}", None
     
     exp_timestamp = payload.get("exp")
     if exp_timestamp:
         exp_date = datetime.fromtimestamp(exp_timestamp)
         if datetime.utcnow() > exp_date:
+            print("Licencia expirada")
             return False, f"Licencia expirada el {exp_date.strftime('%Y-%m-%d')}", None
     
     license_type = payload.get("type", "FULL")
@@ -67,6 +104,7 @@ def validate_license():
         license_hw_id = payload.get("hw_id")
         current_hw_id = get_machine_id()
         if license_hw_id and license_hw_id != current_hw_id:
+            print(f"Hardware mismatch: {license_hw_id} vs {current_hw_id}")
             return False, "Esta licencia no es valida para este equipo", None
     
     return True, "Licencia valida", payload
@@ -83,59 +121,61 @@ def save_license(license_key):
 
 def check_license():
     """Verifica la licencia con UI simplificada."""
-    print("Verificando licencia...")
-    valid, message, payload = validate_license()
-    
-    if not valid:
-        print(f"Licencia invalida: {message}")
-        print(f"Machine ID: {get_machine_id()}")
+    try:
+        valid, message, payload = validate_license()
         
-        # UI Simplificada
-        root = tk.Tk()
-        root.withdraw() # Ocultar ventana principal
-        
-        machine_id = get_machine_id()
-        msg = (
-            f"No se detecto una licencia valida.\n"
-            f"Error: {message}\n\n"
-            f"Machine ID de este equipo: {machine_id}\n\n"
-            f"Por favor, ingrese su codigo de licencia a continuacion:"
-        )
-        
-        # Usar simpledialog que es mas robusto
-        license_key = simpledialog.askstring(
-            "Activacion Requerida", 
-            msg, 
-            parent=root
-        )
-        
-        if license_key:
-            # Intentar activar
-            license_key = license_key.strip()
-            # Guardar temporalmente para validar
-            if save_license(license_key):
-                valid, message, payload = validate_license()
-                if valid:
-                    messagebox.showinfo("Exito", "Licencia activada correctamente.")
-                    return # Exito
+        if not valid:
+            print(f"Licencia invalida: {message}")
+            
+            # UI Simplificada
+            root = tk.Tk()
+            root.withdraw() 
+            
+            machine_id = get_machine_id()
+            msg = (
+                f"No se detecto una licencia valida.\n"
+                f"Error: {message}\n\n"
+                f"Machine ID de este equipo: {machine_id}\n\n"
+                f"Por favor, ingrese su codigo de licencia a continuacion:"
+            )
+            
+            license_key = simpledialog.askstring(
+                "Activacion Requerida", 
+                msg, 
+                parent=root
+            )
+            
+            if license_key:
+                license_key = license_key.strip()
+                if save_license(license_key):
+                    valid, message, payload = validate_license()
+                    if valid:
+                        messagebox.showinfo("Exito", "Licencia activada correctamente.")
+                        root.destroy()
+                        return 
+                    else:
+                        messagebox.showerror("Error", f"La licencia ingresada no es valida:\n{message}")
+                        root.destroy()
+                        sys.exit(1)
                 else:
-                    messagebox.showerror("Error", f"La licencia ingresada no es valida:\n{message}")
+                    root.destroy()
                     sys.exit(1)
             else:
+                messagebox.showinfo(
+                    "Cancelado",
+                    f"Inicio cancelado.\n\n"
+                    f"Si tiene problemas, puede crear manualmente 'license.key' "
+                    f"en {BASE_DIR}."
+                )
+                root.destroy()
                 sys.exit(1)
-        else:
-            # Usuario cancelo
-            # Ultimo recurso: Instrucciones manuales
-            messagebox.showinfo(
-                "Cancelado",
-                f"Inicio cancelado.\n\n"
-                f"Si tiene problemas, puede crear manualmente un archivo llamado 'license.key' "
-                f"en la carpeta {BASE_DIR} y pegar su licencia dentro."
-            )
-            sys.exit(1)
 
-    # Si llegamos aqui, la licencia es valida
-    print("Licencia valida.")
+        print("Licencia OK")
+    except Exception as e:
+        print(f"Error en check_license: {e}")
+        traceback.print_exc()
+        messagebox.showerror("Error", f"Error verificando licencia: {e}\nRevise launcher.log")
+        sys.exit(1)
 
 def start_backend():
     """Inicia el servidor backend."""
@@ -146,10 +186,12 @@ def start_backend():
         "--host", APP_HOST, 
         "--port", str(APP_PORT)
     ]
-    # Creation flags para ocultar consola si es posible
+    
+    # IMPORTANTE: En Windows sin consola, necesitamos PIPE o redirigir a archivo
+    # Si pasamos stdout=sys.stdout y sys.stdout es un archivo, funciona.
     process = subprocess.Popen(
         cmd,
-        cwd=os.path.dirname(os.path.abspath(__file__)),
+        cwd=BASE_DIR,
         stdout=sys.stdout,
         stderr=sys.stderr
     )
@@ -159,12 +201,11 @@ def main():
     try:
         check_license()
         
-        # git_update() # Desactivado
-        
         server_process = start_backend()
         
         time.sleep(4)
         url = f"http://{APP_HOST}:{APP_PORT}"
+        print(f"Abriendo navegador: {url}")
         webbrowser.open(url)
         
         try:
@@ -173,11 +214,12 @@ def main():
             server_process.terminate()
             
     except Exception as e:
-        # Catch-all para errores
+        print(f"Error FATAL en main: {e}")
+        traceback.print_exc()
         try:
-            messagebox.showerror("Error Fatal", f"Ocurrio un error inesperado:\n{str(e)}")
+            messagebox.showerror("Error Fatal", f"Ocurrio un error inesperado:\n{str(e)}\nRevise launcher.log")
         except:
-            print(f"Error fatal: {e}")
+            pass
 
 if __name__ == "__main__":
     main()
