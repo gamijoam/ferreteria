@@ -26,6 +26,7 @@ class ProductBase(BaseModel):
     supplier_id: Optional[int] = Field(None, description="ID del proveedor principal", example=1)
     location: Optional[str] = Field(None, description="Ubicación física en almacén", example="Pasillo 4, Estante B")
     exchange_rate_id: Optional[int] = Field(None, description="ID de tasa de cambio específica (opcional)", example=2)
+    is_combo: bool = Field(False, description="Indica si el producto es un combo/bundle")
     is_active: bool = Field(True, description="Indica si el producto está disponible para la venta")
 
 # Exchange Rate Schemas
@@ -73,8 +74,25 @@ class ProductUnitRead(ProductUnitBase):
     class Config:
         from_attributes = True
 
+# Combo/Bundle Schemas
+class ComboItemBase(BaseModel):
+    child_product_id: int = Field(..., description="ID del producto componente", example=5)
+    quantity: Decimal = Field(..., description="Cantidad del componente en el combo", gt=0, example="2.000")
+
+class ComboItemCreate(ComboItemBase):
+    pass
+
+class ComboItemRead(ComboItemBase):
+    id: int
+    parent_product_id: int
+    child_product: Optional['ProductRead'] = None  # Include child product details
+    
+    class Config:
+        from_attributes = True
+
 class ProductCreate(ProductBase):
     units: List[ProductUnitCreate] = Field([], description="Lista de unidades alternativas (cajas, bultos)")
+    combo_items: List[ComboItemCreate] = Field([], description="Lista de componentes si es un combo")
 
 class ProductUpdate(BaseModel):
     name: Optional[str] = None
@@ -93,8 +111,10 @@ class ProductUpdate(BaseModel):
     location: Optional[str] = None
     unit_type: Optional[str] = None
     exchange_rate_id: Optional[int] = None  # NEW: Allow updating exchange rate
+    is_combo: Optional[bool] = None  # NEW: Allow updating combo status
     is_active: Optional[bool] = None
     units: Optional[List[ProductUnitCreate]] = None
+    combo_items: Optional[List[ComboItemCreate]] = None  # NEW: Allow updating combo items
 
     class Config:
         from_attributes = True
@@ -117,6 +137,7 @@ class ProductRead(ProductBase):
     id: int
     price_rules: List[PriceRuleRead] = []
     units: List[ProductUnitRead] = []
+    combo_items: List[ComboItemRead] = []  # NEW: Include combo items
     
     class Config:
         from_attributes = True

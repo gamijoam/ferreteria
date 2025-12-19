@@ -100,6 +100,9 @@ class Product(Base):
     location = Column(String, nullable=True) # Shelf/Department location
     conversion_factor = Column(Integer, default=1) # How many units in the box?
     unit_type = Column(String, default="Unidad") # Unidad, Metro, Kilo, Litro
+    
+    # NEW: Combo/Bundle Support
+    is_combo = Column(Boolean, default=False)  # True if this product is a combo/bundle
 
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
     supplier_id = Column(Integer, ForeignKey("suppliers.id"), nullable=True)
@@ -110,9 +113,25 @@ class Product(Base):
     exchange_rate = relationship("ExchangeRate", back_populates="products")
     price_rules = relationship("PriceRule", back_populates="product")
     units = relationship("ProductUnit", back_populates="product", cascade="all, delete-orphan")
+    
+    # NEW: Combo relationships
+    # Items that are part of THIS combo (if this product is a combo)
+    combo_items = relationship(
+        "ComboItem", 
+        foreign_keys="ComboItem.parent_product_id",
+        back_populates="parent_product",
+        cascade="all, delete-orphan"
+    )
+    
+    # Combos that include THIS product as a component
+    parent_combos = relationship(
+        "ComboItem",
+        foreign_keys="ComboItem.child_product_id",
+        back_populates="child_product"
+    )
 
     def __repr__(self):
-        return f"<Product(name='{self.name}', is_box={self.is_box}, factor={self.conversion_factor})>"
+        return f"<Product(name='{self.name}', is_box={self.is_box}, is_combo={self.is_combo}, factor={self.conversion_factor})>"
 
 class ProductUnit(Base):
     __tablename__ = "product_units"
@@ -131,6 +150,33 @@ class ProductUnit(Base):
 
     def __repr__(self):
         return f"<ProductUnit(name='{self.unit_name}', factor={self.conversion_factor})>"
+
+class ComboItem(Base):
+    """
+    Combo/Bundle Item Model - Defines components of a combo product
+    Example: "Combo Emprendedor" contains "2x Cemento" + "1x Pala"
+    """
+    __tablename__ = "combo_items"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    parent_product_id = Column(Integer, ForeignKey("products.id"), nullable=False)  # The combo product
+    child_product_id = Column(Integer, ForeignKey("products.id"), nullable=False)   # The component product
+    quantity = Column(Numeric(12, 3), nullable=False, default=1.000)  # Quantity of child in combo
+    
+    # Relationships
+    parent_product = relationship(
+        "Product",
+        foreign_keys=[parent_product_id],
+        back_populates="combo_items"
+    )
+    child_product = relationship(
+        "Product",
+        foreign_keys=[child_product_id],
+        back_populates="parent_combos"
+    )
+    
+    def __repr__(self):
+        return f"<ComboItem(parent={self.parent_product_id}, child={self.child_product_id}, qty={self.quantity})>"
 
 class Kardex(Base):
     __tablename__ = "kardex"

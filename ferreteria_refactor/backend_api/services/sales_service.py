@@ -101,14 +101,82 @@ class SalesService:
                 raise HTTPException(status_code=404, detail=f"Product {item.product_id} not found")
             
             # Calculate base units to deduct using conversion_factor
-            # item.conversion_factor and item.quantity are Decimals from schema
             units_to_deduct = item.quantity * item.conversion_factor
             
-            # Check Stock
-            if product.stock < units_to_deduct:
-                 raise HTTPException(status_code=400, detail=f"Insufficient stock for {product.name}")
-    
-            # Calculate subtotal (before discount)
+            # NEW: COMBO LOGIC - Check if product is a combo
+            if product.is_combo:
+                # COMBO: Don't check/deduct stock from parent, process children instead
+                if not product.combo_items:
+                    raise HTTPException(
+                        status_code=400, 
+                        detail=f"Combo product '{product.name}' has no components defined"
+                    )
+                
+                # Check stock for ALL child products first (fail fast)
+                for combo_item in product.combo_items:
+                    child_product = combo_item.child_product
+                    qty_needed = item.quantity * combo_item.quantity
+                    
+                    if child_product.stock < qty_needed:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Insufficient stock for combo component '{child_product.name}'. Needed: {qty_needed}, Available: {child_product.stock}"
+                        )
+                
+                # All checks passed, now deduct stock from children
+                for combo_item in product.combo_items:
+                    child_product = combo_item.child_product
+                    qty_to_deduct = item.quantity * combo_item.quantity
+                    
+                    # Deduct stock from child
+                    child_product.stock -= qty_to_deduct
+                    
+                    # Create Kardex entry for child product
+                    kardex_entry = models.Kardex(
+                        product_id=child_product.id,
+                        movement_type="SALE",
+                        quantity=-qty_to_deduct,
+                        balance_after=child_product.stock,
+                        description=f"Sale via combo: {product.name} (Sale #{new_sale.id})"
+                    )
+                    db.add(kardex_entry)
+                    
+                    # Collect child product info for broadcast
+                    updated_products_info.append({
+                        "id": child_product.id,
+                        "name": child_product.name,
+                        "price": float(child_product.price),
+                        "stock": float(child_product.stock),
+                        "exchange_rate_id": child_product.exchange_rate_id
+                    })
+            else:
+                # NORMAL PRODUCT: Check and deduct stock as usual
+                if product.stock < units_to_deduct:
+                    raise HTTPException(status_code=400, detail=f"Insufficient stock for {product.name}")
+                
+                # Update Stock
+                product.stock -= units_to_deduct
+                
+                # Collect info for broadcast
+                updated_products_info.append({
+                    "id": product.id,
+                    "name": product.name,
+                    "price": float(product.price),
+                    "stock": float(product.stock),
+                    "exchange_rate_id": product.exchange_rate_id
+                })
+                
+                # Register Kardex Movement
+                kardex_entry = models.Kardex(
+                    product_id=product.id,
+                    movement_type="SALE",
+                    quantity=-units_to_deduct,
+                    balance_after=product.stock,
+                    description=f"Sale #{new_sale.id}: Sold {item.quantity} units at ${item.unit_price_usd} each"
+                )
+                db.add(kardex_entry)
+            
+            # Calculate subtotal (before discount) - SAME FOR BOTH
             subtotal = item.unit_price_usd * item.quantity
             
             # Apply discount if any
@@ -118,40 +186,18 @@ class SalesService:
                 elif item.discount_type == "FIXED":
                     subtotal = subtotal - item.discount
             
-            # Create Sale Detail
+            # Create Sale Detail - SAME FOR BOTH
             detail = models.SaleDetail(
                 sale_id=new_sale.id,
                 product_id=product.id,
-                quantity=units_to_deduct,  # Store base units deducted
-                unit_price=item.unit_price_usd,  # Store the price per unit sold
+                quantity=units_to_deduct,
+                unit_price=item.unit_price_usd,
                 subtotal=subtotal,
-                is_box_sale=False,  # Deprecated, keeping for compatibility
+                is_box_sale=False,
                 discount=item.discount,
                 discount_type=item.discount_type
             )
             db.add(detail)
-    
-            # Update Stock
-            product.stock -= units_to_deduct
-            
-            # Collect info for broadcast
-            updated_products_info.append({
-                "id": product.id,
-                "name": product.name,
-                "price": float(product.price), # Cast to float for JSON
-                "stock": float(product.stock),
-                "exchange_rate_id": product.exchange_rate_id
-            })
-            
-            # Register Kardex Movement
-            kardex_entry = models.Kardex(
-                product_id=product.id,
-                movement_type="SALE",
-                quantity=-units_to_deduct,  # Negative for outgoing
-                balance_after=product.stock,
-                description=f"Sale #{new_sale.id}: Sold {item.quantity} units at ${item.unit_price_usd} each"
-            )
-            db.add(kardex_entry)
     
         # 3. Process Payments (New Multi-Payment Logic)
         if sale_data.payments:

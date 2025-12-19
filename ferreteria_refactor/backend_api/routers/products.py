@@ -31,7 +31,7 @@ def read_products(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)
 @router.post("/", response_model=schemas.ProductRead, dependencies=[Depends(has_role([UserRole.ADMIN, UserRole.WAREHOUSE]))])
 def create_product(product: schemas.ProductCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     # 1. Operaciones DB (Síncronas en Threadpool)
-    product_data = product.dict(exclude={"units"})
+    product_data = product.dict(exclude={"units", "combo_items"})
     db_product = models.Product(**product_data)
     db.add(db_product)
     db.commit()
@@ -44,6 +44,18 @@ def create_product(product: schemas.ProductCreate, background_tasks: BackgroundT
             db.add(db_unit)
         db.commit()
         db.refresh(db_product)
+    
+    # NEW: Process Combo Items
+    if product.combo_items:
+        for combo_item in product.combo_items:
+            db_combo_item = models.ComboItem(
+                parent_product_id=db_product.id,
+                child_product_id=combo_item.child_product_id,
+                quantity=combo_item.quantity
+            )
+            db.add(db_combo_item)
+        db.commit()
+        db.refresh(db_product)
         
     # 2. WebSocket en Background
     payload = {
@@ -51,6 +63,7 @@ def create_product(product: schemas.ProductCreate, background_tasks: BackgroundT
         "name": db_product.name,
         "price": float(db_product.price),
         "stock": float(db_product.stock),
+        "is_combo": db_product.is_combo,
         "exchange_rate_id": db_product.exchange_rate_id,
         "units": [
             {
@@ -60,7 +73,14 @@ def create_product(product: schemas.ProductCreate, background_tasks: BackgroundT
                 "price_usd": float(u.price_usd) if u.price_usd else None,
                 "barcode": u.barcode
             } for u in db_product.units
-        ] if db_product.units else []
+        ] if db_product.units else [],
+        "combo_items": [
+            {
+                "id": c.id,
+                "child_product_id": c.child_product_id,
+                "quantity": float(c.quantity)
+            } for c in db_product.combo_items
+        ] if db_product.combo_items else []
     }
     background_tasks.add_task(run_broadcast, WebSocketEvents.PRODUCT_CREATED, payload)
         
@@ -78,6 +98,11 @@ def update_product(product_id: int, product_update: schemas.ProductUpdate, backg
     units_data = None
     if "units" in update_data:
         units_data = update_data.pop("units")
+    
+    # NEW: Separate combo_items data if present
+    combo_items_data = None
+    if "combo_items" in update_data:
+        combo_items_data = update_data.pop("combo_items")
 
     # Capture Current State (Old)
     old_state = {c.name: getattr(db_product, c.name) for c in db_product.__table__.columns}
@@ -95,6 +120,22 @@ def update_product(product_id: int, product_update: schemas.ProductUpdate, backg
         for unit in units_data:
             db_unit = models.ProductUnit(**unit, product_id=product_id)
             db.add(db_unit)
+    
+    # NEW: Handle Combo Items Update (Snapshot Strategy)
+    if combo_items_data is not None:
+        # Delete existing combo items
+        db.query(models.ComboItem).filter(
+            models.ComboItem.parent_product_id == product_id
+        ).delete()
+        
+        # Add new combo items
+        for combo_item in combo_items_data:
+            db_combo_item = models.ComboItem(
+                parent_product_id=product_id,
+                child_product_id=combo_item["child_product_id"],
+                quantity=combo_item["quantity"]
+            )
+            db.add(db_combo_item)
 
     db.commit()
     db.refresh(db_product)
@@ -117,6 +158,7 @@ def update_product(product_id: int, product_update: schemas.ProductUpdate, backg
         "name": db_product.name,
         "price": float(db_product.price),
         "stock": float(db_product.stock),
+        "is_combo": db_product.is_combo,
         "exchange_rate_id": db_product.exchange_rate_id,
         "units": [
             {
@@ -126,7 +168,14 @@ def update_product(product_id: int, product_update: schemas.ProductUpdate, backg
                 "price_usd": float(u.price_usd) if u.price_usd else None,
                 "barcode": u.barcode
             } for u in db_product.units
-        ] if db_product.units else []
+        ] if db_product.units else [],
+        "combo_items": [
+            {
+                "id": c.id,
+                "child_product_id": c.child_product_id,
+                "quantity": float(c.quantity)
+            } for c in db_product.combo_items
+        ] if db_product.combo_items else []
     }
     background_tasks.add_task(run_broadcast, WebSocketEvents.PRODUCT_UPDATED, payload)
     
