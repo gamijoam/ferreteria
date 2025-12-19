@@ -492,3 +492,6 @@ class AuditLog(Base):
 
     def __repr__(self):
         return f"<AuditLog(action='{self.action}', table='{self.table_name}')>"
+
+
+

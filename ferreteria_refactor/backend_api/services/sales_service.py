@@ -1,16 +1,26 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import datetime, timedelta
-from fastapi import HTTPException
-from decimal import Decimal  # NEW
+from fastapi import HTTPException, BackgroundTasks
+from decimal import Decimal
 from ..models import models
 from .. import schemas
 from ..websocket.manager import manager
 from ..websocket.events import WebSocketEvents
+import asyncio
+
+# DUPLICATED HELPER due to circular import risks if we try to import from routers
+def run_broadcast(event: str, data: dict):
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(manager.broadcast(event, data))
+    finally:
+        loop.close()
 
 class SalesService:
     @staticmethod
-    async def create_sale(db: Session, sale_data: schemas.SaleCreate, user_id: int):
+    def create_sale(db: Session, sale_data: schemas.SaleCreate, user_id: int, background_tasks: BackgroundTasks = None):
         updated_products_info = []
         
         # Credit Validation for Credit Sales
@@ -167,22 +177,23 @@ class SalesService:
     
         db.commit()
         
-        # Emit Stock Update Events
-        for p_info in updated_products_info:
-            await manager.broadcast(WebSocketEvents.PRODUCT_UPDATED, p_info)
-            await manager.broadcast(WebSocketEvents.PRODUCT_STOCK_UPDATED, {
-                "id": p_info["id"], 
-                "stock": p_info["stock"]
+        # Emit Stock Update Events using BackgroundTasks
+        if background_tasks:
+            for p_info in updated_products_info:
+                background_tasks.add_task(run_broadcast, WebSocketEvents.PRODUCT_UPDATED, p_info)
+                background_tasks.add_task(run_broadcast, WebSocketEvents.PRODUCT_STOCK_UPDATED, {
+                    "id": p_info["id"], 
+                    "stock": p_info["stock"]
+                })
+            
+            # Emit Sale Event
+            background_tasks.add_task(run_broadcast, WebSocketEvents.SALE_COMPLETED, {
+                "id": new_sale.id,
+                "total_amount": float(new_sale.total_amount), # Cast for JSON
+                "currency": new_sale.currency,
+                "payment_method": new_sale.payment_method,
+                "customer_id": new_sale.customer_id,
+                "date": new_sale.date.isoformat() if new_sale.date else None
             })
-        
-        # Emit Sale Event
-        await manager.broadcast(WebSocketEvents.SALE_COMPLETED, {
-            "id": new_sale.id,
-            "total_amount": float(new_sale.total_amount), # Cast for JSON
-            "currency": new_sale.currency,
-            "payment_method": new_sale.payment_method,
-            "customer_id": new_sale.customer_id,
-            "date": new_sale.date.isoformat() if new_sale.date else None
-        })
             
         return {"status": "success", "sale_id": new_sale.id}

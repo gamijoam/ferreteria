@@ -13,7 +13,7 @@ from .routers import (
 )
 from .middleware.license_guard import LicenseGuardMiddleware
 
-models.Base.metadata.create_all(bind=engine)
+# models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="Ferretería Enterprise API",
@@ -61,11 +61,44 @@ app.include_router(websocket.router, prefix="/api/v1", tags=["WebSocket Events"]
 app.include_router(audit.router, prefix="/api/v1", tags=["Auditoría"])
 app.include_router(system.router, prefix="/api/v1", tags=["Sistema y Licencias"])
 
+def run_migrations():
+    """Run Alembic migrations programmatically on startup."""
+    from alembic import command
+    from alembic.config import Config
+    
+    print("🔄 Checking database migrations...")
+    try:
+        # Determine paths
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        alembic_ini_path = os.path.join(base_dir, "alembic.ini")
+        
+        if not os.path.exists(alembic_ini_path):
+            print(f"⚠️ Warning: alembic.ini not found at {alembic_ini_path}. Skipping migrations.")
+            return
+
+        # Create Alembic configuration object
+        alembic_cfg = Config(alembic_ini_path)
+        # Ensure script location is absolute/correct relative to ini
+        alembic_cfg.set_main_option("script_location", os.path.join(base_dir, "alembic"))
+        
+        # Run upgrade head
+        command.upgrade(alembic_cfg, "head")
+        print("✅ Database migrations applied successfully.")
+    except Exception as e:
+        print(f"❌ Migration failed: {e}")
+        # Optional: raise e # Force crash if migration fails
+
+
 @app.on_event("startup")
 def startup_event():
+    # 1. Run Migrations
+    run_migrations()
+
+    # 2. Existing startup items
     from .database.db import SessionLocal
     from .routers.auth import init_admin_user
     from .routers.config import init_exchange_rates
+
     db = SessionLocal()
     try:
         init_admin_user(db)

@@ -1,15 +1,27 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session, joinedload
 from typing import List
+import json
+import asyncio
 from ..database.db import get_db
 from ..models import models
+from ..models.models import UserRole
 from .. import schemas
 from ..dependencies import has_role
-from ..models.models import UserRole
 from ..websocket.manager import manager
 from ..websocket.events import WebSocketEvents
+from ..audit_utils import log_action
 
 router = APIRouter(prefix="/products", tags=["products"])
+
+# Helper para ejecutar broadcast asíncrono desde contexto síncrono
+def run_broadcast(event: str, data: dict):
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(manager.broadcast(event, data))
+    finally:
+        loop.close()
 
 @router.get("/", response_model=List[schemas.ProductRead])
 def read_products(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
@@ -17,8 +29,8 @@ def read_products(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)
     return products
 
 @router.post("/", response_model=schemas.ProductRead, dependencies=[Depends(has_role([UserRole.ADMIN, UserRole.WAREHOUSE]))])
-async def create_product(product: schemas.ProductCreate, db: Session = Depends(get_db)):
-    # Exclude 'units' from the main Product creation
+def create_product(product: schemas.ProductCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    # 1. Operaciones DB (Síncronas en Threadpool)
     product_data = product.dict(exclude={"units"})
     db_product = models.Product(**product_data)
     db.add(db_product)
@@ -33,8 +45,8 @@ async def create_product(product: schemas.ProductCreate, db: Session = Depends(g
         db.commit()
         db.refresh(db_product)
         
-    # Broadcast product created with complete data
-    await manager.broadcast(WebSocketEvents.PRODUCT_CREATED, {
+    # 2. WebSocket en Background
+    payload = {
         "id": db_product.id,
         "name": db_product.name,
         "price": float(db_product.price),
@@ -49,12 +61,13 @@ async def create_product(product: schemas.ProductCreate, db: Session = Depends(g
                 "barcode": u.barcode
             } for u in db_product.units
         ] if db_product.units else []
-    })
+    }
+    background_tasks.add_task(run_broadcast, WebSocketEvents.PRODUCT_CREATED, payload)
         
     return db_product
 
 @router.put("/{product_id}", response_model=schemas.ProductRead, dependencies=[Depends(has_role([UserRole.ADMIN, UserRole.WAREHOUSE]))])
-async def update_product(product_id: int, product_update: schemas.ProductUpdate, db: Session = Depends(get_db)):
+def update_product(product_id: int, product_update: schemas.ProductUpdate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     db_product = db.query(models.Product).filter(models.Product.id == product_id).first()
     if not db_product:
         raise HTTPException(status_code=404, detail="Product not found")
@@ -66,18 +79,10 @@ async def update_product(product_id: int, product_update: schemas.ProductUpdate,
     if "units" in update_data:
         units_data = update_data.pop("units")
 
-    # Prepare BEFORE state for audit
-    # We create a simple dict representation or clone object attributes
-    # Ideally, we use the helper from audit_utils which handles models
-    # But here db_product is attached to session.
-    # To avoid issues with session refresh, we might want to capture dict now.
-    from ..audit_utils import log_action
-    
-    # Simple snapshot of relevant fields before update
-    # or rely on calculate_diff handling the model directly if we pass a copy?
-    # Easier: Convert to dict manually for the "old" state before applying changes
+    # Capture Current State (Old)
     old_state = {c.name: getattr(db_product, c.name) for c in db_product.__table__.columns}
 
+    # Apply Updates
     for key, value in update_data.items():
         setattr(db_product, key, value)
     
@@ -94,36 +99,20 @@ async def update_product(product_id: int, product_update: schemas.ProductUpdate,
     db.commit()
     db.refresh(db_product)
     
-    # LOG ACTION
-    # We pass the old_state dict as "before" and the refreshed db_product as "after"
-    user_id = 1 # TODO: Get from current user dependency if available, otherwise 1 (System/Admin)
-    # The routers/products.py dependencies don't inject 'current_user' into the function, only check roles.
-    # We should update function sig to get user ID if we want strict attribution.
-    # For now, we'll try to get it if added to params, or default to None.
-    
-    # Let's improve this: Add user dependency or placeholder
-    
-    # Calculate diff manually since we have dict vs model
-    # audit_utils.calculate_diff handles model vs model usually. 
-    # Let's construct a temp object or just use a specialized diff logic?
-    # Actually, let's just use log_action with the manual diff.
-    
+    # Logic Refactor: Audit (Simplified)
+    user_id = 1 # TODO: Get from current_user
     new_state = {c.name: getattr(db_product, c.name) for c in db_product.__table__.columns}
     
-    # Calculate diff
-    import json
     changes = {}
     for k, v in new_state.items():
         if k in old_state and old_state[k] != v:
             changes[k] = {"old": old_state[k], "new": v}
             
     if changes:
-        log_action(db, user_id=1, action="UPDATE", table_name="products", record_id=db_product.id, changes=json.dumps(changes, default=str))
+        log_action(db, user_id=user_id, action="UPDATE", table_name="products", record_id=db_product.id, changes=json.dumps(changes, default=str))
 
-
-
-    # Broadcast with complete product data including units
-    await manager.broadcast(WebSocketEvents.PRODUCT_UPDATED, {
+    # Broadcast
+    payload = {
         "id": db_product.id,
         "name": db_product.name,
         "price": float(db_product.price),
@@ -138,11 +127,10 @@ async def update_product(product_id: int, product_update: schemas.ProductUpdate,
                 "barcode": u.barcode
             } for u in db_product.units
         ] if db_product.units else []
-    })
+    }
+    background_tasks.add_task(run_broadcast, WebSocketEvents.PRODUCT_UPDATED, payload)
     
     return db_product
-
-
 
 @router.get("/{product_id}", response_model=schemas.ProductRead)
 def read_product(product_id: int, db: Session = Depends(get_db)):
@@ -152,7 +140,7 @@ def read_product(product_id: int, db: Session = Depends(get_db)):
     return product
 
 @router.delete("/{product_id}", dependencies=[Depends(has_role([UserRole.ADMIN]))])
-async def delete_product(product_id: int, db: Session = Depends(get_db)):
+def delete_product(product_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     product = db.query(models.Product).filter(models.Product.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
@@ -162,10 +150,11 @@ async def delete_product(product_id: int, db: Session = Depends(get_db)):
     db.commit()
     
     # Broadcast product deleted/deactivated
-    await manager.broadcast(WebSocketEvents.PRODUCT_DELETED, {
+    payload = {
         "id": product.id,
         "name": product.name
-    })
+    }
+    background_tasks.add_task(run_broadcast, WebSocketEvents.PRODUCT_DELETED, payload)
     
     return {"status": "success", "message": "Product deactivated"}
 
@@ -247,12 +236,12 @@ def delete_price_rule(rule_id: int, db: Session = Depends(get_db)):
     return {"status": "success"}
 
 @router.post("/sales/")
-async def create_sale(sale_data: schemas.SaleCreate, db: Session = Depends(get_db)):
+def create_sale(sale_data: schemas.SaleCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     from ..services.sales_service import SalesService
     
-    # Delegate to Service
+    # Delegate to Service (Now Sync)
     # TODO: Get actual user_id from dependency
-    return await SalesService.create_sale(db, sale_data, user_id=1)
+    return SalesService.create_sale(db, sale_data, user_id=1, background_tasks=background_tasks)
 
 @router.post("/sales/payments")
 def register_sale_payment(
@@ -316,12 +305,6 @@ def bulk_create_products(products: List[schemas.ProductCreate], db: Session = De
         try:
             # Use nested transaction (savepoint) to isolate each insertion
             with db.begin_nested():
-                # Check for existing SKU to avoid generic IntegrityError if possible (optimization)
-                # But begin_nested handles it safely.
-                # db_product = models.Product(**p.dict()) 
-                # p.dict() might invoke validations.
-                
-                # Manual mapping or dict unpacking
                 db_product = models.Product(
                     name=p.name,
                     sku=p.sku,
