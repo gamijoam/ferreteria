@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any
+import requests
+from datetime import datetime
 from ..database.db import get_db
 from ..models import models
 from .. import schemas
@@ -165,7 +167,8 @@ def get_business_info(db: Session = Depends(get_db)):
         document_id=config_dict.get("business_doc", ""),
         address=config_dict.get("business_address", ""),
         phone=config_dict.get("business_phone", ""),
-        email=config_dict.get("business_email", "")
+        email=config_dict.get("business_email", ""),
+        ticket_template=config_dict.get("ticket_template", "")  # NEW
     )
 
 @router.put("/business", response_model=schemas.BusinessInfo)
@@ -180,7 +183,8 @@ def update_business_info(
         "business_doc": info.document_id,
         "business_address": info.address,
         "business_phone": info.phone,
-        "business_email": info.email
+        "business_email": info.email,
+        "ticket_template": info.ticket_template  # NEW
     }
     
     for key, value in mapping.items():
@@ -196,6 +200,79 @@ def update_business_info(
     
     # Return updated info
     return get_business_info(db)
+
+@router.post("/test-print")
+def test_print_ticket(db: Session = Depends(get_db)):
+    """Send test ticket to hardware bridge"""
+    # Get template
+    template_config = db.query(models.BusinessConfig).get("ticket_template")
+    if not template_config or not template_config.value:
+        raise HTTPException(status_code=404, detail="No ticket template configured")
+    
+    # Get business info
+    business_info = get_business_info(db)
+    
+    # Create mock sale data
+    context = {
+        "business": {
+            "name": business_info.name or "Mi Negocio",
+            "document_id": business_info.document_id or "J-12345678-9",
+            "address": business_info.address or "Calle Principal, Local 123",
+            "phone": business_info.phone or "0414-1234567",
+            "email": business_info.email or "info@minegocio.com"
+        },
+        "sale": {
+            "id": 9999,
+            "date": datetime.now().strftime("%d/%m/%Y %H:%M"),
+            "total": 125.50,
+            "is_credit": True,
+            "balance": 75.50,
+            "customer": {
+                "name": "Juan Pérez",
+                "id_number": "V-12345678"
+            },
+            "items": [
+                {
+                    "product": {"name": "Cemento Gris 50kg"},
+                    "quantity": 2.0,
+                    "unit_price": 15.00,
+                    "subtotal": 30.00
+                },
+                {
+                    "product": {"name": "Cabilla 3/8 x 12m"},
+                    "quantity": 5.0,
+                    "unit_price": 12.50,
+                    "subtotal": 62.50
+                },
+                {
+                    "product": {"name": "Pala Metálica"},
+                    "quantity": 1.0,
+                    "unit_price": 33.00,
+                    "subtotal": 33.00
+                }
+            ]
+        }
+    }
+    
+    # Send to hardware bridge
+    try:
+        response = requests.post(
+            "http://localhost:5001/print",
+            json={
+                "template": template_config.value,
+                "context": context
+            },
+            timeout=5
+        )
+        response.raise_for_status()
+        return {"status": "success", "message": "Test ticket sent to printer"}
+    except requests.exceptions.ConnectionError:
+        raise HTTPException(
+            status_code=503, 
+            detail="Hardware bridge not available. Make sure it's running on port 5001."
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Print error: {str(e)}")
 
 @router.get("/", response_model=List[schemas.BusinessConfigRead])
 def get_all_configs(db: Session = Depends(get_db)):

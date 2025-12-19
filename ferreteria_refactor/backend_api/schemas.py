@@ -614,6 +614,7 @@ class BusinessInfo(BaseModel):
     email: Optional[str] = ""
     website: Optional[str] = ""
     logo_url: Optional[str] = "" # URL for displayed logo
+    ticket_template: Optional[str] = ""  # NEW: Jinja2 template for tickets
 
 # ========================
 # Audit Log Schemas
