@@ -51,7 +51,6 @@ class SalesService:
                 )
             
             # 3. Check credit limit
-            # SQLAlchemy returns Decimal for Numeric columns, but scalar() might return None
             current_debt = db.query(func.sum(models.Sale.balance_pending)).filter(
                 models.Sale.customer_id == sale_data.customer_id,
                 models.Sale.is_credit == True,
@@ -115,7 +114,15 @@ class SalesService:
                 # Check stock for ALL child products first (fail fast)
                 for combo_item in product.combo_items:
                     child_product = combo_item.child_product
-                    qty_needed = item.quantity * combo_item.quantity
+                    
+                    # NEW: Calculate quantity considering unit presentation
+                    if combo_item.unit_id and combo_item.unit:
+                        # If specific unit is defined, use its conversion factor
+                        conversion_factor = combo_item.unit.conversion_factor
+                        qty_needed = item.quantity * combo_item.quantity * conversion_factor
+                    else:
+                        # No unit specified, use base quantity
+                        qty_needed = item.quantity * combo_item.quantity
                     
                     if child_product.stock < qty_needed:
                         raise HTTPException(
@@ -126,7 +133,17 @@ class SalesService:
                 # All checks passed, now deduct stock from children
                 for combo_item in product.combo_items:
                     child_product = combo_item.child_product
-                    qty_to_deduct = item.quantity * combo_item.quantity
+                    
+                    # NEW: Calculate quantity considering unit presentation
+                    if combo_item.unit_id and combo_item.unit:
+                        # If specific unit is defined, use its conversion factor
+                        conversion_factor = combo_item.unit.conversion_factor
+                        qty_to_deduct = item.quantity * combo_item.quantity * conversion_factor
+                        unit_description = f" ({combo_item.quantity}x {combo_item.unit.unit_name})"
+                    else:
+                        # No unit specified, use base quantity
+                        qty_to_deduct = item.quantity * combo_item.quantity
+                        unit_description = ""
                     
                     # Deduct stock from child
                     child_product.stock -= qty_to_deduct
@@ -137,7 +154,7 @@ class SalesService:
                         movement_type="SALE",
                         quantity=-qty_to_deduct,
                         balance_after=child_product.stock,
-                        description=f"Sale via combo: {product.name} (Sale #{new_sale.id})"
+                        description=f"Sale via combo: {product.name}{unit_description} (Sale #{new_sale.id})"
                     )
                     db.add(kardex_entry)
                     
@@ -235,7 +252,7 @@ class SalesService:
             # Emit Sale Event
             background_tasks.add_task(run_broadcast, WebSocketEvents.SALE_COMPLETED, {
                 "id": new_sale.id,
-                "total_amount": float(new_sale.total_amount), # Cast for JSON
+                "total_amount": float(new_sale.total_amount),
                 "currency": new_sale.currency,
                 "payment_method": new_sale.payment_method,
                 "customer_id": new_sale.customer_id,
