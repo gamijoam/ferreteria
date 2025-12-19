@@ -16,13 +16,13 @@ from datetime import datetime
 # Clave pública RSA (debe coincidir con la generada por license_generator.py)
 # IMPORTANTE: Esta clave se embebe en el código y se distribuye con la aplicación
 PUBLIC_KEY = """-----BEGIN PUBLIC KEY-----
-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0wnnOdeEW3b181oL2KC9
-1lZFKhVOLPiohBL69d6qLSsYJNuv3SIVf6jD+khFZMgAXcIT87Bgov614SKk/IPN
-Uip6zEUPWWsATQqIEsK0dchsgaHZYb0/fUOu7NK3Xi2PHvtUE66YgKYEbBbxVlXW
-ocGWhyfgUBZWgboG8Ehhe0s/74SKSc+5n7DVKIHm6bwqRhzfANCdaD349sB9HS34
-iPS2uot2kBNfNTCuLaxWMhDwvsyEVy75PqRiJj76cbD6PE1N/BRx4U2N8NIy4wyG
-rRNtqsPUITYZVaFO/97jS4cLE0pbxxMENM3BzqAJiPL+59IPkyAk9JJDsMHbjXlj
-TQIDAQAB
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvvRgZK4BaGKv0t270yQb
+baE3rNTL7Uy6JbRjPqU8L4m3qQRdgSCSlMFEE/nIRpxqSlDeTRPMHtaYH53rAfuo
+kUrUxxTwiU2aFvRhdd9WHo9HGzmutboeQIJny6ReLp9TOrS/rGdIkMd4A8gEDWWZ
+gjhhZlUxoJZHdINu42wqi9WBpXQrbcTc0jkAnpZisjzs9+Pxp5TiDm9vOl4BEGbf
+/uo88o2DUwvB8OSn1T74mt3uN7JbKf4TBWtMmJoHFLuMe35MLO5tkUsyWW7v5ogs
+ILvS1VdBdvWNOsZdpA8L/k78e2UG7ppkg0YiXbBFtLsxpYMb6Q6bQ09AVgfXvgFO
+MwIDAQAB
 -----END PUBLIC KEY-----"""
 
 # Ruta del archivo de licencia
