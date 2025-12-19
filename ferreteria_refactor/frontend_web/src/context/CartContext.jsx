@@ -200,18 +200,54 @@ export const CartProvider = ({ children }) => {
     const totals = useMemo(() => {
         const totalsPerCurrency = {};
 
-        cart.forEach(item => {
-            // Get currency code from exchange rate
-            const currencyCode = item.exchange_rate_source === 'pre-resolved'
-                ? (exchangeRates.find(r => r.id === item.exchange_rate_id)?.currency_code || 'VES')
-                : 'VES'; // Default to VES for now
+        // Calculate totals for ALL active currencies
+        if (exchangeRates && exchangeRates.length > 0) {
+            // Get all unique active currency codes
+            const activeCurrencies = [...new Set(
+                exchangeRates
+                    .filter(r => r.is_active)
+                    .map(r => r.currency_code)
+            )];
 
-            if (!totalsPerCurrency[currencyCode]) {
-                totalsPerCurrency[currencyCode] = 0;
-            }
+            // Initialize totals for each currency
+            activeCurrencies.forEach(currCode => {
+                totalsPerCurrency[currCode] = 0;
+            });
 
-            totalsPerCurrency[currencyCode] += item.subtotal_bs || (item.subtotal_usd * item.exchange_rate);
-        });
+            // Calculate total for each currency
+            cart.forEach(item => {
+                const itemTotalUSD = item.subtotal_usd;
+
+                // Convert to each active currency
+                activeCurrencies.forEach(currCode => {
+                    // Find the exchange rate for this currency
+                    // Use the item's specific rate if it matches this currency, otherwise use default
+                    let rateToUse = 1; // Default for USD
+
+                    if (currCode !== 'USD') {
+                        // Check if item has a special rate for this currency
+                        const itemRate = exchangeRates.find(r =>
+                            r.id === item.exchange_rate_id &&
+                            r.currency_code === currCode
+                        );
+
+                        if (itemRate) {
+                            rateToUse = itemRate.rate;
+                        } else {
+                            // Use default rate for this currency
+                            const defaultRate = exchangeRates.find(r =>
+                                r.currency_code === currCode &&
+                                r.is_default &&
+                                r.is_active
+                            );
+                            rateToUse = defaultRate ? defaultRate.rate : 1;
+                        }
+                    }
+
+                    totalsPerCurrency[currCode] += itemTotalUSD * rateToUse;
+                });
+            });
+        }
 
         return {
             usd: cart.reduce((acc, item) => acc + item.subtotal_usd, 0),
