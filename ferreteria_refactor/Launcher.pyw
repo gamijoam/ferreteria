@@ -21,6 +21,21 @@ import uuid
 BASE_DIR = Path(__file__).parent
 LICENSE_FILE = BASE_DIR / "license.key"
 BACKEND_DIR = BASE_DIR / "backend_api"
+LOG_FILE = BASE_DIR / "launcher.log"
+
+# Redirigir stdout/stderr si no hay consola (para ejecución con doble click)
+if sys.stdout is None:
+    sys.stdout = open(LOG_FILE, "a")
+if sys.stderr is None:
+    sys.stderr = open(LOG_FILE, "a")
+
+print(f"\\n--- Launcher iniciado: {datetime.now()} ---")
+print(f"CWD: {os.getcwd()}")
+print(f"Script: {__file__}")
+
+# Asegurar CWD
+os.chdir(BASE_DIR)
+print(f"New CWD: {os.getcwd()}")
 
 # Clave pública (debe coincidir con la del middleware)
 PUBLIC_KEY = """-----BEGIN PUBLIC KEY-----
