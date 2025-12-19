@@ -51,7 +51,8 @@ def create_product(product: schemas.ProductCreate, background_tasks: BackgroundT
             db_combo_item = models.ComboItem(
                 parent_product_id=db_product.id,
                 child_product_id=combo_item.child_product_id,
-                quantity=combo_item.quantity
+                quantity=combo_item.quantity,
+                unit_id=combo_item.unit_id  # NEW: Include unit_id
             )
             db.add(db_combo_item)
         db.commit()
@@ -133,7 +134,8 @@ def update_product(product_id: int, product_update: schemas.ProductUpdate, backg
             db_combo_item = models.ComboItem(
                 parent_product_id=product_id,
                 child_product_id=combo_item["child_product_id"],
-                quantity=combo_item["quantity"]
+                quantity=combo_item["quantity"],
+                unit_id=combo_item.get("unit_id")  # NEW: Include unit_id
             )
             db.add(db_combo_item)
 
