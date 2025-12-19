@@ -374,7 +374,7 @@ const AccountsReceivable = () => {
                                 <div className="bg-red-50 rounded-lg p-4">
                                     <p className="text-sm text-gray-600">Saldo Pendiente</p>
                                     <p className="font-bold text-lg text-red-600">
-                                        ${(selectedInvoice.balance_pending || selectedInvoice.total_amount).toFixed(2)}
+                                        ${Number(selectedInvoice.balance_pending || selectedInvoice.total_amount).toFixed(2)}
                                     </p>
                                 </div>
                             </div>
