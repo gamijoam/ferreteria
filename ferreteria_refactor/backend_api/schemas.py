@@ -78,6 +78,7 @@ class ProductUnitRead(ProductUnitBase):
 class ComboItemBase(BaseModel):
     child_product_id: int = Field(..., description="ID del producto componente", example=5)
     quantity: Decimal = Field(..., description="Cantidad del componente en el combo", gt=0, example="2.000")
+    unit_id: Optional[int] = Field(None, description="ID de la presentación específica (opcional)")  # NEW
 
 class ComboItemCreate(ComboItemBase):
     pass

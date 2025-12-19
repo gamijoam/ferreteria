@@ -162,6 +162,7 @@ class ComboItem(Base):
     parent_product_id = Column(Integer, ForeignKey("products.id"), nullable=False)  # The combo product
     child_product_id = Column(Integer, ForeignKey("products.id"), nullable=False)   # The component product
     quantity = Column(Numeric(12, 3), nullable=False, default=1.000)  # Quantity of child in combo
+    unit_id = Column(Integer, ForeignKey("product_units.id"), nullable=True)  # NEW: Optional unit/presentation
     
     # Relationships
     parent_product = relationship(
@@ -174,6 +175,7 @@ class ComboItem(Base):
         foreign_keys=[child_product_id],
         back_populates="parent_combos"
     )
+    unit = relationship("ProductUnit", foreign_keys=[unit_id])  # NEW: Link to specific unit
     
     def __repr__(self):
         return f"<ComboItem(parent={self.parent_product_id}, child={self.child_product_id}, qty={self.quantity})>"
