@@ -493,5 +493,19 @@ class AuditLog(Base):
     def __repr__(self):
         return f"<AuditLog(action='{self.action}', table='{self.table_name}')>"
 
+# ============================================
+# TABLA DE PRUEBA PARA AUTO-MIGRACION
+# ============================================
+class TestAutoMigration(Base):
+    """Tabla de prueba para verificar el sistema de auto-migracion."""
+    __tablename__ = "test_auto_migration"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    test_name = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.now)
+    is_active = Column(Boolean, default=True)
+
+
 
 
