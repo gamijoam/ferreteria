@@ -10,6 +10,8 @@ const ComboManager = ({ productId, initialComboItems = [], onChange }) => {
     const [comboItems, setComboItems] = useState(initialComboItems);
     const [availableProducts, setAvailableProducts] = useState([]);
     const [selectedProductId, setSelectedProductId] = useState('');
+    const [selectedUnitId, setSelectedUnitId] = useState('');  // NEW: Selected unit
+    const [availableUnits, setAvailableUnits] = useState([]);  // NEW: Units for selected product
     const [quantity, setQuantity] = useState('1.000');
     const [loading, setLoading] = useState(false);
 
@@ -50,6 +52,21 @@ const ComboManager = ({ productId, initialComboItems = [], onChange }) => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [comboItems]); // Only depend on comboItems, not onChange
 
+    // NEW: Load units when product is selected
+    useEffect(() => {
+        if (selectedProductId) {
+            const product = availableProducts.find(p => p.id === parseInt(selectedProductId));
+            if (product && product.units) {
+                setAvailableUnits(product.units);
+            } else {
+                setAvailableUnits([]);
+            }
+        } else {
+            setAvailableUnits([]);
+            setSelectedUnitId('');
+        }
+    }, [selectedProductId, availableProducts]);
+
     const handleAddItem = () => {
         if (!selectedProductId || !quantity) {
             alert('Por favor selecciona un producto y cantidad');
@@ -68,13 +85,17 @@ const ComboManager = ({ productId, initialComboItems = [], onChange }) => {
         const newItem = {
             child_product_id: product.id,
             quantity: parseFloat(quantity),
+            unit_id: selectedUnitId ? parseInt(selectedUnitId) : null,  // NEW: Include unit_id
             // For display purposes (not sent to backend)
             _product_name: product.name,
-            _product_price: product.price
+            _product_price: product.price,
+            _unit_name: selectedUnitId ? availableUnits.find(u => u.id === parseInt(selectedUnitId))?.unit_name : null  // NEW
         };
 
         setComboItems([...comboItems, newItem]);
         setSelectedProductId('');
+        setSelectedUnitId('');  // NEW: Reset unit
+        setAvailableUnits([]);  // NEW: Clear units
         setQuantity('1.000');
     };
 
@@ -113,7 +134,7 @@ const ComboManager = ({ productId, initialComboItems = [], onChange }) => {
             {/* Add Item Form */}
             <div className="add-item-form bg-gray-50 p-4 rounded-lg mb-4">
                 <div className="grid grid-cols-12 gap-3">
-                    <div className="col-span-6">
+                    <div className="col-span-5">
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                             Producto
                         </label>
@@ -131,7 +152,27 @@ const ComboManager = ({ productId, initialComboItems = [], onChange }) => {
                         </select>
                     </div>
 
+                    {/* NEW: Unit Selector */}
                     <div className="col-span-3">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Presentación
+                        </label>
+                        <select
+                            value={selectedUnitId}
+                            onChange={(e) => setSelectedUnitId(e.target.value)}
+                            disabled={!selectedProductId || availableUnits.length === 0}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        >
+                            <option value="">Base (unidad)</option>
+                            {availableUnits.map(unit => (
+                                <option key={unit.id} value={unit.id}>
+                                    {unit.unit_name} (x{parseFloat(unit.conversion_factor).toFixed(2)})
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="col-span-2">
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                             Cantidad
                         </label>
@@ -145,7 +186,7 @@ const ComboManager = ({ productId, initialComboItems = [], onChange }) => {
                         />
                     </div>
 
-                    <div className="col-span-3 flex items-end">
+                    <div className="col-span-2 flex items-end">
                         <button
                             type="button"
                             onClick={handleAddItem}
@@ -164,6 +205,7 @@ const ComboManager = ({ productId, initialComboItems = [], onChange }) => {
                         <thead>
                             <tr className="bg-gray-100 border-b">
                                 <th className="text-left p-2 text-sm font-medium">Producto</th>
+                                <th className="text-center p-2 text-sm font-medium">Presentación</th>
                                 <th className="text-center p-2 text-sm font-medium">Cantidad</th>
                                 <th className="text-right p-2 text-sm font-medium">Precio Unit.</th>
                                 <th className="text-right p-2 text-sm font-medium">Subtotal</th>
@@ -179,6 +221,15 @@ const ComboManager = ({ productId, initialComboItems = [], onChange }) => {
                                     <tr key={index} className="border-b hover:bg-gray-50">
                                         <td className="p-2 text-sm">
                                             {product?.name || item._product_name || 'Producto desconocido'}
+                                        </td>
+                                        <td className="p-2 text-center text-sm">
+                                            {item._unit_name ? (
+                                                <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">
+                                                    {item._unit_name}
+                                                </span>
+                                            ) : (
+                                                <span className="text-gray-400 text-xs">Base</span>
+                                            )}
                                         </td>
                                         <td className="p-2 text-center">
                                             <input
