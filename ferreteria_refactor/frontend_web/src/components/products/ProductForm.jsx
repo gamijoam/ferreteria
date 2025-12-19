@@ -3,6 +3,7 @@ import { X, Plus, Trash2, Package, DollarSign, Barcode, Tag, Layers, AlertTriang
 import { useConfig } from '../../context/ConfigContext';
 import apiClient from '../../config/axios';
 import ProductUnitManager from './ProductUnitManager';
+import ComboManager from './ComboManager';
 
 const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
     const { getActiveCurrencies, convertPrice, currencies } = useConfig();
@@ -22,8 +23,10 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
         location: '',
         margin: 0,
         unit_type: 'UNID',
-        exchange_rate_id: null,  // NEW: Product-level exchange rate
-        units: []
+        exchange_rate_id: null,
+        is_combo: false,  // NEW: Combo flag
+        units: [],
+        combo_items: []  // NEW: Combo components
     });
 
     // Reset or Populate on simple change
@@ -73,15 +76,18 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
                     margin: initialData.price > 0
                         ? ((initialData.price - initialData.cost_price) / initialData.price) * 100
                         : 0,
-                    exchange_rate_id: initialData.exchange_rate_id || null,  // NEW
-                    units: mappedUnits
+                    exchange_rate_id: initialData.exchange_rate_id || null,
+                    is_combo: initialData.is_combo || false,  // NEW
+                    units: mappedUnits,
+                    combo_items: initialData.combo_items || []  // NEW
                 });
             } else {
                 // Reset for new product
                 setFormData({
                     name: '', sku: '', category_id: null,
                     cost: 0, price: 0, stock: 0, min_stock: 5, location: '',
-                    margin: 0, unit_type: 'UNID', exchange_rate_id: null, units: []
+                    margin: 0, unit_type: 'UNID', exchange_rate_id: null,
+                    is_combo: false, units: [], combo_items: []
                 });
             }
             setActiveTab('general');
@@ -166,6 +172,7 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
             unit_type: formData.unit_type,
             location: formData.location,
             exchange_rate_id: formData.exchange_rate_id ? parseInt(formData.exchange_rate_id) : null,  // Parse as integer
+            is_combo: formData.is_combo,  // NEW: Combo flag
             units: formData.units.map(u => {
                 let factor = parseFloat(u.user_input);
                 if (u.type === 'fraction') factor = factor !== 0 ? 1 / factor : 0;
@@ -177,7 +184,11 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
                     is_default: false,
                     exchange_rate_id: u.exchange_rate_id ? parseInt(u.exchange_rate_id) : null  // Parse as integer
                 };
-            })
+            }),
+            combo_items: formData.is_combo ? formData.combo_items.map(ci => ({  // NEW: Combo items
+                child_product_id: ci.child_product_id,
+                quantity: parseFloat(ci.quantity)
+            })) : []
         };
         onSubmit(payload);
     };
