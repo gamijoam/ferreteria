@@ -188,15 +188,25 @@ const AccountsReceivable = () => {
     };
 
     const getTotalStats = () => {
-        const total = invoices.reduce((sum, inv) => sum + (inv.balance_pending || inv.total_amount), 0);
-        const overdue = invoices
-            .filter(inv => !inv.paid && inv.due_date && new Date(inv.due_date) < new Date())
-            .reduce((sum, inv) => sum + (inv.balance_pending || inv.total_amount), 0);
+        // Total pending (unpaid invoices)
         const pending = invoices
             .filter(inv => !inv.paid)
-            .reduce((sum, inv) => sum + (inv.balance_pending || inv.total_amount), 0);
+            .reduce((sum, inv) => sum + Number(inv.balance_pending || inv.total_amount || 0), 0);
 
-        return { total, overdue, pending };
+        // Overdue (unpaid and past due date)
+        const overdue = invoices
+            .filter(inv => !inv.paid && inv.due_date && new Date(inv.due_date) < new Date())
+            .reduce((sum, inv) => sum + Number(inv.balance_pending || inv.total_amount || 0), 0);
+
+        // Paid (all paid invoices)
+        const paid = invoices
+            .filter(inv => inv.paid)
+            .reduce((sum, inv) => sum + Number(inv.total_amount || 0), 0);
+
+        // Total (all invoices)
+        const total = pending + paid;
+
+        return { total, overdue, pending, paid };
     };
 
     const stats = getTotalStats();
@@ -226,7 +236,7 @@ const AccountsReceivable = () => {
 
                 <div className="bg-gradient-to-br from-green-500 to-green-600 text-white rounded-lg shadow-lg p-6">
                     <p className="text-green-100 text-sm mb-2">Cobrado (Total)</p>
-                    <p className="text-4xl font-bold">${(stats.total - stats.pending).toLocaleString('es-ES', { minimumFractionDigits: 2 })}</p>
+                    <p className="text-4xl font-bold">${stats.paid.toFixed(2)}</p>
                     <p className="text-green-100 text-sm mt-2">{invoices.filter(i => i.paid).length} facturas pagadas</p>
                 </div>
             </div>

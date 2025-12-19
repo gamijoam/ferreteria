@@ -25,10 +25,24 @@ const CustomerManager = () => {
         phone: '',
         email: '',
         address: '',
-        credit_limit: 0,
-        payment_term_days: 15,
+        credit_limit: '',  // Changed from 0 to empty string
+        payment_term_days: '',  // Changed from 15 to empty string
         is_blocked: false
     });
+
+    // Helper to reset form
+    const resetForm = () => {
+        setCustomerForm({
+            name: '',
+            id_number: '',
+            phone: '',
+            email: '',
+            address: '',
+            credit_limit: '',
+            payment_term_days: '',
+            is_blocked: false
+        });
+    };
 
     useEffect(() => {
         fetchCustomers();
@@ -196,7 +210,10 @@ const CustomerManager = () => {
                     <p className="text-gray-600">Administra clientes y su salud financiera</p>
                 </div>
                 <button
-                    onClick={() => setShowCreateModal(true)}
+                    onClick={() => {
+                        resetForm();  // Reset form before opening
+                        setShowCreateModal(true);
+                    }}
                     className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
                 >
                     <Plus size={20} />
@@ -228,8 +245,8 @@ const CustomerManager = () => {
                             <div
                                 key={customer.id}
                                 className={`p-3 rounded-lg cursor-pointer transition-colors ${selectedCustomer?.id === customer.id
-                                        ? 'bg-blue-100 border-2 border-blue-500'
-                                        : 'bg-gray-50 hover:bg-gray-100'
+                                    ? 'bg-blue-100 border-2 border-blue-500'
+                                    : 'bg-gray-50 hover:bg-gray-100'
                                     }`}
                             >
                                 <div className="flex items-center justify-between">
@@ -350,8 +367,8 @@ const CustomerManager = () => {
                                     <div className="bg-white rounded-lg shadow-md p-6">
                                         <p className="text-sm text-gray-600 mb-2">Deuda Actual</p>
                                         <p className={`text-3xl font-bold ${financialStatus.total_debt > financialStatus.credit_limit * 0.8
-                                                ? 'text-red-600'
-                                                : 'text-gray-800'
+                                            ? 'text-red-600'
+                                            : 'text-gray-800'
                                             }`}>
                                             ${financialStatus.total_debt.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
                                         </p>
@@ -522,14 +539,14 @@ const CustomerManager = () => {
                                 type="number"
                                 placeholder="Límite de Crédito"
                                 value={customerForm.credit_limit}
-                                onChange={(e) => setCustomerForm({ ...customerForm, credit_limit: parseFloat(e.target.value) })}
+                                onChange={(e) => setCustomerForm({ ...customerForm, credit_limit: e.target.value === '' ? '' : parseFloat(e.target.value) })}
                                 className="w-full p-2 border rounded"
                             />
                             <input
                                 type="number"
                                 placeholder="Días de Plazo"
                                 value={customerForm.payment_term_days}
-                                onChange={(e) => setCustomerForm({ ...customerForm, payment_term_days: parseInt(e.target.value) })}
+                                onChange={(e) => setCustomerForm({ ...customerForm, payment_term_days: e.target.value === '' ? '' : parseInt(e.target.value) })}
                                 className="w-full p-2 border rounded"
                             />
                         </div>
@@ -588,6 +605,21 @@ const CustomerManager = () => {
                                 placeholder="Email"
                                 value={customerForm.email}
                                 onChange={(e) => setCustomerForm({ ...customerForm, email: e.target.value })}
+                                className="w-full p-2 border rounded"
+                            />
+                            {/* NEW: Add credit fields to edit modal */}
+                            <input
+                                type="number"
+                                placeholder="Límite de Crédito"
+                                value={customerForm.credit_limit}
+                                onChange={(e) => setCustomerForm({ ...customerForm, credit_limit: e.target.value === '' ? '' : parseFloat(e.target.value) })}
+                                className="w-full p-2 border rounded"
+                            />
+                            <input
+                                type="number"
+                                placeholder="Días de Plazo"
+                                value={customerForm.payment_term_days}
+                                onChange={(e) => setCustomerForm({ ...customerForm, payment_term_days: e.target.value === '' ? '' : parseInt(e.target.value) })}
                                 className="w-full p-2 border rounded"
                             />
                         </div>
