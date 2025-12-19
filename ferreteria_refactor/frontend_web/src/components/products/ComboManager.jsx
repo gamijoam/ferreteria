@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import apiClient from '../../config/axios';
 
 /**
  * ComboManager Component
@@ -17,7 +17,7 @@ const ComboManager = ({ productId, initialComboItems = [], onChange }) => {
     useEffect(() => {
         const fetchProducts = async () => {
             try {
-                const response = await axios.get('/api/v1/products');
+                const response = await apiClient.get('/products');
                 // Filter out the current product and other combos
                 const filtered = response.data.filter(p =>
                     p.id !== productId && !p.is_combo
