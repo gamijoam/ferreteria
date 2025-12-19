@@ -190,15 +190,19 @@ def get_session_details(
         amt = p.amount # Already Decimal from DB
         
         if method not in sales_by_method:
-            sales_by_method[method] = {"USD": Decimal("0.00"), "Bs": Decimal("0.00")}
+            sales_by_method[method] = {}
         
-        # Accumulate - use case-insensitive comparison for Bs
-        if curr and curr.upper() in ["BS", "VES", "VEF"]:  # Venezuelan Bolivar variants
-            sales_by_method[method]["Bs"] += amt
+        # Initialize currency in method if not exists
+        if curr not in sales_by_method[method]:
+            sales_by_method[method][curr] = Decimal("0.00")
+        
+        # Accumulate by actual currency
+        sales_by_method[method][curr] += amt
+        
+        # Also track total by currency (for backward compatibility)
+        if curr and curr.upper() in ["BS", "VES", "VEF"]:
             sales_total_bs += amt
         else:
-            # Default to USD
-            sales_by_method[method]["USD"] += amt
             sales_total_usd += amt
 
     # Calculate Movements
@@ -211,13 +215,20 @@ def get_session_details(
     # Calculate Expected Cash (Only Cash payments affect the drawer)
     # Check for multiple possible cash payment method names
     cash_methods = ["Efectivo", "CASH", "Cash", "efectivo"]
-    cash_sales_usd = Decimal("0.00")
-    cash_sales_bs = Decimal("0.00")
+    cash_by_currency = {}  # Track cash sales by currency
     
     for method_name in cash_methods:
         if method_name in sales_by_method:
-            cash_sales_usd += sales_by_method[method_name].get("USD", Decimal("0.00"))
-            cash_sales_bs += sales_by_method[method_name].get("Bs", Decimal("0.00"))
+            for curr, amt in sales_by_method[method_name].items():
+                if curr not in cash_by_currency:
+                    cash_by_currency[curr] = Decimal("0.00")
+                cash_by_currency[curr] += amt
+    
+    # Legacy USD/Bs for backward compatibility
+    cash_sales_usd = cash_by_currency.get("USD", Decimal("0.00"))
+    cash_sales_bs = Decimal("0.00")
+    for curr in ["Bs", "VES", "VEF"]:
+        cash_sales_bs += cash_by_currency.get(curr, Decimal("0.00"))
 
     expected_usd = session.initial_cash + cash_sales_usd + deposits_usd - expenses_usd
     expected_bs = session.initial_cash_bs + cash_sales_bs + deposits_bs - expenses_bs
@@ -231,11 +242,8 @@ def get_session_details(
         "Bs": float(expected_bs)
     }
     
-    # Build cash_by_currency (only cash payments)
-    cash_by_currency = {
-        "USD": float(cash_sales_usd),
-        "Bs": float(cash_sales_bs)
-    }
+    # Build cash_by_currency (only cash payments) - convert to float for JSON
+    cash_by_currency_response = {curr: float(amt) for curr, amt in cash_by_currency.items()}
     
     # Build transfers_by_currency (non-cash payments)
     transfers_by_currency = {}
@@ -246,6 +254,17 @@ def get_session_details(
                     if curr not in transfers_by_currency:
                         transfers_by_currency[curr] = {}
                     transfers_by_currency[curr][method] = float(amt)
+    
+    # Calculate credit sales (only unpaid ones)
+    credit_sales = db.query(models.Sale).filter(
+        models.Sale.date >= session.start_time,
+        models.Sale.date <= (session.end_time or datetime.now()),
+        models.Sale.is_credit == True,
+        models.Sale.balance_pending > 0  # Only unpaid credits
+    ).all()
+    
+    total_credit_pending = sum(float(sale.balance_pending or 0) for sale in credit_sales)
+    credit_count = len(credit_sales)
 
     return {
         "session": session,
@@ -258,8 +277,10 @@ def get_session_details(
             "expenses_bs": expenses_bs,
             "deposits_usd": deposits_usd,
             "deposits_bs": deposits_bs,
-            "cash_by_currency": cash_by_currency,
-            "transfers_by_currency": transfers_by_currency
+            "cash_by_currency": cash_by_currency_response,
+            "transfers_by_currency": transfers_by_currency,
+            "credit_pending": total_credit_pending,  # NEW: Total unpaid credits
+            "credit_count": credit_count  # NEW: Number of unpaid credit sales
         },
         "expected_usd": expected_usd,
         "expected_bs": expected_bs,
@@ -311,6 +332,16 @@ async def close_cash_session(
     
     expected_usd = session.initial_cash + cash_sales_usd + deposits_usd - expenses_usd
     expected_bs = session.initial_cash_bs + cash_sales_bs + deposits_bs - expenses_bs
+    
+    # Calculate unpaid credit sales for reporting
+    credit_sales = db.query(models.Sale).filter(
+        models.Sale.date >= session.start_time,
+        models.Sale.date <= datetime.now(),
+        models.Sale.is_credit == True,
+        models.Sale.balance_pending > 0  # Only unpaid credits
+    ).all()
+    
+    total_credit_pending = sum(float(sale.balance_pending or 0) for sale in credit_sales)
 
     # Update Session
     session.end_time = datetime.now()
@@ -332,7 +363,9 @@ async def close_cash_session(
         "final_cash_reported": float(session.final_cash_reported),
         "final_cash_reported_bs": float(session.final_cash_reported_bs),
         "difference": float(session.difference),
-        "difference_bs": float(session.difference_bs)
+        "difference_bs": float(session.difference_bs),
+        "credit_pending": total_credit_pending,  # NEW: Include unpaid credits
+        "credit_count": len(credit_sales)  # NEW: Count of unpaid sales
     })
     
     return session
