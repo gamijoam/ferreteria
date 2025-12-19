@@ -1,0 +1,232 @@
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+
+/**
+ * ComboManager Component
+ * Manages combo/bundle items for a product
+ * Used within ProductForm to add/edit/remove combo components
+ */
+const ComboManager = ({ productId, initialComboItems = [], onChange }) => {
+    const [comboItems, setComboItems] = useState(initialComboItems);
+    const [availableProducts, setAvailableProducts] = useState([]);
+    const [selectedProductId, setSelectedProductId] = useState('');
+    const [quantity, setQuantity] = useState('1.000');
+    const [loading, setLoading] = useState(false);
+
+    // Fetch available products (excluding the current product to prevent circular refs)
+    useEffect(() => {
+        const fetchProducts = async () => {
+            try {
+                const response = await axios.get('/api/v1/products');
+                // Filter out the current product and other combos
+                const filtered = response.data.filter(p =>
+                    p.id !== productId && !p.is_combo
+                );
+                setAvailableProducts(filtered);
+            } catch (error) {
+                console.error('Error fetching products:', error);
+            }
+        };
+        fetchProducts();
+    }, [productId]);
+
+    // Notify parent component of changes
+    useEffect(() => {
+        if (onChange) {
+            onChange(comboItems);
+        }
+    }, [comboItems, onChange]);
+
+    const handleAddItem = () => {
+        if (!selectedProductId || !quantity) {
+            alert('Por favor selecciona un producto y cantidad');
+            return;
+        }
+
+        const product = availableProducts.find(p => p.id === parseInt(selectedProductId));
+        if (!product) return;
+
+        // Check if product already exists in combo
+        if (comboItems.some(item => item.child_product_id === product.id)) {
+            alert('Este producto ya está en el combo');
+            return;
+        }
+
+        const newItem = {
+            child_product_id: product.id,
+            quantity: parseFloat(quantity),
+            // For display purposes (not sent to backend)
+            _product_name: product.name,
+            _product_price: product.price
+        };
+
+        setComboItems([...comboItems, newItem]);
+        setSelectedProductId('');
+        setQuantity('1.000');
+    };
+
+    const handleRemoveItem = (index) => {
+        setComboItems(comboItems.filter((_, i) => i !== index));
+    };
+
+    const handleQuantityChange = (index, newQuantity) => {
+        const updated = [...comboItems];
+        updated[index].quantity = parseFloat(newQuantity);
+        setComboItems(updated);
+    };
+
+    // Calculate total cost of combo components
+    const calculateTotalCost = () => {
+        return comboItems.reduce((sum, item) => {
+            const product = availableProducts.find(p => p.id === item.child_product_id);
+            if (product) {
+                return sum + (parseFloat(product.price) * parseFloat(item.quantity));
+            }
+            return sum;
+        }, 0);
+    };
+
+    return (
+        <div className="combo-manager">
+            <div className="combo-header">
+                <h3 className="text-lg font-semibold mb-2">
+                    Componentes del Combo
+                </h3>
+                <p className="text-sm text-gray-600 mb-4">
+                    Agrega los productos que forman parte de este combo
+                </p>
+            </div>
+
+            {/* Add Item Form */}
+            <div className="add-item-form bg-gray-50 p-4 rounded-lg mb-4">
+                <div className="grid grid-cols-12 gap-3">
+                    <div className="col-span-6">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Producto
+                        </label>
+                        <select
+                            value={selectedProductId}
+                            onChange={(e) => setSelectedProductId(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                        >
+                            <option value="">Seleccionar producto...</option>
+                            {availableProducts.map(product => (
+                                <option key={product.id} value={product.id}>
+                                    {product.name} - ${parseFloat(product.price).toFixed(2)}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="col-span-3">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Cantidad
+                        </label>
+                        <input
+                            type="number"
+                            step="0.001"
+                            min="0.001"
+                            value={quantity}
+                            onChange={(e) => setQuantity(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                        />
+                    </div>
+
+                    <div className="col-span-3 flex items-end">
+                        <button
+                            type="button"
+                            onClick={handleAddItem}
+                            className="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition"
+                        >
+                            + Agregar
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Combo Items List */}
+            {comboItems.length > 0 ? (
+                <div className="combo-items-list">
+                    <table className="w-full border-collapse">
+                        <thead>
+                            <tr className="bg-gray-100 border-b">
+                                <th className="text-left p-2 text-sm font-medium">Producto</th>
+                                <th className="text-center p-2 text-sm font-medium">Cantidad</th>
+                                <th className="text-right p-2 text-sm font-medium">Precio Unit.</th>
+                                <th className="text-right p-2 text-sm font-medium">Subtotal</th>
+                                <th className="text-center p-2 text-sm font-medium">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {comboItems.map((item, index) => {
+                                const product = availableProducts.find(p => p.id === item.child_product_id);
+                                const subtotal = product ? parseFloat(product.price) * parseFloat(item.quantity) : 0;
+
+                                return (
+                                    <tr key={index} className="border-b hover:bg-gray-50">
+                                        <td className="p-2 text-sm">
+                                            {product?.name || item._product_name || 'Producto desconocido'}
+                                        </td>
+                                        <td className="p-2 text-center">
+                                            <input
+                                                type="number"
+                                                step="0.001"
+                                                min="0.001"
+                                                value={item.quantity}
+                                                onChange={(e) => handleQuantityChange(index, e.target.value)}
+                                                className="w-20 px-2 py-1 border border-gray-300 rounded text-center text-sm"
+                                            />
+                                        </td>
+                                        <td className="p-2 text-right text-sm">
+                                            ${product ? parseFloat(product.price).toFixed(2) : '0.00'}
+                                        </td>
+                                        <td className="p-2 text-right text-sm font-medium">
+                                            ${subtotal.toFixed(2)}
+                                        </td>
+                                        <td className="p-2 text-center">
+                                            <button
+                                                type="button"
+                                                onClick={() => handleRemoveItem(index)}
+                                                className="text-red-600 hover:text-red-800 text-sm font-medium"
+                                            >
+                                                Eliminar
+                                            </button>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                        <tfoot>
+                            <tr className="bg-blue-50 font-semibold">
+                                <td colSpan="3" className="p-2 text-right text-sm">
+                                    Costo Total de Componentes:
+                                </td>
+                                <td className="p-2 text-right text-sm">
+                                    ${calculateTotalCost().toFixed(2)}
+                                </td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+
+                    <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                        <p className="text-sm text-yellow-800">
+                            <strong>💡 Nota:</strong> El precio del combo es independiente del costo de los componentes.
+                            Puedes establecer un precio con descuento para incentivar la compra del combo.
+                        </p>
+                    </div>
+                </div>
+            ) : (
+                <div className="empty-state text-center py-8 text-gray-500">
+                    <svg className="mx-auto h-12 w-12 text-gray-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                    </svg>
+                    <p className="text-sm">No hay componentes en este combo</p>
+                    <p className="text-xs mt-1">Agrega productos usando el formulario arriba</p>
+                </div>
+            )}
+        </div>
+    );
+};
+
+export default ComboManager;
