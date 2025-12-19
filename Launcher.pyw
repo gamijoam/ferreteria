@@ -166,7 +166,40 @@ TQIDAQAB
         process = subprocess.Popen(cmd, cwd=BASE_DIR, env=env, stdout=stdout_dest, stderr=stderr_dest)
         return process
 
+    def git_update():
+        """Intenta actualizar el repositorio."""
+        log("Chequeando actualizaciones...")
+        try:
+            # Verificar si git esta instalado
+            subprocess.run(["git", "--version"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+            
+            # Hacer git pull
+            log("Ejecutando git pull...")
+            result = subprocess.run(
+                ["git", "pull"], 
+                cwd=BASE_DIR,
+                capture_output=True,
+                text=True
+            )
+            
+            if result.returncode == 0:
+                log(f"Git pull exitoso: {result.stdout}")
+                if "Already up to date." not in result.stdout:
+                    log("Actualizacion detectada. Reiniciando...")
+                    # Reiniciar script
+                    os.execv(sys.executable, [sys.executable] + sys.argv)
+            else:
+                log(f"Git pull fallo: {result.stderr}")
+                
+        except FileNotFoundError:
+            log("Git no encontrado en PATH. Saltando actualizacion.")
+        except Exception as e:
+            log(f"Error en auto-update: {e}")
+
     def main():
+        # 0. Auto-update
+        git_update()
+
         # 1. Licencia
         ok, msg, _ = validate_license()
         if not ok:
