@@ -101,55 +101,64 @@ const Products = () => {
                         </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                        {products.map(product => (
-                            <tr key={product.id} className="hover:bg-gray-50 transition-colors">
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                    <div className="flex items-center">
-                                        <div className="h-10 w-10 flex-shrink-0 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold">
-                                            {product.name.charAt(0)}
-                                        </div>
-                                        <div className="ml-4">
-                                            <div className="text-sm font-medium text-gray-900 flex items-center">
-                                                {product.name}
-                                                {product.units && product.units.length > 0 && (
-                                                    <span className="ml-2 px-2 py-0.5 text-[10px] bg-purple-100 text-purple-700 rounded-full border border-purple-200">
-                                                        Multi-formato
-                                                    </span>
-                                                )}
+                        {products
+                            .filter(product => {
+                                if (!searchTerm) return true;
+                                const search = searchTerm.toLowerCase();
+                                return (
+                                    product.name.toLowerCase().includes(search) ||
+                                    (product.sku && product.sku.toLowerCase().includes(search))
+                                );
+                            })
+                            .map(product => (
+                                <tr key={product.id} className="hover:bg-gray-50 transition-colors">
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <div className="flex items-center">
+                                            <div className="h-10 w-10 flex-shrink-0 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold">
+                                                {product.name.charAt(0)}
                                             </div>
-                                            <div className="text-sm text-gray-500">{product.unit}</div>
+                                            <div className="ml-4">
+                                                <div className="text-sm font-medium text-gray-900 flex items-center">
+                                                    {product.name}
+                                                    {product.units && product.units.length > 0 && (
+                                                        <span className="ml-2 px-2 py-0.5 text-[10px] bg-purple-100 text-purple-700 rounded-full border border-purple-200">
+                                                            Multi-formato
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="text-sm text-gray-500">{product.unit}</div>
+                                            </div>
                                         </div>
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{product.sku}</td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                    <div className="text-sm font-semibold text-gray-900">${Number(product.price).toFixed(2)}</div>
-                                    <div className="text-xs text-gray-500 flex flex-col">
-                                        {getActiveCurrencies().map(currency => (
-                                            <span key={currency.id}>
-                                                {convertProductPrice(product, currency.currency_code).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency.symbol}
-                                            </span>
-                                        ))}
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${product.stock > 10 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                                        {formatStock(product.stock)}
-                                    </span>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 cursor-pointer hover:underline">
-                                    <span
-                                        onClick={() => {
-                                            setSelectedProduct(product);
-                                            setIsModalOpen(true);
-                                        }}
-                                        className="text-blue-600 hover:text-blue-800 font-medium cursor-pointer"
-                                    >
-                                        Editar
-                                    </span>
-                                </td>
-                            </tr>
-                        ))}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{product.sku}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <div className="text-sm font-semibold text-gray-900">${Number(product.price).toFixed(2)}</div>
+                                        <div className="text-xs text-gray-500 flex flex-col">
+                                            {getActiveCurrencies().map(currency => (
+                                                <span key={currency.id}>
+                                                    {convertProductPrice(product, currency.currency_code).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency.symbol}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${product.stock > 10 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                            {formatStock(product.stock)}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 cursor-pointer hover:underline">
+                                        <span
+                                            onClick={() => {
+                                                setSelectedProduct(product);
+                                                setIsModalOpen(true);
+                                            }}
+                                            className="text-blue-600 hover:text-blue-800 font-medium cursor-pointer"
+                                        >
+                                            Editar
+                                        </span>
+                                    </td>
+                                </tr>
+                            ))}
                     </tbody>
                 </table>
             </div>
