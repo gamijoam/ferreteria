@@ -92,6 +92,7 @@ class ProductUpdate(BaseModel):
     supplier_id: Optional[int] = None
     location: Optional[str] = None
     unit_type: Optional[str] = None
+    exchange_rate_id: Optional[int] = None  # NEW: Allow updating exchange rate
     is_active: Optional[bool] = None
     units: Optional[List[ProductUnitCreate]] = None
 
