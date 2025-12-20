@@ -56,7 +56,7 @@ node_modules/
 frontend_web/node_modules/
 
 # Build outputs
-frontend_web/dist/
+
 frontend_web/build/
 
 # Temporary files
