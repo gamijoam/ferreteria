@@ -132,8 +132,8 @@ const TicketConfig = () => {
                 <button
                     onClick={() => setView('gallery')}
                     className={`px-4 py-2 font-medium flex items-center gap-2 transition-colors ${view === 'gallery'
-                            ? 'border-b-2 border-blue-600 text-blue-600'
-                            : 'text-gray-500 hover:text-gray-700'
+                        ? 'border-b-2 border-blue-600 text-blue-600'
+                        : 'text-gray-500 hover:text-gray-700'
                         }`}
                 >
                     <Grid size={20} />
@@ -142,8 +142,8 @@ const TicketConfig = () => {
                 <button
                     onClick={() => setView('editor')}
                     className={`px-4 py-2 font-medium flex items-center gap-2 transition-colors ${view === 'editor'
-                            ? 'border-b-2 border-blue-600 text-blue-600'
-                            : 'text-gray-500 hover:text-gray-700'
+                        ? 'border-b-2 border-blue-600 text-blue-600'
+                        : 'text-gray-500 hover:text-gray-700'
                         }`}
                 >
                     <Code size={20} />
@@ -153,8 +153,8 @@ const TicketConfig = () => {
 
             {message && (
                 <div className={`mb-4 p-4 rounded-lg flex items-center gap-2 ${message.type === 'success'
-                        ? 'bg-green-50 text-green-800 border border-green-200'
-                        : 'bg-red-50 text-red-800 border border-red-200'
+                    ? 'bg-green-50 text-green-800 border border-green-200'
+                    : 'bg-red-50 text-red-800 border border-red-200'
                     }`}>
                     {message.type === 'success' ? <CheckCircle size={20} /> : <AlertCircle size={20} />}
                     {message.text}
@@ -176,21 +176,87 @@ const TicketConfig = () => {
                                     <h3 className="text-lg font-bold text-gray-800 mb-2">{preset.name}</h3>
                                     <p className="text-gray-600 text-sm mb-4">{preset.description}</p>
 
-                                    {/* Preview */}
+                                    {/* Preview - Template Specific */}
                                     <div className="bg-gray-50 rounded p-4 mb-4 font-mono text-xs text-gray-700 h-48 overflow-hidden border border-gray-200">
-                                        <div className="text-center font-bold">MI NEGOCIO</div>
-                                        <div className="text-center text-xs">Calle Principal #123</div>
-                                        <div className="text-center text-xs">RIF: J-12345678</div>
-                                        <div className="border-t border-gray-300 my-2"></div>
-                                        <div className="text-xs">Factura: #001</div>
-                                        <div className="text-xs">Fecha: 19/12/2025</div>
-                                        <div className="border-t border-gray-300 my-2"></div>
-                                        <div className="text-xs">Producto 1</div>
-                                        <div className="text-xs text-right">$10.00</div>
-                                        <div className="text-xs">Producto 2</div>
-                                        <div className="text-xs text-right">$15.00</div>
-                                        <div className="border-t border-gray-300 my-2"></div>
-                                        <div className="text-right font-bold">TOTAL: $25.00</div>
+                                        {preset.id === 'classic' && (
+                                            <>
+                                                <div className="text-center font-bold">MI NEGOCIO</div>
+                                                <div className="text-center text-xs">Calle Principal #123</div>
+                                                <div className="text-center text-xs">RIF: J-12345678</div>
+                                                <div className="text-center">================================</div>
+                                                <div className="text-xs">Fecha: 19/12/2025</div>
+                                                <div className="text-xs">Factura: #001</div>
+                                                <div className="text-xs">Cliente: Juan Pérez</div>
+                                                <div className="text-center">================================</div>
+                                                <div className="text-xs">Cemento 50kg</div>
+                                                <div className="text-xs">  2 x $10.00 = $20.00</div>
+                                                <div className="text-center">================================</div>
+                                                <div className="text-right font-bold">TOTAL: $20.00</div>
+                                            </>
+                                        )}
+                                        {preset.id === 'modern' && (
+                                            <>
+                                                <div className="text-center font-bold">MI NEGOCIO</div>
+                                                <div className="text-center text-xs">Dirección | Tel: 0414-1234567</div>
+                                                <div className="text-center">--------------------------------</div>
+                                                <div className="text-xs">#001 | 19/12/2025 | Juan Pérez</div>
+                                                <div className="text-center">--------------------------------</div>
+                                                <div className="text-xs">Cemento 50kg</div>
+                                                <div className="text-xs text-right">2 x $10.00 = $20.00</div>
+                                                <div className="text-center">--------------------------------</div>
+                                                <div className="text-right font-bold">TOTAL: $20.00</div>
+                                                <div className="text-center">--------------------------------</div>
+                                                <div className="text-center text-xs">Gracias por preferirnos</div>
+                                            </>
+                                        )}
+                                        {preset.id === 'detailed' && (
+                                            <>
+                                                <div className="text-center">================================</div>
+                                                <div className="text-center font-bold">MI NEGOCIO</div>
+                                                <div className="text-center">================================</div>
+                                                <div className="text-xs">Calle Principal #123</div>
+                                                <div className="text-xs">RIF: J-12345678-9</div>
+                                                <div className="text-xs font-bold">FACTURA: #001</div>
+                                                <div className="text-xs">FECHA: 19/12/2025 15:30</div>
+                                                <div className="text-xs">CLIENTE: Juan Pérez</div>
+                                                <div className="text-center">================================</div>
+                                                <div className="text-xs">CANT  DESCRIPCION     TOTAL</div>
+                                                <div className="text-xs">2     Cemento 50kg   $20.00</div>
+                                                <div className="text-xs">      @$10.00/u</div>
+                                                <div className="text-right font-bold">TOTAL: $20.00</div>
+                                            </>
+                                        )}
+                                        {preset.id === 'minimal' && (
+                                            <>
+                                                <div className="text-center font-bold">MI NEGOCIO</div>
+                                                <div className="text-xs">#001 | 19/12/2025</div>
+                                                <div className="text-center">--------------------------------</div>
+                                                <div className="text-xs">2x Cemento 50kg</div>
+                                                <div className="text-xs text-right">$20.00</div>
+                                                <div className="text-xs">1x Cabilla 3/8</div>
+                                                <div className="text-xs text-right">$12.50</div>
+                                                <div className="text-center">--------------------------------</div>
+                                                <div className="text-right font-bold">TOTAL: $32.50</div>
+                                                <div className="text-center text-xs mt-2">Gracias</div>
+                                            </>
+                                        )}
+                                        {preset.id === 'receipt' && (
+                                            <>
+                                                <div className="text-center font-bold">COMPROBANTE DE VENTA</div>
+                                                <div className="text-center">================================</div>
+                                                <div className="text-xs">Negocio: MI NEGOCIO</div>
+                                                <div className="text-xs">RIF: J-12345678-9</div>
+                                                <div className="text-xs">Fecha: 19/12/2025 15:30</div>
+                                                <div className="text-xs">Comprobante Nro: 001</div>
+                                                <div className="text-center">================================</div>
+                                                <div className="text-xs">Cliente: Juan Pérez</div>
+                                                <div className="text-xs font-bold">DETALLE DE LA VENTA:</div>
+                                                <div className="text-xs">2 Cemento 50kg @$10.00</div>
+                                                <div className="text-xs text-right">$20.00</div>
+                                                <div className="text-right font-bold">TOTAL: $20.00</div>
+                                                <div className="text-xs mt-2">Firma: _____________</div>
+                                            </>
+                                        )}
                                     </div>
 
                                     <button
