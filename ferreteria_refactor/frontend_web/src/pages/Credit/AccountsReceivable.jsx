@@ -133,28 +133,31 @@ const AccountsReceivable = () => {
         }
 
         const balancePending = selectedInvoice.balance_pending || selectedInvoice.total_amount;
+        const currentExchangeRate = getExchangeRate(paymentCurrency);
 
-        if (paymentAmount > balancePending) {
-            alert(`El monto no puede exceder el saldo pendiente: $${balancePending.toFixed(2)}`);
+        // Convert the payment amount (e.g. Bs) to Anchor (USD)
+        // If paymentCurrency is USD, rate is 1, so conversion is 1:1
+        // If paymentCurrency is Bs (Rate 50), 100 Bs -> 2 USD
+        const amountInAnchor = paymentAmount / (currentExchangeRate || 1);
+
+        if (amountInAnchor > balancePending + 0.01) { // 0.01 tolerance
+            alert(`El monto ingresado ($${amountInAnchor.toFixed(2)}) excede el saldo pendiente ($${balancePending.toFixed(2)})`);
             return;
         }
 
         try {
-            // Get exchange rate automatically from config
-            const currentExchangeRate = getExchangeRate(paymentCurrency);
-
             // 1. Create SalePayment
             await apiClient.post('/products/sales/payments', {
                 sale_id: selectedInvoice.id,
-                amount: paymentAmount,
+                amount: paymentAmount, // Record original amount (e.g. 100 Bs)
                 currency: paymentCurrency,
                 payment_method: paymentMethod,
                 exchange_rate: currentExchangeRate
             });
 
-            // 2. Update sale balance_pending
-            const newBalance = balancePending - paymentAmount;
-            const isPaid = newBalance <= 0.01; // Consider paid if less than 1 cent
+            // 2. Update sale balance_pending using the Anchor equivalent
+            const newBalance = Math.max(0, balancePending - amountInAnchor);
+            const isPaid = newBalance <= 0.01;
 
             await apiClient.put(`/products/sales/${selectedInvoice.id}`, null, {
                 params: {
@@ -169,7 +172,7 @@ const AccountsReceivable = () => {
                     type: 'DEPOSIT',
                     amount: paymentAmount,
                     currency: paymentCurrency,
-                    exchange_rate: exchangeRate,
+                    exchange_rate: currentExchangeRate,
                     description: `Abono CxC - Factura #${selectedInvoice.id} - ${selectedInvoice.customer?.name || 'Cliente'}`
                 });
             } catch (cashError) {
@@ -466,7 +469,11 @@ const AccountsReceivable = () => {
                                     onChange={(e) => setPaymentCurrency(e.target.value)}
                                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
                                 >
-                                    {availableCurrencies.map(curr => (
+                                    {/* Merge Anchor + Active Currencies, ensuring no duplicates if anchor is also active */}
+                                    {[
+                                        { symbol: 'USD', name: 'Dólar', rate: 1, is_anchor: true }, // Always explicit USD option
+                                        ...availableCurrencies.filter(c => c.symbol !== 'USD')
+                                    ].map(curr => (
                                         <option key={curr.symbol} value={curr.symbol}>
                                             {curr.name} ({curr.symbol})
                                         </option>
@@ -474,7 +481,7 @@ const AccountsReceivable = () => {
                                 </select>
                                 {paymentCurrency !== 'USD' && (
                                     <p className="text-xs text-gray-500 mt-2">
-                                        Tasa: {getExchangeRate(paymentCurrency).toFixed(2)} {paymentCurrency}/USD
+                                        Tasa: {getExchangeRate(paymentCurrency).toLocaleString('es-VE', { minimumFractionDigits: 2 })} {paymentCurrency}/USD
                                     </p>
                                 )}
                             </div>
