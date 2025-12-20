@@ -157,11 +157,26 @@ async def print_ticket(request: Request):
         template_str = data.get('template')
         context = data.get('context', {})
         
+        print(f"🔍 DEBUG: Received template length: {len(template_str) if template_str else 0}")
+        print(f"🔍 DEBUG: Context keys: {list(context.keys())}")
+        
+        # DEBUG: Print template line 18
+        template_lines = template_str.split('\n')
+        if len(template_lines) >= 18:
+            print(f"🔍 DEBUG: Template line 18: {template_lines[17]}")
+        
+        # DEBUG: Print sale.items structure
+        if 'sale' in context and 'items' in context['sale']:
+            print(f"🔍 DEBUG: sale.items type: {type(context['sale']['items'])}")
+            print(f"🔍 DEBUG: sale.items is list: {isinstance(context['sale']['items'], list)}")
+        
         if not template_str:
             raise HTTPException(status_code=400, detail="Template is required")
         
         # Render template and parse tags
+        print("🔍 DEBUG: Starting template rendering...")
         commands = print_from_template(template_str, context)
+        print(f"🔍 DEBUG: Generated {len(commands)} commands")
         
         if PRINTER_MODE == "VIRTUAL":
             content = format_virtual_ticket(commands)
@@ -208,7 +223,12 @@ async def print_ticket(request: Request):
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"USB print error: {str(e)}")
             
+    except HTTPException:
+        raise
     except Exception as e:
+        import traceback
+        error_detail = traceback.format_exc()
+        print(f"❌ ERROR: {error_detail}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # Legacy endpoint (keep for backward compatibility)

@@ -1,27 +1,26 @@
-------------------------------------------------
-                TICKET DE VENTA                 
-------------------------------------------------
-          FERRETERIA EL NUEVO PROGRESO          
+                   MI NEGOCIO                   
+           Calle Principal, Local 123           
                RIF: J-12345678-9                
-           Av. Principal Las Acacias            
-              Fecha: Invalid Date               
-            CLIENTE: CLIENTE GENERAL            
-------------------------------------------------
+               Tel: 0414-1234567                
+================================                
+Fecha: 19/12/2025 20:34                         
+Factura: #9999                                  
+Cliente: Juan Pérez                             
+               *** A CREDITO ***                
+Saldo Pendiente: $75.5                          
+================================                
+                      <left>PRODUCTO</left>TOTAL
+--------------------------------                
+Cemento Gris 50kg                               
+  2.0 x $15.0 = $30.0                           
+Cabilla 3/8 x 12m                               
+  5.0 x $12.5 = $62.5                           
+Pala Metálica                                   
+  1.0 x $33.0 = $33.0                           
+================================                
+                                   TOTAL: $125.5
+================================                
+             Gracias por su compra              
+                   Mi Negocio                   
 
-CANT   DESCRIPCION                         TOTAL
-------------------------------------------------
-TALADRO                                         
-1.0 UNID   x 20.00                         20.00
-------------------------------------------------
-
-SUBTOTAL USD                              20.00
-TOTAL BS                                 900.00
-METODO PAGO                            EFECTIVO
-RECIBIDO                                   0.00
-------------------------------------------------
-
-            ¡Gracias por su compra!             
-       Conserve este ticket para cambios        
-   NO SE ACEPTAN DEVOLUCIONES DESPUES DE 24H    
-
-
+================================================ [CORTE] ================================================
