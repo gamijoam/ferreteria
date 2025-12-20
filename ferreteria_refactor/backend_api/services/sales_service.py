@@ -3,6 +3,7 @@ from sqlalchemy import func
 from datetime import datetime, timedelta
 from fastapi import HTTPException, BackgroundTasks
 from decimal import Decimal
+import requests
 from ..models import models
 from .. import schemas
 from ..websocket.manager import manager
@@ -237,7 +238,7 @@ class SalesService:
                 exchange_rate=sale_data.exchange_rate
             )
             db.add(fallback_payment)
-    
+        
         db.commit()
         
         # Emit Stock Update Events using BackgroundTasks
@@ -259,4 +260,82 @@ class SalesService:
                 "date": new_sale.date.isoformat() if new_sale.date else None
             })
             
+            # AUTO-PRINT TICKET
+            background_tasks.add_task(print_sale_ticket, db, new_sale.id)
+            
         return {"status": "success", "sale_id": new_sale.id}
+
+def print_sale_ticket(db: Session, sale_id: int):
+    """
+    Print ticket for a completed sale
+    Sends sale data to hardware bridge for printing
+    """
+    try:
+        # Get sale with all relationships
+        sale = db.query(models.Sale).filter(models.Sale.id == sale_id).first()
+        if not sale:
+            print(f"❌ Sale {sale_id} not found for printing")
+            return
+        
+        # Get business info
+        business_config = {}
+        configs = db.query(models.BusinessConfig).all()
+        for config in configs:
+            business_config[config.key] = config.value
+        
+        # Get ticket template
+        template = business_config.get('ticket_template')
+        if not template:
+            print("⚠️  No ticket template configured, skipping print")
+            return
+        
+        # Build context for template
+        context = {
+            "business": {
+                "name": business_config.get('business_name', 'MI NEGOCIO'),
+                "document_id": business_config.get('business_doc', ''),
+                "address": business_config.get('business_address', ''),
+                "phone": business_config.get('business_phone', ''),
+                "email": business_config.get('business_email', '')
+            },
+            "sale": {
+                "id": sale.id,
+                "date": sale.date.strftime("%d/%m/%Y %H:%M") if sale.date else "",
+                "total": float(sale.total_amount),
+                "is_credit": sale.is_credit,
+                "balance": float(sale.balance_pending) if sale.balance_pending else 0.0,
+                "customer": {
+                    "name": sale.customer.name if sale.customer else None,
+                    "id_number": sale.customer.id_number if sale.customer else None
+                } if sale.customer else None,
+                "items": [
+                    {
+                        "product": {"name": item.product.name if item.product else "Producto"},
+                        "quantity": float(item.quantity),
+                        "unit_price": float(item.unit_price),
+                        "subtotal": float(item.subtotal)
+                    }
+                    for item in sale.items
+                ]
+            }
+        }
+        
+        # Send to hardware bridge
+        response = requests.post(
+            "http://localhost:5001/print",
+            json={
+                "template": template,
+                "context": context
+            },
+            timeout=5
+        )
+        
+        if response.status_code == 200:
+            print(f"✅ Ticket printed for sale #{sale_id}")
+        else:
+            print(f"⚠️  Print failed for sale #{sale_id}: {response.text}")
+            
+    except requests.exceptions.ConnectionError:
+        print("⚠️  Hardware bridge not available (port 5001)")
+    except Exception as e:
+        print(f"❌ Error printing ticket for sale #{sale_id}: {str(e)}")
