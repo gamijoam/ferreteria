@@ -2,32 +2,32 @@ import { useState, useEffect } from 'react';
 import { Printer, Save, FileText, AlertCircle, CheckCircle } from 'lucide-react';
 import apiClient from '../../config/axios';
 
-const DEFAULT_TEMPLATE = `<center><bold>{{ business.name }}</bold></center>
-<center>{{ business.address }}</center>
-<center>RIF: {{ business.document_id }}</center>
-<center>Tel: {{ business.phone }}</center>
+const DEFAULT_TEMPLATE = `<center><bold>${'{{ business.name }}'}</bold></center>
+<center>${'{{ business.address }}'}</center>
+<center>RIF: ${'{{ business.document_id }}'}</center>
+<center>Tel: ${'{{ business.phone }}'}</center>
 ================================
-Fecha: {{ sale.date }}
-Factura: #{{ sale.id }}
-{% if sale.customer %}
-Cliente: {{ sale.customer.name }}
-{% endif %}
-{% if sale.is_credit %}
+Fecha: ${'{{ sale.date }}'}
+Factura: #${'{{ sale.id }}'}
+${'{% if sale.customer %}'}
+Cliente: ${'{{ sale.customer.name }}'}
+${'{% endif %}'}
+${'{% if sale.is_credit %}'}
 <center><bold>*** A CREDITO ***</bold></center>
-Saldo Pendiente: ${{ sale.balance }}
-{% endif %}
+Saldo Pendiente: $$${'{{ sale.balance }}'}
+${'{% endif %}'}
 ================================
 <left>PRODUCTO</left><right>TOTAL</right>
 --------------------------------
-{% for item in sale.items %}
-{{ item.product.name }}
-  {{ item.quantity }} x ${{ item.unit_price }} = ${{ item.subtotal }}
-{% endfor %}
+${'{% for item in sale.items %}'}
+${'{{ item.product.name }}'}
+  ${'{{ item.quantity }}'} x $$${'{{ item.unit_price }}'} = $$${'{{ item.subtotal }}'}
+${'{% endfor %}'}
 ================================
-<right><bold>TOTAL: ${{ sale.total }}</bold></right>
+<right><bold>TOTAL: $$${'{{ sale.total }}'}</bold></right>
 ================================
 <center>Gracias por su compra</center>
-<center>{{ business.name }}</center>
+<center>${'{{ business.name }}'}</center>
 <cut>`;
 
 const TicketConfig = () => {
@@ -101,8 +101,8 @@ const TicketConfig = () => {
 
             {message && (
                 <div className={`mb-4 p-4 rounded-lg flex items-center gap-2 ${message.type === 'success'
-                        ? 'bg-green-50 text-green-800 border border-green-200'
-                        : 'bg-red-50 text-red-800 border border-red-200'
+                    ? 'bg-green-50 text-green-800 border border-green-200'
+                    : 'bg-red-50 text-red-800 border border-red-200'
                     }`}>
                     {message.type === 'success' ? <CheckCircle size={20} /> : <AlertCircle size={20} />}
                     {message.text}
