@@ -43,7 +43,7 @@ const SaleSuccessModal = ({ isOpen, onClose, saleData }) => {
                     </div>
                     <div className="flex justify-between">
                         <span className="text-gray-600">Cambio:</span>
-                        <span className="font-bold text-green-600">${Math.max(0, (Number(saleData.paymentData.amountReceived) - saleData.totalUSD)).toFixed(2)}</span>
+                        <span className="font-bold text-green-600">${Math.max(0, (Number(saleData.paymentData.totalPaidUSD || 0) - Number(saleData.totalUSD || 0))).toFixed(2)}</span>
                     </div>
                 </div>
 
