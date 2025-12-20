@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { DollarSign, AlertTriangle, FileText, CreditCard, ArrowLeft, TrendingDown } from 'lucide-react';
+import { DollarSign, AlertTriangle, FileText, CreditCard, ArrowLeft, TrendingDown, Eye } from 'lucide-react';
 import apiClient from '../../config/axios';
+import PurchaseItemsModal from '../../components/purchases/PurchaseItemsModal';
 
 const AccountsPayable = () => {
     const [suppliers, setSuppliers] = useState([]);
@@ -8,6 +9,7 @@ const AccountsPayable = () => {
     const [supplierPurchases, setSupplierPurchases] = useState([]);
     const [selectedPurchase, setSelectedPurchase] = useState(null);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [showItemsModal, setShowItemsModal] = useState(false); // NEW
     const [loading, setLoading] = useState(true);
 
     // Summary stats
@@ -69,6 +71,12 @@ const AccountsPayable = () => {
     const handleRegisterPayment = (purchase) => {
         setSelectedPurchase(purchase);
         setShowPaymentModal(true);
+    };
+
+    // NEW: Handle view items
+    const handleViewItems = (purchase) => {
+        setSelectedPurchase(purchase);
+        setShowItemsModal(true);
     };
 
     const handlePaymentSuccess = () => {
@@ -265,7 +273,14 @@ const AccountsPayable = () => {
                                                 {purchase.payment_status === 'PENDING' ? 'Pendiente' : 'Parcial'}
                                             </span>
                                         </td>
-                                        <td className="p-4 text-right">
+                                        <td className="p-4 text-right flex items-center justify-end gap-2">
+                                            <button
+                                                onClick={() => handleViewItems(purchase)}
+                                                className="bg-blue-100 hover:bg-blue-200 text-blue-700 p-2 rounded-lg transition-colors"
+                                                title="Ver Productos"
+                                            >
+                                                <Eye size={20} />
+                                            </button>
                                             <button
                                                 onClick={() => handleRegisterPayment(purchase)}
                                                 className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
@@ -289,6 +304,13 @@ const AccountsPayable = () => {
                     onSuccess={handlePaymentSuccess}
                 />
             )}
+
+            {/* NEW: Purchase Items Modal */}
+            <PurchaseItemsModal
+                isOpen={showItemsModal}
+                onClose={() => setShowItemsModal(false)}
+                purchaseId={selectedPurchase?.id}
+            />
         </div>
     );
 };

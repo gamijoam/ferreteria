@@ -130,6 +130,59 @@ const PurchaseDetail = () => {
                 </div>
             </div>
 
+            {/* NEW: Purchase Items List */}
+            <div className="bg-white rounded-lg shadow mb-6">
+                <div className="p-4 border-b bg-gray-50 flex items-center">
+                    <Package className="mr-2 text-gray-500" size={20} />
+                    <h3 className="text-lg font-bold text-gray-800">Productos Comprados</h3>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                        <thead className="bg-gray-50 border-b">
+                            <tr>
+                                <th className="p-4 font-semibold text-gray-600">Producto</th>
+                                <th className="p-4 font-semibold text-gray-600 text-center">Cantidad</th>
+                                <th className="p-4 font-semibold text-gray-600 text-right">Costo Unit.</th>
+                                <th className="p-4 font-semibold text-gray-600 text-right">Subtotal</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                            {purchase.items && purchase.items.length > 0 ? (
+                                purchase.items.map((item, index) => (
+                                    <tr key={index} className="hover:bg-gray-50">
+                                        <td className="p-4">
+                                            <div className="font-medium text-gray-800">
+                                                {item.product?.name || `Producto #${item.product_id}`}
+                                            </div>
+                                            {item.product?.sku && (
+                                                <div className="text-xs text-gray-500">SKU: {item.product.sku}</div>
+                                            )}
+                                        </td>
+                                        <td className="p-4 text-center">
+                                            <span className="bg-blue-50 text-blue-700 py-1 px-3 rounded-full text-sm font-bold">
+                                                {item.quantity}
+                                            </span>
+                                        </td>
+                                        <td className="p-4 text-right text-gray-600">
+                                            ${Number(item.cost_price).toFixed(2)}
+                                        </td>
+                                        <td className="p-4 text-right font-bold text-gray-800">
+                                            ${(Number(item.quantity) * Number(item.cost_price)).toFixed(2)}
+                                        </td>
+                                    </tr>
+                                ))
+                            ) : (
+                                <tr>
+                                    <td colSpan="4" className="p-8 text-center text-gray-500">
+                                        No hay productos registrados en esta compra.
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             {/* Payment Summary */}
             <div className="grid grid-cols-3 gap-4 mb-6">
                 <div className="bg-blue-50 rounded-lg p-4 border-2 border-blue-200">
