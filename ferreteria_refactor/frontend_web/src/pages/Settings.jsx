@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Building2, Coins, Receipt, Save, RefreshCw, Trash2, Plus, Edit, Check, X, Star, AlertCircle, Loader2, Globe } from 'lucide-react';
+import { Building2, Coins, Receipt, Save, RefreshCw, Trash2, Plus, Edit, Check, X, Star, AlertCircle, Loader2, Globe, Printer } from 'lucide-react';
 import { useConfig } from '../context/ConfigContext';
 import configService from '../services/configService';
 import apiClient from '../config/axios';
+import TicketConfig from './Settings/TicketConfig';  // NEW
 
 const PREDEFINED_CURRENCIES = [
     { code: 'USD', symbol: '$', name: 'Dólar Americano' },
@@ -204,6 +205,12 @@ const Settings = () => {
                     className={`px-6 py-3 font-medium flex items-center whitespace-nowrap transition-all ${activeTab === 'taxes' ? 'border-b-2 border-blue-600 text-blue-600 bg-blue-50/50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}
                 >
                     <Receipt className="mr-2" size={20} /> Impuestos
+                </button>
+                <button
+                    onClick={() => setActiveTab('tickets')}
+                    className={`px-6 py-3 font-medium flex items-center whitespace-nowrap transition-all ${activeTab === 'tickets' ? 'border-b-2 border-blue-600 text-blue-600 bg-blue-50/50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}
+                >
+                    <Printer className="mr-2" size={20} /> Tickets
                 </button>
             </div>
 
@@ -591,6 +598,11 @@ const Settings = () => {
                     <h3 className="text-xl font-bold text-gray-400 mb-2">Configuración de Impuestos</h3>
                     <p className="text-gray-400">Próximamente... En esta sección podrás configurar el IVA y otros impuestos.</p>
                 </div>
+            )}
+
+            {/* Tickets Tab - NEW */}
+            {activeTab === 'tickets' && (
+                <TicketConfig />
             )}
         </div>
     );
