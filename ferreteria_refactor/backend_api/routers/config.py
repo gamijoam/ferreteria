@@ -9,6 +9,7 @@ from .. import schemas
 from ..dependencies import admin_only
 from ..websocket.manager import manager
 from ..websocket.events import WebSocketEvents
+from ..template_presets import get_all_presets, get_preset_by_id
 
 router = APIRouter(
     prefix="/config",
@@ -273,6 +274,56 @@ def test_print_ticket(db: Session = Depends(get_db)):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Print error: {str(e)}")
+
+# ========================================
+# TEMPLATE PRESETS
+# ========================================
+
+@router.get("/ticket-templates/presets")
+def get_template_presets():
+    """Get all available template presets"""
+    return get_all_presets()
+
+@router.get("/ticket-templates/presets/{preset_id}")
+def get_template_preset(preset_id: str):
+    """Get a specific template preset by ID"""
+    preset = get_preset_by_id(preset_id)
+    if not preset:
+        raise HTTPException(status_code=404, detail="Template preset not found")
+    return {
+        "id": preset_id,
+        "name": preset["name"],
+        "description": preset["description"],
+        "template": preset["template"]
+    }
+
+@router.post("/ticket-templates/apply/{preset_id}")
+def apply_template_preset(
+    preset_id: str,
+    db: Session = Depends(get_db),
+    user: Any = Depends(admin_only)
+):
+    """Apply a template preset to business configuration"""
+    preset = get_preset_by_id(preset_id)
+    if not preset:
+        raise HTTPException(status_code=404, detail="Template preset not found")
+    
+    # Update or create ticket_template config
+    config = db.query(models.BusinessConfig).get("ticket_template")
+    if not config:
+        config = models.BusinessConfig(key="ticket_template", value=preset["template"])
+        db.add(config)
+    else:
+        config.value = preset["template"]
+    
+    db.commit()
+    
+    return {
+        "status": "success",
+        "message": f"Template '{preset['name']}' applied successfully",
+        "preset_id": preset_id,
+        "preset_name": preset["name"]
+    }
 
 @router.get("/", response_model=List[schemas.BusinessConfigRead])
 def get_all_configs(db: Session = Depends(get_db)):
