@@ -502,6 +502,7 @@ class PurchaseOrder(Base):
     # Relationships
     supplier = relationship("Supplier", back_populates="purchase_orders")
     payments = relationship("PurchasePayment", back_populates="purchase", cascade="all, delete-orphan")
+    items = relationship("PurchaseItem", back_populates="purchase", cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<PurchaseOrder(id={self.id}, supplier={self.supplier_id}, total={self.total_amount}, status={self.payment_status})>"
@@ -523,6 +524,22 @@ class PurchasePayment(Base):
     
     def __repr__(self):
         return f"<PurchasePayment(id={self.id}, purchase={self.purchase_id}, amount={self.amount})>"
+
+class PurchaseItem(Base):
+    __tablename__ = "purchase_items"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    purchase_id = Column(Integer, ForeignKey("purchase_orders.id"), nullable=False)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
+    quantity = Column(Numeric(12, 3), nullable=False)
+    unit_cost = Column(Numeric(14, 4), nullable=False) # Store cost at time of purchase
+    
+    # Relationships
+    purchase = relationship("PurchaseOrder", back_populates="items")
+    product = relationship("Product")
+    
+    def __repr__(self):
+        return f"<PurchaseItem(purchase={self.purchase_id}, product={self.product_id}, qty={self.quantity})>"
 
 class AuditLog(Base):
     __tablename__ = "audit_logs"

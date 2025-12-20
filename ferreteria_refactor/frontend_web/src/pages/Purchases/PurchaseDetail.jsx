@@ -164,10 +164,10 @@ const PurchaseDetail = () => {
                                             </span>
                                         </td>
                                         <td className="p-4 text-right text-gray-600">
-                                            ${Number(item.cost_price).toFixed(2)}
+                                            ${Number(item.unit_cost).toFixed(2)}
                                         </td>
                                         <td className="p-4 text-right font-bold text-gray-800">
-                                            ${(Number(item.quantity) * Number(item.cost_price)).toFixed(2)}
+                                            ${(Number(item.quantity) * Number(item.unit_cost)).toFixed(2)}
                                         </td>
                                     </tr>
                                 ))

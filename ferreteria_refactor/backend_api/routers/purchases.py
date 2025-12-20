@@ -53,6 +53,15 @@ async def create_purchase_order(order_data: schemas.PurchaseOrderCreate, db: Ses
             if not product:
                 continue
             
+            # SAVE PURCHASE ITEM (History)
+            purchase_item = models.PurchaseItem(
+                purchase_id=purchase.id,
+                product_id=product.id,
+                quantity=item.quantity,
+                unit_cost=item.unit_cost
+            )
+            db.add(purchase_item)
+
             # Update stock
             old_stock = product.stock
             product.stock += item.quantity
@@ -113,7 +122,8 @@ async def create_purchase_order(order_data: schemas.PurchaseOrderCreate, db: Ses
 def get_all_purchase_orders(status: Optional[str] = None, db: Session = Depends(get_db)):
     """Get all purchase orders, optionally filtered by status"""
     query = db.query(models.PurchaseOrder).options(
-        joinedload(models.PurchaseOrder.supplier)
+        joinedload(models.PurchaseOrder.supplier),
+        joinedload(models.PurchaseOrder.items).joinedload(models.PurchaseItem.product) # Load items and their products
     )
     
     if status:
@@ -130,7 +140,8 @@ def get_all_purchase_orders(status: Optional[str] = None, db: Session = Depends(
 def get_pending_purchases(db: Session = Depends(get_db)):
     """Get all pending and partially paid purchases"""
     purchases = db.query(models.PurchaseOrder).options(
-        joinedload(models.PurchaseOrder.supplier)
+        joinedload(models.PurchaseOrder.supplier),
+        joinedload(models.PurchaseOrder.items).joinedload(models.PurchaseItem.product)
     ).filter(
         models.PurchaseOrder.payment_status.in_([models.PaymentStatus.PENDING, models.PaymentStatus.PARTIAL])
     ).order_by(models.PurchaseOrder.due_date).all()
@@ -141,7 +152,8 @@ def get_pending_purchases(db: Session = Depends(get_db)):
 def get_purchase_order(order_id: int, db: Session = Depends(get_db)):
     """Get purchase order by ID"""
     order = db.query(models.PurchaseOrder).options(
-        joinedload(models.PurchaseOrder.supplier)
+        joinedload(models.PurchaseOrder.supplier),
+        joinedload(models.PurchaseOrder.items).joinedload(models.PurchaseItem.product)
     ).filter(models.PurchaseOrder.id == order_id).first()
     
     if not order:

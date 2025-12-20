@@ -109,10 +109,10 @@ const PurchaseItemsModal = ({ isOpen, onClose, purchaseId }) => {
                                             </span>
                                         </td>
                                         <td className="p-4 text-right font-mono text-gray-600">
-                                            ${Number(item.cost_price).toFixed(2)}
+                                            ${Number(item.unit_cost).toFixed(2)}
                                         </td>
                                         <td className="p-4 text-right font-bold text-gray-800 font-mono">
-                                            ${(Number(item.quantity) * Number(item.cost_price)).toFixed(2)}
+                                            ${(Number(item.quantity) * Number(item.unit_cost)).toFixed(2)}
                                         </td>
                                     </tr>
                                 ))}
@@ -121,7 +121,7 @@ const PurchaseItemsModal = ({ isOpen, onClose, purchaseId }) => {
                                 <tr>
                                     <td colSpan="3" className="p-4 text-right font-bold text-gray-600">Total Productos:</td>
                                     <td className="p-4 text-right font-bold text-blue-600 text-lg">
-                                        ${items.reduce((sum, item) => sum + (Number(item.quantity) * Number(item.cost_price)), 0).toFixed(2)}
+                                        ${items.reduce((sum, item) => sum + (Number(item.quantity) * Number(item.unit_cost)), 0).toFixed(2)}
                                     </td>
                                 </tr>
                             </tfoot>

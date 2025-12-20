@@ -577,6 +577,29 @@ class PurchaseOrderResponse(PurchaseOrderBase):
     class Config:
         from_attributes = True
 
+class PurchaseItemRead(BaseModel):
+    id: int
+    product_id: int
+    quantity: Decimal
+    unit_cost: Decimal
+    product: Optional['ProductRead'] = None
+
+    class Config:
+        from_attributes = True
+
+class PurchaseOrderResponse(PurchaseOrderBase):
+    id: int
+    purchase_date: datetime
+    due_date: Optional[datetime] = None
+    total_amount: Decimal
+    paid_amount: Decimal
+    payment_status: str
+    supplier: Optional['SupplierRead'] = None
+    items: List[PurchaseItemRead] = [] # Include items in response
+    
+    class Config:
+        from_attributes = True
+
 class PurchasePaymentCreate(BaseModel):
     amount: Decimal
     payment_method: str = "Efectivo"
