@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { DollarSign, CreditCard, Banknote, CheckCircle, Calculator, Users, X } from 'lucide-react';
+import { DollarSign, CreditCard, Banknote, CheckCircle, Calculator, Users, X, UserPlus, User } from 'lucide-react';
 import { useConfig } from '../../context/ConfigContext';
 import { useWebSocket } from '../../context/WebSocketContext';
 import apiClient from '../../config/axios';
 import toast from 'react-hot-toast';
+import QuickCustomerModal from './QuickCustomerModal';
 
 const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onConfirm }) => {
     const { getActiveCurrencies, convertPrice, getExchangeRate } = useConfig();
@@ -18,6 +19,9 @@ const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onCon
     const [isCreditSale, setIsCreditSale] = useState(false);
     const [customers, setCustomers] = useState([]);
     const [selectedCustomer, setSelectedCustomer] = useState(null);
+
+    // Quick Customer Modal
+    const [isQuickCustomerOpen, setIsQuickCustomerOpen] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
@@ -51,6 +55,11 @@ const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onCon
         } catch (error) {
             console.error('Error fetching customers:', error);
         }
+    };
+
+    const handleQuickCustomerSuccess = (newCustomer) => {
+        // The websocket handles list update, but we set selection immediately
+        setSelectedCustomer(newCustomer);
     };
 
     if (!isOpen) return null;
@@ -116,11 +125,9 @@ const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onCon
                     discount_type: "NONE"
                 })),
                 is_credit: isCreditSale,
-                customer_id: isCreditSale ? selectedCustomer.id : null,
+                customer_id: selectedCustomer ? selectedCustomer.id : null, // Send customer for ALL sales if selected
                 notes: ""
             };
-
-            // ... (inside handleConfirm)
 
             const response = await apiClient.post('/products/sales/', saleData);
             const saleId = response.data.sale_id;
@@ -130,7 +137,7 @@ const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onCon
                 totalPaidUSD: isCreditSale ? 0 : totalPaidUSD,
                 changeUSD: isCreditSale ? 0 : (changeUSD > 0 ? changeUSD : 0),
                 isCreditSale,
-                customer: isCreditSale ? selectedCustomer : null,
+                customer: selectedCustomer || null,
                 saleId: saleId
             });
 
@@ -195,14 +202,16 @@ const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onCon
                         </div>
                     )}
 
-                    {isCreditSale && selectedCustomer && (
-                        <div className="mt-auto p-4 rounded-lg bg-blue-600/20 border border-blue-500">
+                    {selectedCustomer && (
+                        <div className={`mt-auto p-4 rounded-lg ${isCreditSale ? 'bg-blue-600/20 border border-blue-500' : 'bg-gray-800 border border-gray-700'}`}>
                             <div className="text-center">
-                                <div className="text-sm text-blue-300 mb-1">Cliente</div>
-                                <div className="text-lg font-bold text-blue-400">{selectedCustomer.name}</div>
-                                <div className="text-xs text-blue-300 mt-2">
-                                    Límite: ${Number(selectedCustomer.credit_limit || 0).toFixed(2)}
-                                </div>
+                                <div className={`text-sm mb-1 ${isCreditSale ? 'text-blue-300' : 'text-gray-400'}`}>Cliente Asignado</div>
+                                <div className={`text-lg font-bold ${isCreditSale ? 'text-blue-400' : 'text-white'}`}>{selectedCustomer.name}</div>
+                                {isCreditSale && (
+                                    <div className="text-xs text-blue-300 mt-2">
+                                        Límite: ${Number(selectedCustomer.credit_limit || 0).toFixed(2)}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
@@ -219,6 +228,43 @@ const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onCon
                         </button>
                     </div>
 
+                    {/* Customer Selection (Generic for ALL sales) */}
+                    <div className="mb-6">
+                        <label className="block text-sm font-medium text-gray-700 mb-2 flex justify-between items-center">
+                            <span>Cliente {isCreditSale && <span className="text-red-500">*</span>}</span>
+                            <button
+                                onClick={() => setIsQuickCustomerOpen(true)}
+                                className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200 transition flex items-center gap-1 font-bold"
+                            >
+                                <UserPlus size={14} /> Nuevo Cliente
+                            </button>
+                        </label>
+                        <div className="relative">
+                            <User className="absolute left-3 top-3.5 text-gray-400" size={18} />
+                            <select
+                                value={selectedCustomer?.id || ''}
+                                onChange={(e) => {
+                                    const customer = customers.find(c => c.id === parseInt(e.target.value));
+                                    setSelectedCustomer(customer);
+                                }}
+                                className={`w-full pl-10 pr-3 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none appearance-none bg-white ${isCreditSale && !selectedCustomer ? 'border-red-300 ring-1 ring-red-200' : 'border-gray-300'}`}
+                            >
+                                <option value="">-- Consumidor Final (Sin Cliente) --</option>
+                                {customers.map(customer => (
+                                    <option key={customer.id} value={customer.id}>
+                                        {customer.name} - {customer.id_number || 'Sin ID'}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        {isCreditSale && selectedCustomer && (
+                            <div className="mt-2 text-xs flex gap-3">
+                                <span className="text-green-700 font-medium">Límite: ${Number(selectedCustomer.credit_limit || 0).toFixed(2)}</span>
+                                <span className="text-blue-700 font-medium">Plazo: {selectedCustomer.payment_term_days || 15} días</span>
+                            </div>
+                        )}
+                    </div>
+
                     {/* Credit Sale Toggle */}
                     <div className="mb-6 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
                         <label className="flex items-center cursor-pointer">
@@ -232,40 +278,6 @@ const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onCon
                             <span className="font-semibold text-blue-800">Venta a Crédito</span>
                         </label>
                     </div>
-
-                    {/* Customer Selection (only for credit sales) */}
-                    {isCreditSale && (
-                        <div className="mb-6">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Seleccionar Cliente *
-                            </label>
-                            <select
-                                value={selectedCustomer?.id || ''}
-                                onChange={(e) => {
-                                    const customer = customers.find(c => c.id === parseInt(e.target.value));
-                                    setSelectedCustomer(customer);
-                                }}
-                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                            >
-                                <option value="">-- Seleccione un cliente --</option>
-                                {customers.map(customer => (
-                                    <option key={customer.id} value={customer.id}>
-                                        {customer.name} - {customer.id_number || 'Sin ID'}
-                                    </option>
-                                ))}
-                            </select>
-                            {selectedCustomer && (
-                                <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded text-sm">
-                                    <p className="font-semibold text-green-800">
-                                        Límite: ${Number(selectedCustomer.credit_limit || 0).toFixed(2)}
-                                    </p>
-                                    <p className="text-green-700">
-                                        Plazo: {selectedCustomer.payment_term_days || 15} días
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-                    )}
 
                     {/* Payment Rows (only for cash sales) */}
                     {!isCreditSale && (
@@ -360,6 +372,13 @@ const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onCon
                     </div>
                 </div>
             </div>
+
+            {/* Quick Customer Modal Layer */}
+            <QuickCustomerModal
+                isOpen={isQuickCustomerOpen}
+                onClose={() => setIsQuickCustomerOpen(false)}
+                onSuccess={handleQuickCustomerSuccess}
+            />
         </div>
     );
 };
