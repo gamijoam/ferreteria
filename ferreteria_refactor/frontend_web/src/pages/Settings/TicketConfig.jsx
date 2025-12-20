@@ -1,57 +1,53 @@
-import { useState, useEffect } from 'react';
-import { Printer, Save, FileText, AlertCircle, CheckCircle, Grid, Code } from 'lucide-react';
-import apiClient from '../../config/axios';
-
-const DEFAULT_TEMPLATE = `<center><bold>${'{{ business.name }}'}</bold></center>
-<center>${'{{ business.address }}'}</center>
-<center>RIF: ${'{{ business.document_id }}'}</center>
-<center>Tel: ${'{{ business.phone }}'}</center>
-================================
-Fecha: ${'{{ sale.date }}'}
-Factura: #${'{{ sale.id }}'}
-${'{% if sale.customer %}'}
-Cliente: ${'{{ sale.customer.name }}'}
-${'{% endif %}'}
-${'{% if sale.is_credit %}'}
-<center><bold>*** A CREDITO ***</bold></center>
-Saldo Pendiente: $${'{{ sale.balance }}'}
-${'{% endif %}'}
-================================
-<left>PRODUCTO</left><right>TOTAL</right>
---------------------------------
-${'{% for item in sale[\'items\'] %}'}
-${'{{ item.product.name }}'}
-  ${'{{ item.quantity }}'} x $${'{{ item.unit_price }}'} = $${'{{ item.subtotal }}'}
-${'{% endfor %}'}
-================================
-<right><bold>TOTAL: $${'{{ sale.total }}'}</bold></right>
-================================
-<center>Gracias por su compra</center>
-<center>${'{{ business.name }}'}</center>
-<cut>`;
+import React, { useState, useEffect } from 'react';
+import apiClient from '../../services/api';
 
 const TicketConfig = () => {
-    const [template, setTemplate] = useState(DEFAULT_TEMPLATE);
+    const [activeTab, setActiveTab] = useState('gallery'); // 'gallery' or 'editor'
+    const [template, setTemplate] = useState('');
+    const [presets, setPresets] = useState([]);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState(null);
-    const [view, setView] = useState('gallery'); // 'gallery' or 'editor'
-    const [presets, setPresets] = useState([]);
+
+    // Initial default template (escaped for JS string)
+    const defaultTemplate = `=== TICKET DE VENTA ===
+{{ business.name }}
+{{ business.address }}
+RIF: {{ business.document_id }}
+Tel: {{ business.phone }}
+================================
+Fecha: {{ sale.date }}
+Factura: #{{ sale.id }}
+Cliente: {{ sale.customer.name if sale.customer else "Consumidor Final" }}
+================================
+CANT   PRODUCTO         TOTAL
+--------------------------------
+{% for item in sale.items %}
+{{ item.quantity }} x {{ item.product.name }}
+       {{ item.unit_price }} = {{ item.subtotal }}
+{% endfor %}
+================================
+TOTAL:       {{ sale.total }}
+================================
+      Gracias por su compra`;
 
     useEffect(() => {
-        fetchTemplate();
+        fetchConfig();
         fetchPresets();
     }, []);
 
-    const fetchTemplate = async () => {
+    const fetchConfig = async () => {
         setLoading(true);
         try {
             const response = await apiClient.get('/config/business');
-            if (response.data.ticket_template) {
+            if (response.data && response.data.ticket_template) {
                 setTemplate(response.data.ticket_template);
+            } else {
+                setTemplate(defaultTemplate);
             }
         } catch (error) {
-            console.error('Error fetching template:', error);
+            console.error('Error fetching config:', error);
+            setMessage({ type: 'error', text: 'Error al cargar configuración' });
         } finally {
             setLoading(false);
         }
@@ -60,12 +56,28 @@ const TicketConfig = () => {
     const fetchPresets = async () => {
         try {
             const response = await apiClient.get('/config/ticket-templates/presets');
-            setPresets(Object.entries(response.data).map(([id, preset]) => ({
-                id,
-                ...preset
-            })));
+            setPresets(response.data);
         } catch (error) {
             console.error('Error fetching presets:', error);
+        }
+    };
+
+    const handleApplyPreset = async (presetId) => {
+        if (!confirm('¿Aplicar esta plantilla? Se sobrescribirá la configuración actual.')) return;
+
+        setSaving(true);
+        setMessage(null);
+        try {
+            const response = await apiClient.post(`/config/ticket-templates/apply/${presetId}`);
+            setMessage({ type: 'success', text: `Plantilla "${response.data.preset_name}" aplicada` });
+            // Refresh editor with new template
+            fetchConfig();
+            setActiveTab('editor'); // Switch to editor to see result
+        } catch (error) {
+            console.error('Error applying preset:', error);
+            setMessage({ type: 'error', text: 'Error al aplicar plantilla' });
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -76,7 +88,9 @@ const TicketConfig = () => {
             await apiClient.put('/config/business', {
                 ticket_template: template
             });
-            setMessage({ type: 'success', text: '✅ Plantilla guardada exitosamente' });
+            setMessage({ type: 'success', text: '✅ Plantilla guardada correctamente' });
+            // Clear success message after 3 seconds
+            setTimeout(() => setMessage(null), 3000);
         } catch (error) {
             console.error('Error saving template:', error);
             setMessage({ type: 'error', text: '❌ Error al guardar plantilla' });
@@ -98,275 +112,166 @@ const TicketConfig = () => {
 
     const handleReset = () => {
         if (confirm('¿Restaurar plantilla por defecto? Se perderán los cambios no guardados.')) {
-            setTemplate(DEFAULT_TEMPLATE);
-        }
-    };
-
-    const handleApplyPreset = async (presetId) => {
-        setMessage(null);
-        try {
-            await apiClient.post(`/config/ticket-templates/apply/${presetId}`);
-            await fetchTemplate(); // Reload template
-            setMessage({ type: 'success', text: '✅ Plantilla aplicada exitosamente' });
-            setView('editor'); // Switch to editor view
-        } catch (error) {
-            console.error('Error applying preset:', error);
-            setMessage({ type: 'error', text: '❌ Error al aplicar plantilla' });
+            setTemplate(defaultTemplate);
         }
     };
 
     return (
-        <div className="p-6 max-w-7xl mx-auto">
-            <div className="mb-6">
-                <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-                    <Printer size={28} />
-                    Configuración de Tickets
-                </h1>
-                <p className="text-gray-600 mt-1">
-                    Personaliza el diseño de tus tickets de venta
-                </p>
-            </div>
+        <div className="bg-white rounded-lg shadow-sm p-6 max-w-6xl mx-auto">
+            <h2 className="text-xl font-bold mb-4 text-gray-800 border-b pb-2">Configuración de Tickets</h2>
 
-            {/* View Tabs */}
-            <div className="mb-6 flex gap-2 border-b">
+            {/* TABS */}
+            <div className="flex space-x-4 mb-6">
                 <button
-                    onClick={() => setView('gallery')}
-                    className={`px-4 py-2 font-medium flex items-center gap-2 transition-colors ${view === 'gallery'
-                        ? 'border-b-2 border-blue-600 text-blue-600'
-                        : 'text-gray-500 hover:text-gray-700'
+                    onClick={() => setActiveTab('gallery')}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'gallery'
+                            ? 'bg-blue-600 text-white shadow-md'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                         }`}
                 >
-                    <Grid size={20} />
-                    Galería de Plantillas
+                    🖼️ Galería de Plantillas
                 </button>
                 <button
-                    onClick={() => setView('editor')}
-                    className={`px-4 py-2 font-medium flex items-center gap-2 transition-colors ${view === 'editor'
-                        ? 'border-b-2 border-blue-600 text-blue-600'
-                        : 'text-gray-500 hover:text-gray-700'
+                    onClick={() => setActiveTab('editor')}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'editor'
+                            ? 'bg-blue-600 text-white shadow-md'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                         }`}
                 >
-                    <Code size={20} />
-                    Editor Avanzado
+                    📝 Editor de Código (Jinja2)
                 </button>
             </div>
 
             {message && (
-                <div className={`mb-4 p-4 rounded-lg flex items-center gap-2 ${message.type === 'success'
-                    ? 'bg-green-50 text-green-800 border border-green-200'
-                    : 'bg-red-50 text-red-800 border border-red-200'
-                    }`}>
-                    {message.type === 'success' ? <CheckCircle size={20} /> : <AlertCircle size={20} />}
+                <div className={`mb-4 p-4 rounded-md ${message.type === 'error' ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
                     {message.text}
                 </div>
             )}
 
-            {/* Gallery View */}
-            {view === 'gallery' && (
-                <div>
-                    <h2 className="text-xl font-bold text-gray-800 mb-4">Plantillas Predefinidas</h2>
-                    <p className="text-gray-600 mb-6">
-                        Selecciona una plantilla lista para usar. Puedes personalizarla después en el editor avanzado.
-                    </p>
+            {loading ? (
+                <div className="text-center py-8 text-gray-500">Cargando configuración...</div>
+            ) : (
+                <>
+                    {/* GALLERY VIEW */}
+                    {activeTab === 'gallery' && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                            {presets.map(preset => (
+                                <div key={preset.id} className="border rounded-xl hover:shadow-lg transition-shadow overflow-hidden bg-gray-50 flex flex-col">
+                                    <div className="p-4 bg-white border-b flex-grow">
+                                        <h3 className="font-bold text-lg text-gray-800">{preset.name}</h3>
+                                        <p className="text-sm text-gray-500 mt-1">{preset.description}</p>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {presets.map(preset => (
-                            <div key={preset.id} className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow">
-                                <div className="p-6">
-                                    <h3 className="text-lg font-bold text-gray-800 mb-2">{preset.name}</h3>
-                                    <p className="text-gray-600 text-sm mb-4">{preset.description}</p>
-
-                                    {/* Preview - Template Specific */}
-                                    <div className="bg-gray-50 rounded p-4 mb-4 font-mono text-xs text-gray-700 h-48 overflow-hidden border border-gray-200">
-                                        {preset.id === 'classic' && (
-                                            <>
-                                                <div className="text-center font-bold">MI NEGOCIO</div>
-                                                <div className="text-center text-xs">Calle Principal #123</div>
-                                                <div className="text-center text-xs">RIF: J-12345678</div>
-                                                <div className="text-center">================================</div>
-                                                <div className="text-xs">Fecha: 19/12/2025</div>
-                                                <div className="text-xs">Factura: #001</div>
-                                                <div className="text-xs">Cliente: Juan Pérez</div>
-                                                <div className="text-center">================================</div>
-                                                <div className="text-xs">Cemento 50kg</div>
-                                                <div className="text-xs">  2 x $10.00 = $20.00</div>
-                                                <div className="text-center">================================</div>
-                                                <div className="text-right font-bold">TOTAL: $20.00</div>
-                                            </>
-                                        )}
-                                        {preset.id === 'modern' && (
-                                            <>
-                                                <div className="text-center font-bold">MI NEGOCIO</div>
-                                                <div className="text-center text-xs">Dirección | Tel: 0414-1234567</div>
-                                                <div className="text-center">--------------------------------</div>
-                                                <div className="text-xs">#001 | 19/12/2025 | Juan Pérez</div>
-                                                <div className="text-center">--------------------------------</div>
-                                                <div className="text-xs">Cemento 50kg</div>
-                                                <div className="text-xs text-right">2 x $10.00 = $20.00</div>
-                                                <div className="text-center">--------------------------------</div>
-                                                <div className="text-right font-bold">TOTAL: $20.00</div>
-                                                <div className="text-center">--------------------------------</div>
-                                                <div className="text-center text-xs">Gracias por preferirnos</div>
-                                            </>
-                                        )}
-                                        {preset.id === 'detailed' && (
-                                            <>
-                                                <div className="text-center">================================</div>
-                                                <div className="text-center font-bold">MI NEGOCIO</div>
-                                                <div className="text-center">================================</div>
-                                                <div className="text-xs">Calle Principal #123</div>
-                                                <div className="text-xs">RIF: J-12345678-9</div>
-                                                <div className="text-xs font-bold">FACTURA: #001</div>
-                                                <div className="text-xs">FECHA: 19/12/2025 15:30</div>
-                                                <div className="text-xs">CLIENTE: Juan Pérez</div>
-                                                <div className="text-center">================================</div>
-                                                <div className="text-xs">CANT  DESCRIPCION     TOTAL</div>
-                                                <div className="text-xs">2     Cemento 50kg   $20.00</div>
-                                                <div className="text-xs">      @$10.00/u</div>
-                                                <div className="text-right font-bold">TOTAL: $20.00</div>
-                                            </>
-                                        )}
-                                        {preset.id === 'minimal' && (
-                                            <>
-                                                <div className="text-center font-bold">MI NEGOCIO</div>
-                                                <div className="text-xs">#001 | 19/12/2025</div>
-                                                <div className="text-center">--------------------------------</div>
-                                                <div className="text-xs">2x Cemento 50kg</div>
-                                                <div className="text-xs text-right">$20.00</div>
-                                                <div className="text-xs">1x Cabilla 3/8</div>
-                                                <div className="text-xs text-right">$12.50</div>
-                                                <div className="text-center">--------------------------------</div>
-                                                <div className="text-right font-bold">TOTAL: $32.50</div>
-                                                <div className="text-center text-xs mt-2">Gracias</div>
-                                            </>
-                                        )}
-                                        {preset.id === 'receipt' && (
-                                            <>
-                                                <div className="text-center font-bold">COMPROBANTE DE VENTA</div>
-                                                <div className="text-center">================================</div>
-                                                <div className="text-xs">Negocio: MI NEGOCIO</div>
-                                                <div className="text-xs">RIF: J-12345678-9</div>
-                                                <div className="text-xs">Fecha: 19/12/2025 15:30</div>
-                                                <div className="text-xs">Comprobante Nro: 001</div>
-                                                <div className="text-center">================================</div>
-                                                <div className="text-xs">Cliente: Juan Pérez</div>
-                                                <div className="text-xs font-bold">DETALLE DE LA VENTA:</div>
-                                                <div className="text-xs">2 Cemento 50kg @$10.00</div>
-                                                <div className="text-xs text-right">$20.00</div>
-                                                <div className="text-right font-bold">TOTAL: $20.00</div>
-                                                <div className="text-xs mt-2">Firma: _____________</div>
-                                            </>
-                                        )}
+                                        {/* Mini Preview Mockup */}
+                                        <div className="mt-4 border p-2 text-[10px] font-mono bg-white text-gray-400 h-32 overflow-hidden relative select-none">
+                                            <div className="absolute inset-0 bg-gradient-to-b from-transparent to-white/90"></div>
+                                            {preset.template.slice(0, 200)}...
+                                        </div>
                                     </div>
+                                    <div className="p-4 bg-gray-50 mt-auto">
+                                        <button
+                                            onClick={() => handleApplyPreset(preset.id)}
+                                            className="w-full py-2 bg-white border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 font-medium transition-colors"
+                                        >
+                                            Aplicar Plantilla
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
 
+                    {/* EDITOR VIEW */}
+                    {activeTab === 'editor' && (
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            {/* Editor Panel */}
+                            <div className="lg:col-span-2">
+                                <div className="mb-2 flex justify-between items-center">
+                                    <label className="text-sm font-medium text-gray-700">Plantilla Jinja2</label>
+                                    <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded">Soporta variables y lógica</span>
+                                </div>
+                                <textarea
+                                    className="w-full h-[500px] p-4 font-mono text-sm bg-gray-900 text-green-400 rounded-lg border focus:ring-2 focus:ring-blue-500 resize-none shadow-inner"
+                                    value={template}
+                                    onChange={(e) => setTemplate(e.target.value)}
+                                    placeholder="Escribe tu plantilla aquí..."
+                                    spellCheck={false}
+                                />
+
+                                <div className="mt-4 flex flex-wrap gap-3">
                                     <button
-                                        onClick={() => handleApplyPreset(preset.id)}
-                                        className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                                        onClick={handleSave}
+                                        disabled={saving}
+                                        className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium shadow-sm active:scale-95 transition-transform"
                                     >
-                                        Usar Esta Plantilla
+                                        {saving ? 'Guardando...' : '💾 Guardar Cambios'}
+                                    </button>
+                                    <button
+                                        onClick={handleTestPrint}
+                                        className="px-6 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 font-medium shadow-sm active:scale-95 transition-transform"
+                                    >
+                                        🖨️ Imprimir Prueba
+                                    </button>
+                                    <button
+                                        onClick={handleReset}
+                                        className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 ml-auto"
+                                    >
+                                        🔄 Reset
                                     </button>
                                 </div>
                             </div>
-                        ))}
-                    </div>
-                </div>
-            )}
 
-            {/* Editor View */}
-            {view === 'editor' && (
-                <div className="grid grid-cols-3 gap-6">
-                    {/* Editor */}
-                    <div className="col-span-2 bg-white rounded-lg shadow-md p-6">
-                        <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                                <FileText size={20} />
-                                Editor de Plantilla
-                            </h2>
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={handleReset}
-                                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition"
-                                >
-                                    Restaurar Defecto
-                                </button>
-                            </div>
-                        </div>
+                            {/* Reference Sidebar */}
+                            <div className="bg-gray-50 rounded-lg p-5 border h-fit sticky top-4">
+                                <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                                    <span>📚</span> Variables Disponibles
+                                </h3>
 
-                        <textarea
-                            value={template}
-                            onChange={(e) => setTemplate(e.target.value)}
-                            className="w-full h-96 p-4 border border-gray-300 rounded-lg font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            placeholder="Escribe tu plantilla aquí..."
-                        />
-
-                        <div className="flex gap-3 mt-4">
-                            <button
-                                onClick={handleSave}
-                                disabled={saving}
-                                className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-6 py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition"
-                            >
-                                <Save size={20} />
-                                {saving ? 'Guardando...' : 'Guardar Configuración'}
-                            </button>
-                            <button
-                                onClick={handleTestPrint}
-                                className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium flex items-center gap-2 transition"
-                            >
-                                <Printer size={20} />
-                                Imprimir Prueba
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Reference Panel */}
-                    <div className="col-span-1 bg-white rounded-lg shadow-md p-6">
-                        <h2 className="text-lg font-semibold text-gray-800 mb-4">Referencia Rápida</h2>
-
-                        <div className="space-y-4">
-                            {/* Variables */}
-                            <div>
-                                <h3 className="font-semibold text-gray-700 mb-2">Variables Disponibles</h3>
-                                <div className="text-sm space-y-1 font-mono">
-                                    <div className="text-blue-600">business.name</div>
-                                    <div className="text-blue-600">business.address</div>
-                                    <div className="text-blue-600">business.phone</div>
-                                    <div className="text-purple-600">sale.id</div>
-                                    <div className="text-purple-600">sale.date</div>
-                                    <div className="text-purple-600">sale.total</div>
-                                    <div className="text-purple-600">sale['items']</div>
-                                </div>
-                            </div>
-
-                            {/* Jinja2 Syntax */}
-                            <div>
-                                <h3 className="font-semibold text-gray-700 mb-2">Sintaxis Jinja2</h3>
-                                <div className="text-sm space-y-2">
-                                    <div className="bg-gray-50 p-2 rounded font-mono text-xs">
-                                        {'{{ variable }}'}
+                                <div className="space-y-4 text-sm font-mono text-gray-600 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+                                    <div>
+                                        <p className="font-bold text-blue-600 mb-1">Negocio</p>
+                                        <ul className="list-disc pl-4 space-y-0.5">
+                                            <li>business.name</li>
+                                            <li>business.address</li>
+                                            <li>business.phone</li>
+                                            <li>business.document_id</li>
+                                        </ul>
                                     </div>
-                                    <div className="bg-gray-50 p-2 rounded font-mono text-xs">
-                                        {'{% if condition %}...{% endif %}'}
+
+                                    <div>
+                                        <p className="font-bold text-blue-600 mb-1">Venta</p>
+                                        <ul className="list-disc pl-4 space-y-0.5">
+                                            <li>sale.id</li>
+                                            <li>sale.date</li>
+                                            <li>sale.total</li>
+                                            <li>sale.is_credit</li>
+                                            <li>sale.customer.name</li>
+                                        </ul>
                                     </div>
-                                    <div className="bg-gray-50 p-2 rounded font-mono text-xs">
-                                        {'{% for item in sale[\'items\'] %}...{% endfor %}'}
+
+                                    <div>
+                                        <p className="font-bold text-blue-600 mb-1">Items (Bucle)</p>
+                                        <div className="bg-gray-200 p-2 rounded text-xs mb-1">
+                                            {'start_loop item in sale.items end_loop'}
+                                        </div>
+                                        <ul className="list-disc pl-4 space-y-0.5">
+                                            <li>item.product.name</li>
+                                            <li>item.quantity</li>
+                                            <li>item.unit_price</li>
+                                            <li>item.subtotal</li>
+                                        </ul>
+                                    </div>
+
+                                    <div>
+                                        <p className="font-bold text-blue-600 mb-1">Formateo $</p>
+                                        <div className="bg-gray-200 p-2 rounded text-xs text-gray-500">
+                                            {'{{ "%.2f"|format(valor) }}'}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-
-                            {/* Format Tags */}
-                            <div>
-                                <h3 className="font-semibold text-gray-700 mb-2">Tags de Formato</h3>
-                                <div className="text-sm space-y-1">
-                                    <div className="font-mono text-xs">&lt;center&gt;...&lt;/center&gt;</div>
-                                    <div className="font-mono text-xs">&lt;left&gt;...&lt;/left&gt;</div>
-                                    <div className="font-mono text-xs">&lt;right&gt;...&lt;/right&gt;</div>
-                                    <div className="font-mono text-xs">&lt;bold&gt;...&lt;/bold&gt;</div>
-                                    <div className="font-mono text-xs">&lt;cut&gt;</div>
-                                </div>
-                            </div>
                         </div>
-                    </div>
-                </div>
+                    )}
+                </>
             )}
         </div>
     );
