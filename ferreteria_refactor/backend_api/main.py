@@ -32,6 +32,37 @@ app = FastAPI(
     },
 )
 
+from .config import settings
+
+@app.on_event("startup")
+async def startup_event():
+    print("\n" + "="*60)
+    print("🚀 FERRETERÍA API INICIADA")
+    
+    # Mostrar URL de base de datos (ocultando password)
+    db_url = settings.DATABASE_URL
+    safe_msg = ""
+    
+    if "sqlite" in db_url:
+        safe_msg = f"SQLite: {db_url.replace('sqlite:///', '')}"
+    elif "@" in db_url:
+        try:
+            safe_msg = f"PostgreSQL: {db_url.split('@')[1]}"
+        except:
+            safe_msg = db_url
+    else:
+        safe_msg = db_url
+        
+    print(f"📊 CONECTADO A BASE DE DATOS: {safe_msg}")
+    
+    # DEBUG: Print all routes
+    print("\n🛣️ RUTAS REGISTRADAS:")
+    for route in app.routes:
+        if hasattr(route, "path"):
+            print(f"  - {route.path} [{','.join(route.methods) if hasattr(route, 'methods') else ''}]")
+            
+    print("="*60 + "\n")
+
 # License Guard Middleware (DEBE IR PRIMERO)
 app.add_middleware(LicenseGuardMiddleware)
 

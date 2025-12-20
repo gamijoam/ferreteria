@@ -205,11 +205,13 @@ def update_business_info(
 @router.post("/test-print")
 def test_print_ticket(db: Session = Depends(get_db)):
     """Send test ticket to hardware bridge"""
+    print("DEBUG: /test-print endpoint hit") # Debug log
     # Get template
     template_config = db.query(models.BusinessConfig).get("ticket_template")
     if not template_config or not template_config.value:
-        raise HTTPException(status_code=404, detail="No ticket template configured")
-    
+        pass # Allow testing even without saved template (use default if needed) or raise
+        # For now, let's just proceed to verify endpoint works
+        
     # Get business info
     business_info = get_business_info(db)
     
@@ -257,10 +259,13 @@ def test_print_ticket(db: Session = Depends(get_db)):
     
     # Send to hardware bridge
     try:
+        # Check if template is present
+        template_content = template_config.value if (template_config and template_config.value) else "NOTE: No template saved. This is a test."
+        
         response = requests.post(
             "http://localhost:5001/print",
             json={
-                "template": template_config.value,
+                "template": template_content,
                 "context": context
             },
             timeout=5
