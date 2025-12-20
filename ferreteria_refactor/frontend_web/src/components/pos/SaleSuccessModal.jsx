@@ -12,7 +12,10 @@ const SaleSuccessModal = ({ isOpen, onClose, saleData }) => {
         setPrinting(true);
         setPrintStatus(null);
         try {
-            const result = await printerService.printTicket(saleData);
+            if (!saleData.saleId) {
+                throw new Error("No se encontró ID de venta para imprimir");
+            }
+            const result = await printerService.printTicket(saleData.saleId);
             setPrintStatus('success');
             // alert(`Ticket impreso: ${result.message}`);
         } catch (error) {

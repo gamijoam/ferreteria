@@ -122,14 +122,16 @@ const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onCon
 
             // ... (inside handleConfirm)
 
-            await apiClient.post('/products/sales/', saleData);
+            const response = await apiClient.post('/products/sales/', saleData);
+            const saleId = response.data.sale_id;
 
             onConfirm({
                 payments: isCreditSale ? [] : payments,
                 totalPaidUSD: isCreditSale ? 0 : totalPaidUSD,
                 changeUSD: isCreditSale ? 0 : (changeUSD > 0 ? changeUSD : 0),
                 isCreditSale,
-                customer: isCreditSale ? selectedCustomer : null
+                customer: isCreditSale ? selectedCustomer : null,
+                saleId: saleId
             });
 
             setProcessing(false);

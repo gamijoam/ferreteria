@@ -354,7 +354,8 @@ const POS = () => {
             cart: [...cart], // Copy cart
             totalUSD,
             totalBs,
-            paymentData
+            paymentData,
+            saleId: paymentData.saleId // NEW: Capture sale ID for printing
         });
 
         // Don't clear cart immediately, wait for user to close success modal
