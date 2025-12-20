@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import apiClient from '../../services/api';
+import apiClient from '../../config/axios';
 
 const TicketConfig = () => {
     const [activeTab, setActiveTab] = useState('gallery'); // 'gallery' or 'editor'
@@ -22,7 +22,7 @@ Cliente: {{ sale.customer.name if sale.customer else "Consumidor Final" }}
 ================================
 CANT   PRODUCTO         TOTAL
 --------------------------------
-{% for item in sale.items %}
+{% for item in sale.products %}
 {{ item.quantity }} x {{ item.product.name }}
        {{ item.unit_price }} = {{ item.subtotal }}
 {% endfor %}
@@ -125,8 +125,8 @@ TOTAL:       {{ sale.total }}
                 <button
                     onClick={() => setActiveTab('gallery')}
                     className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'gallery'
-                            ? 'bg-blue-600 text-white shadow-md'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        ? 'bg-blue-600 text-white shadow-md'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                         }`}
                 >
                     🖼️ Galería de Plantillas
@@ -134,8 +134,8 @@ TOTAL:       {{ sale.total }}
                 <button
                     onClick={() => setActiveTab('editor')}
                     className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === 'editor'
-                            ? 'bg-blue-600 text-white shadow-md'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        ? 'bg-blue-600 text-white shadow-md'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                         }`}
                 >
                     📝 Editor de Código (Jinja2)
@@ -161,10 +161,29 @@ TOTAL:       {{ sale.total }}
                                         <h3 className="font-bold text-lg text-gray-800">{preset.name}</h3>
                                         <p className="text-sm text-gray-500 mt-1">{preset.description}</p>
 
-                                        {/* Mini Preview Mockup */}
-                                        <div className="mt-4 border p-2 text-[10px] font-mono bg-white text-gray-400 h-32 overflow-hidden relative select-none">
-                                            <div className="absolute inset-0 bg-gradient-to-b from-transparent to-white/90"></div>
-                                            {preset.template.slice(0, 200)}...
+                                        {/* Visual Preview */}
+                                        <div className="mt-4 border p-3 text-[10px] font-mono bg-white text-gray-700 h-48 overflow-hidden relative select-none shadow-inner rounded leading-tight">
+                                            <div className="absolute inset-0 z-10 bg-gradient-to-b from-transparent via-transparent to-white pointer-events-none"></div>
+                                            {/* Simulate Render */}
+                                            <div style={{ whiteSpace: 'pre-wrap' }}>
+                                                {preset.template
+                                                    .replace(/{{ business.name }}/g, "MI FERRETERÍA")
+                                                    .replace(/{{ business.address }}/g, "Calle 1, Local 1")
+                                                    .replace(/{{ business.document_id }}/g, "J-12345678")
+                                                    .replace(/{{ business.phone }}/g, "0414-1234567")
+                                                    .replace(/{{ sale.date }}/g, "19/12/2025")
+                                                    .replace(/{{ sale.id }}/g, "1001")
+                                                    .replace(/{{ sale.customer.name.*}}/g, "Juan Pérez")
+                                                    .replace(/{% if sale.is_credit %}[\s\S]*?{% endif %}/g, "") // Hide conditional blocks for preview simplicity
+                                                    .replace(/{% for item in sale.products %}[\s\S]*?{% endfor %}/g,
+                                                        "1.0 x Cemento Gris\n       $12.00 = $12.00\n2.0 x Cabilla 1/2\n       $5.00 = $10.00"
+                                                    )
+                                                    .replace(/{{ sale.total }}/g, "$22.00")
+                                                    .replace(/{{ "\$%.2f"\|format\(sale.total\) }}/g, "$22.00")
+                                                    .replace(/{{ "\$%.2f"\|format\(item.unit_price\) }}/g, "$12.00")
+                                                    .replace(/{{ "\$%.2f"\|format\(item.subtotal\) }}/g, "$12.00")
+                                                }
+                                            </div>
                                         </div>
                                     </div>
                                     <div className="p-4 bg-gray-50 mt-auto">
@@ -251,7 +270,7 @@ TOTAL:       {{ sale.total }}
                                     <div>
                                         <p className="font-bold text-blue-600 mb-1">Items (Bucle)</p>
                                         <div className="bg-gray-200 p-2 rounded text-xs mb-1">
-                                            {'start_loop item in sale.items end_loop'}
+                                            {'start_loop item in sale.products end_loop'}
                                         </div>
                                         <ul className="list-disc pl-4 space-y-0.5">
                                             <li>item.product.name</li>

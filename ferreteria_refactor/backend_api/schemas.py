@@ -607,14 +607,14 @@ class SupplierStatsResponse(BaseModel):
         from_attributes = True
 
 class BusinessInfo(BaseModel):
-    name: Optional[str] = ""
-    document_id: Optional[str] = "" # RIF/NIT/Etc
-    address: Optional[str] = ""
-    phone: Optional[str] = ""
-    email: Optional[str] = ""
-    website: Optional[str] = ""
-    logo_url: Optional[str] = "" # URL for displayed logo
-    ticket_template: Optional[str] = ""  # NEW: Jinja2 template for tickets
+    name: Optional[str] = None
+    document_id: Optional[str] = None # RIF/NIT/Etc
+    address: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    website: Optional[str] = None
+    logo_url: Optional[str] = None # URL for displayed logo
+    ticket_template: Optional[str] = None  # NEW: Jinja2 template for tickets
 
 # ========================
 # Audit Log Schemas

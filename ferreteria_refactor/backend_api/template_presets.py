@@ -17,7 +17,7 @@ Vence: {{ sale.due_date }}
 ================================
 CANT   PRODUCTO         TOTAL
 --------------------------------
-{% for item in sale.items %}
+{% for item in sale.products %}
 {{ "%.1f"|format(item.quantity) }} x {{ item.product.name }}
        {{ "$%.2f"|format(item.unit_price) }} = {{ "$%.2f"|format(item.subtotal) }}
 {% endfor %}
@@ -45,7 +45,7 @@ DOC: {{ sale.customer.id_number if sale.customer else "" }}
 
 ITEMS
 ----------------------------------
-{% for item in sale.items %}
+{% for item in sale.products %}
 * {{ item.product.name }}
   {{ item.quantity }} x {{ "$%.2f"|format(item.unit_price) }} ...... {{ "$%.2f"|format(item.subtotal) }}
 {% endfor %}
@@ -70,7 +70,7 @@ def get_detailed_template() -> str:
 Venta: #{{ sale.id }}
 Fecha: {{ sale.date }}
 --------------------------------
-{% for item in sale.items %}
+{% for item in sale.products %}
 [{{ item.product.sku }}] {{ item.product.name }}
 Cant: {{ item.quantity }}   Precio: {{ "$%.2f"|format(item.unit_price) }}
 Subtotal: {{ "$%.2f"|format(item.subtotal) }}
@@ -86,7 +86,7 @@ def get_minimal_template() -> str:
 Ticket #{{ sale.id }}
 {{ sale.date }}
 --------------------------------
-{% for item in sale.items %}
+{% for item in sale.products %}
 {{ item.quantity }} {{ item.product.name[:20] }} {{ "$%.2f"|format(item.subtotal) }}
 {% endfor %}
 --------------------------------

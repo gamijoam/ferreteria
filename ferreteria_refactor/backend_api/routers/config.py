@@ -256,6 +256,8 @@ def test_print_ticket(db: Session = Depends(get_db)):
             ]
         }
     }
+    # Add alias 'products' to avoid Jinja collision with dict.items()
+    context["sale"]["products"] = context["sale"]["items"]
     
     # Send to hardware bridge
     try:

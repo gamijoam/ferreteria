@@ -271,6 +271,9 @@ def print_sale_ticket(sale_id: int):
     Sends sale data to hardware bridge for printing
     """
     from ..database.db import SessionLocal
+    import json # For debug dumping
+    
+    print(f"🖨️ START PRINT JOB: Sale #{sale_id}")
     
     # Create new database session for background task
     db = SessionLocal()
@@ -286,13 +289,18 @@ def print_sale_ticket(sale_id: int):
         business_config = {}
         configs = db.query(models.BusinessConfig).all()
         for config in configs:
+            # print(f"DEBUG DB: {config.key} = {config.value}") 
             business_config[config.key] = config.value
+            
+        print(f"   Loaded {len(business_config)} config keys. Business Name: '{business_config.get('business_name')}'")
         
         # Get ticket template
         template = business_config.get('ticket_template')
         if not template:
             print("⚠️  No ticket template configured, skipping print")
             return
+            
+        print(f"   Template found (len={len(template)})")
         
         # Build context for template
         context = {
@@ -320,12 +328,21 @@ def print_sale_ticket(sale_id: int):
                         "unit_price": float(item.unit_price),
                         "subtotal": float(item.subtotal)
                     }
-                    for item in sale.items
+                    for item in sale.details
                 ]
             }
         }
+        # Add alias 'products' to avoid Jinja collision with dict.items()
+        context["sale"]["products"] = context["sale"]["items"]
+        
+        print("   Context built successfully")
         
         # Send to hardware bridge
+        print(f"   Sending to http://localhost:5001/print...")
+        
+        # DEBUG: Print payload preview
+        # print(json.dumps(context, indent=2, default=str)) 
+        
         response = requests.post(
             "http://localhost:5001/print",
             json={
@@ -335,14 +352,18 @@ def print_sale_ticket(sale_id: int):
             timeout=5
         )
         
+        print(f"   Bridge Response: {response.status_code} - {response.text}")
+        
         if response.status_code == 200:
             print(f"✅ Ticket printed for sale #{sale_id}")
         else:
             print(f"⚠️  Print failed for sale #{sale_id}: {response.text}")
             
     except requests.exceptions.ConnectionError:
-        print("⚠️  Hardware bridge not available (port 5001)")
+        print("❌ BRIDGE ERROR: Hardware bridge not available (port 5001)")
     except Exception as e:
-        print(f"❌ Error printing ticket for sale #{sale_id}: {str(e)}")
+        print(f"❌ PRINT EXCEPTION: {str(e)}")
+        import traceback
+        traceback.print_exc()
     finally:
         db.close()
