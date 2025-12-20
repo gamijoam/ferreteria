@@ -31,7 +31,7 @@ const ReturnsManager = () => {
 
     const checkCashSession = async () => {
         try {
-            const response = await apiClient.get('/cash/active');
+            const response = await apiClient.get('/cash/sessions/current');
             setCashSessionOpen(response.data.status === 'OPEN');
         } catch (error) {
             setCashSessionOpen(false);
@@ -236,7 +236,7 @@ const ReturnsManager = () => {
                                                     <td className="p-4 font-medium">#{sale.id}</td>
                                                     <td className="p-4">{new Date(sale.date).toLocaleDateString()}</td>
                                                     <td className="p-4">{sale.customer?.name || 'Cliente General'}</td>
-                                                    <td className="p-4 text-right font-bold">${sale.total_amount.toFixed(2)}</td>
+                                                    <td className="p-4 text-right font-bold">${Number(sale.total_amount).toFixed(2)}</td>
                                                     <td className="p-4 text-right">
                                                         <button
                                                             onClick={() => handleSelectSale(sale)}
@@ -382,7 +382,7 @@ const ReturnsManager = () => {
                                         <option value="">Cargando monedas...</option>
                                     ) : (
                                         currencies.map(currency => (
-                                            <option key={currency.symbol} value={currency.symbol}>
+                                            <option key={currency.id} value={currency.symbol}>
                                                 {currency.symbol} - {currency.name}
                                             </option>
                                         ))

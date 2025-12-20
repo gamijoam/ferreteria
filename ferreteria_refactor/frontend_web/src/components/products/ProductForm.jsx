@@ -165,14 +165,28 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
     };
 
     const handleSubmit = () => {
+        // Validation
+        if (!formData.name.trim()) {
+            alert('El nombre del producto es obligatorio');
+            return;
+        }
+        if (parseFloat(formData.price) <= 0 || isNaN(parseFloat(formData.price))) {
+            alert('El precio debe ser mayor a 0');
+            return;
+        }
+        if (isNaN(parseFloat(formData.stock))) {
+            alert('El stock debe ser un número válido');
+            return;
+        }
+
         const payload = {
             name: formData.name,
             sku: formData.sku,
             category_id: parseInt(formData.category_id) || null,
-            cost_price: parseFloat(formData.cost),
+            cost_price: parseFloat(formData.cost) || 0,
             price: parseFloat(formData.price),
-            stock: parseFloat(formData.stock),
-            min_stock: parseFloat(formData.min_stock),
+            stock: parseFloat(formData.stock) || 0,
+            min_stock: parseFloat(formData.min_stock) || 0,
             unit_type: formData.unit_type,
             location: formData.location,
             exchange_rate_id: formData.exchange_rate_id ? parseInt(formData.exchange_rate_id) : null,  // Parse as integer

@@ -108,9 +108,9 @@ const CreatePurchase = () => {
                 product_id: product.id,
                 product_name: product.name,
                 quantity: 1,
-                unit_cost: product.cost_price || 0,
-                original_cost: product.cost_price || 0,
-                subtotal: product.cost_price || 0
+                unit_cost: Number(product.cost_price) || 0,
+                original_cost: Number(product.cost_price) || 0,
+                subtotal: Number(product.cost_price) || 0
             }]);
         }
 

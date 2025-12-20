@@ -125,7 +125,7 @@ const PurchaseDetail = () => {
                     </div>
                     <div>
                         <p className="text-sm text-gray-600">Total</p>
-                        <p className="font-bold text-lg">${purchase.total_amount.toFixed(2)}</p>
+                        <p className="font-bold text-lg">${Number(purchase.total_amount).toFixed(2)}</p>
                     </div>
                 </div>
             </div>
@@ -135,13 +135,13 @@ const PurchaseDetail = () => {
                 <div className="bg-blue-50 rounded-lg p-4 border-2 border-blue-200">
                     <p className="text-sm text-blue-700 mb-1">Total Factura</p>
                     <p className="text-2xl font-bold text-blue-800">
-                        ${purchase.total_amount.toFixed(2)}
+                        ${Number(purchase.total_amount).toFixed(2)}
                     </p>
                 </div>
                 <div className="bg-green-50 rounded-lg p-4 border-2 border-green-200">
                     <p className="text-sm text-green-700 mb-1">Pagado</p>
                     <p className="text-2xl font-bold text-green-800">
-                        ${purchase.paid_amount.toFixed(2)}
+                        ${Number(purchase.paid_amount || 0).toFixed(2)}
                     </p>
                 </div>
                 <div className={`rounded-lg p-4 border-2 ${balance > 0 ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200'
@@ -198,7 +198,7 @@ const PurchaseDetail = () => {
                                     <td className="p-4">{payment.payment_method}</td>
                                     <td className="p-4">{payment.reference || '-'}</td>
                                     <td className="p-4 text-right font-bold text-green-600">
-                                        ${payment.amount.toFixed(2)}
+                                        ${Number(payment.amount).toFixed(2)}
                                     </td>
                                 </tr>
                             ))
