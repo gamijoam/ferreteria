@@ -280,6 +280,9 @@ def test_print_ticket(db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Print error: {str(e)}")
 
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Print error: {str(e)}")
+
 # ========================================
 # TEMPLATE PRESETS
 # ========================================
@@ -287,20 +290,8 @@ def test_print_ticket(db: Session = Depends(get_db)):
 @router.get("/ticket-templates/presets")
 def get_template_presets():
     """Get all available template presets"""
+    from ..template_presets import get_all_presets
     return get_all_presets()
-
-@router.get("/ticket-templates/presets/{preset_id}")
-def get_template_preset(preset_id: str):
-    """Get a specific template preset by ID"""
-    preset = get_preset_by_id(preset_id)
-    if not preset:
-        raise HTTPException(status_code=404, detail="Template preset not found")
-    return {
-        "id": preset_id,
-        "name": preset["name"],
-        "description": preset["description"],
-        "template": preset["template"]
-    }
 
 @router.post("/ticket-templates/apply/{preset_id}")
 def apply_template_preset(
@@ -309,6 +300,8 @@ def apply_template_preset(
     user: Any = Depends(admin_only)
 ):
     """Apply a template preset to business configuration"""
+    from ..template_presets import get_preset_by_id
+    
     preset = get_preset_by_id(preset_id)
     if not preset:
         raise HTTPException(status_code=404, detail="Template preset not found")

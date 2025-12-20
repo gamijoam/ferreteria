@@ -1,177 +1,129 @@
-"""
-Template Presets for Ticket Printing
-Provides 5 predefined templates for easy selection
-"""
+from typing import List, Dict
 
-# Using sale['items'] notation to avoid Jinja2 dict.items() conflict
-
-TEMPLATE_PRESETS = {
-    "classic": {
-        "name": "Clásico",
-        "description": "Diseño tradicional simple y limpio",
-        "preview_image": "classic_preview.png",
-        "template": """<center><bold>{{ business.name }}</bold></center>
-<center>{{ business.address }}</center>
-<center>RIF: {{ business.document_id }}</center>
-<center>Tel: {{ business.phone }}</center>
-<center>================================</center>
-Fecha: {{ sale.date }}
-Factura: #{{ sale.id }}
-{% if sale.customer %}
-Cliente: {{ sale.customer.name }}
-{% endif %}
-{% if sale.is_credit %}
-<center><bold>*** A CREDITO ***</bold></center>
-<center>Saldo: ${{ sale.balance }}</center>
-{% endif %}
-<center>================================</center>
-{% for item in sale['items'] %}
-{{ item.product.name }}
-  {{ item.quantity }} x ${{ item.unit_price }} = ${{ item.subtotal }}
-{% endfor %}
-<center>================================</center>
-<right><bold>TOTAL: ${{ sale.total }}</bold></right>
-<center>================================</center>
-<center>Gracias por su compra</center>
-<center>{{ business.name }}</center>
-<cut>"""
-    },
-    
-    "modern": {
-        "name": "Moderno",
-        "description": "Diseño minimalista y elegante",
-        "preview_image": "modern_preview.png",
-        "template": """<center><bold>{{ business.name }}</bold></center>
-<center>{{ business.address }} | {{ business.phone }}</center>
-<center>--------------------------------</center>
-#{{ sale.id }} | {{ sale.date }}{% if sale.customer %} | {{ sale.customer.name }}{% endif %}
-<center>--------------------------------</center>
-{% for item in sale['items'] %}
-{{ item.product.name }}
-<right>{{ item.quantity }} x ${{ item.unit_price }} = ${{ item.subtotal }}</right>
-{% endfor %}
-<center>--------------------------------</center>
-<right><bold>TOTAL: ${{ sale.total }}</bold></right>
-{% if sale.is_credit %}
-<right>Saldo: ${{ sale.balance }}</right>
-{% endif %}
-<center>--------------------------------</center>
-<center>Gracias por preferirnos</center>
-<cut>"""
-    },
-    
-    "detailed": {
-        "name": "Detallado",
-        "description": "Con toda la información completa",
-        "preview_image": "detailed_preview.png",
-        "template": """<center>================================</center>
-<center><bold>{{ business.name }}</bold></center>
-<center>================================</center>
+def get_classic_template() -> str:
+    return """=== TICKET DE VENTA ===
+{{ business.name }}
 {{ business.address }}
 RIF: {{ business.document_id }}
 Tel: {{ business.phone }}
-{% if business.email %}Email: {{ business.email }}{% endif %}
-<center>================================</center>
-<bold>FACTURA: #{{ sale.id }}</bold>
-FECHA: {{ sale.date }}
-{% if sale.customer %}
-CLIENTE: {{ sale.customer.name }}
-{% if sale.customer.id_number %}CI/RIF: {{ sale.customer.id_number }}{% endif %}
-{% endif %}
-<center>================================</center>
-CANT  DESCRIPCION           TOTAL
-<center>--------------------------------</center>
-{% for item in sale['items'] %}
-{{ item.quantity }}     {{ item.product.name }}
-      @${{ item.unit_price }}/u      ${{ item.subtotal }}
-{% endfor %}
-<center>================================</center>
-<right>SUBTOTAL: ${{ sale.total }}</right>
-{% if sale.is_credit %}
-<right><bold>CREDITO</bold></right>
-<right>Saldo: ${{ sale.balance }}</right>
-{% endif %}
-<center>================================</center>
-<right><bold>TOTAL: ${{ sale.total }}</bold></right>
-<center>================================</center>
-<center>Gracias por su compra</center>
-<center>{{ business.name }}</center>
-<cut>"""
-    },
-    
-    "minimal": {
-        "name": "Minimalista",
-        "description": "Solo lo esencial, ultra compacto",
-        "preview_image": "minimal_preview.png",
-        "template": """<center><bold>{{ business.name }}</bold></center>
-#{{ sale.id }} | {{ sale.date }}
-<center>--------------------------------</center>
-{% for item in sale['items'] %}
-{{ item.quantity }}x {{ item.product.name }}
-<right>${{ item.subtotal }}</right>
-{% endfor %}
-<center>--------------------------------</center>
-<right><bold>TOTAL: ${{ sale.total }}</bold></right>
-{% if sale.is_credit %}
-<right>Saldo: ${{ sale.balance }}</right>
-{% endif %}
-<center>Gracias</center>
-<cut>"""
-    },
-    
-    "receipt": {
-        "name": "Comprobante",
-        "description": "Formato de comprobante oficial",
-        "preview_image": "receipt_preview.png",
-        "template": """<center><bold>COMPROBANTE DE VENTA</bold></center>
-<center>================================</center>
-Negocio: {{ business.name }}
-RIF: {{ business.document_id }}
-Dirección: {{ business.address }}
-Tel: {{ business.phone }}
-<center>================================</center>
+================================
 Fecha: {{ sale.date }}
-Comprobante Nro: {{ sale.id }}
-<center>================================</center>
-{% if sale.customer %}
-Cliente: {{ sale.customer.name }}
-{% if sale.customer.id_number %}CI/RIF: {{ sale.customer.id_number }}{% endif %}
-<center>================================</center>
-{% endif %}
-<bold>DETALLE DE LA VENTA:</bold>
-{% for item in sale['items'] %}
-{{ item.quantity }} {{ item.product.name }}
-  @${{ item.unit_price }}
-<right>${{ item.subtotal }}</right>
-{% endfor %}
-<center>================================</center>
-<right><bold>TOTAL: ${{ sale.total }}</bold></right>
+Factura: #{{ sale.id }}
+Cliente: {{ sale.customer.name if sale.customer else "Consumidor Final" }}
 {% if sale.is_credit %}
-<center>--------------------------------</center>
-<center><bold>VENTA A CREDITO</bold></center>
-<right>Saldo Pendiente: ${{ sale.balance }}</right>
+CONDICION: A CREDITO
+Vence: {{ sale.due_date }}
 {% endif %}
-<center>================================</center>
-<center>Firma del Cliente</center>
-_______________________________
-<center>================================</center>
-<center>Gracias por su compra</center>
-<cut>"""
-    }
-}
+================================
+CANT   PRODUCTO         TOTAL
+--------------------------------
+{% for item in sale.items %}
+{{ "%.1f"|format(item.quantity) }} x {{ item.product.name }}
+       {{ "$%.2f"|format(item.unit_price) }} = {{ "$%.2f"|format(item.subtotal) }}
+{% endfor %}
+================================
+SUBTOTAL:       {{ "$%.2f"|format(sale.total) }}
+{% if sale.discount > 0 %}
+DESCUENTO:     -{{ "$%.2f"|format(sale.discount) }}
+{% endif %}
+TOTAL A PAGAR:  {{ "$%.2f"|format(sale.total) }}
+================================
+      Gracias por su compra
+"""
 
-def get_preset_by_id(preset_id: str):
-    """Get a template preset by ID"""
-    return TEMPLATE_PRESETS.get(preset_id)
+def get_modern_template() -> str:
+    return """
+           {{ business.name }}
+   {{ business.address }}
+----------------------------------
+       TICKET DE VENTA #{{ sale.id }}
+----------------------------------
+{{ sale.date }}
 
-def get_all_presets():
-    """Get all available template presets"""
-    return {
-        preset_id: {
-            "id": preset_id,
-            "name": preset["name"],
-            "description": preset["description"],
-            "preview_image": preset.get("preview_image")
+CLIENTE: {{ sale.customer.name if sale.customer else "CLIENTE GENERAL" }}
+DOC: {{ sale.customer.id_number if sale.customer else "" }}
+
+ITEMS
+----------------------------------
+{% for item in sale.items %}
+* {{ item.product.name }}
+  {{ item.quantity }} x {{ "$%.2f"|format(item.unit_price) }} ...... {{ "$%.2f"|format(item.subtotal) }}
+{% endfor %}
+----------------------------------
+TOTAL ......... {{ "$%.2f"|format(sale.total) }}
+----------------------------------
+{% if sale.is_credit %}
+*** CUENTA POR COBRAR ***
+Saldo Pendiente: {{ "$%.2f"|format(sale.balance) }}
+{% else %}
+*** PAGADO ***
+{% endif %}
+
+      ¡VUELVA PRONTO!
+"""
+
+def get_detailed_template() -> str:
+    return """================================
+{{ business.name }}
+{{ business.document_id }}
+--------------------------------
+Venta: #{{ sale.id }}
+Fecha: {{ sale.date }}
+--------------------------------
+{% for item in sale.items %}
+[{{ item.product.sku }}] {{ item.product.name }}
+Cant: {{ item.quantity }}   Precio: {{ "$%.2f"|format(item.unit_price) }}
+Subtotal: {{ "$%.2f"|format(item.subtotal) }}
+- - - - - - - - - - - - - - - -
+{% endfor %}
+================================
+TOTAL: {{ "$%.2f"|format(sale.total) }}
+================================
+"""
+
+def get_minimal_template() -> str:
+    return """{{ business.name }}
+Ticket #{{ sale.id }}
+{{ sale.date }}
+--------------------------------
+{% for item in sale.items %}
+{{ item.quantity }} {{ item.product.name[:20] }} {{ "$%.2f"|format(item.subtotal) }}
+{% endfor %}
+--------------------------------
+TOTAL: {{ "$%.2f"|format(sale.total) }}
+"""
+
+def get_all_presets() -> List[Dict[str, str]]:
+    return [
+        {
+            "id": "classic",
+            "name": "Clásico",
+            "description": "Formato estándar balanceado",
+            "template": get_classic_template()
+        },
+        {
+            "id": "modern",
+            "name": "Moderno", 
+            "description": "Diseño limpio y centrado",
+            "template": get_modern_template()
+        },
+        {
+            "id": "detailed",
+            "name": "Detallado",
+            "description": "Incluye códigos y detalles línea por línea",
+            "template": get_detailed_template()
+        },
+        {
+            "id": "minimal",
+            "name": "Minimalista",
+            "description": "Ahorra papel, solo información esencial",
+            "template": get_minimal_template()
         }
-        for preset_id, preset in TEMPLATE_PRESETS.items()
-    }
+    ]
+
+def get_preset_by_id(preset_id: str) -> Dict[str, str]:
+    presets = get_all_presets()
+    for p in presets:
+        if p["id"] == preset_id:
+            return p
+    return None

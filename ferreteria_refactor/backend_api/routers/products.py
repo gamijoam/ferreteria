@@ -304,10 +304,27 @@ def get_sale_detail(sale_id: int, db: Session = Depends(get_db)):
         joinedload(models.Sale.payments)
     ).filter(models.Sale.id == sale_id).first()
     
+    
     if not sale:
         raise HTTPException(status_code=404, detail="Sale not found")
     
     return sale
+
+@router.post("/sales/{sale_id}/print")
+def print_sale_endpoint(sale_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """Manually trigger ticket printing for a sale"""
+    # Verify sale exists first
+    sale = db.query(models.Sale).filter(models.Sale.id == sale_id).first()
+    if not sale:
+        raise HTTPException(status_code=404, detail="Sale not found")
+        
+    # Import service to avoid circular dependency at module level
+    from ..services.sales_service import print_sale_ticket
+    
+    # Add to background tasks
+    background_tasks.add_task(print_sale_ticket, sale_id)
+    
+    return {"status": "success", "message": "Ticket printing queued"}
 
 @router.post("/sales/payments")
 def register_sale_payment(
