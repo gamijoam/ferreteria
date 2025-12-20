@@ -261,15 +261,20 @@ class SalesService:
             })
             
             # AUTO-PRINT TICKET
-            background_tasks.add_task(print_sale_ticket, db, new_sale.id)
+            background_tasks.add_task(print_sale_ticket, new_sale.id)
             
         return {"status": "success", "sale_id": new_sale.id}
 
-def print_sale_ticket(db: Session, sale_id: int):
+def print_sale_ticket(sale_id: int):
     """
     Print ticket for a completed sale
     Sends sale data to hardware bridge for printing
     """
+    from ..database.db import SessionLocal
+    
+    # Create new database session for background task
+    db = SessionLocal()
+    
     try:
         # Get sale with all relationships
         sale = db.query(models.Sale).filter(models.Sale.id == sale_id).first()
@@ -339,3 +344,5 @@ def print_sale_ticket(db: Session, sale_id: int):
         print("⚠️  Hardware bridge not available (port 5001)")
     except Exception as e:
         print(f"❌ Error printing ticket for sale #{sale_id}: {str(e)}")
+    finally:
+        db.close()
