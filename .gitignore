@@ -15,7 +15,8 @@ venv.bak/
 # Distribution / Build
 build/
 dist/
-!frontend_web/dist/
+!ferreteria_refactor/frontend_web/dist/
+
 
 # IDEs
 .vscode/
