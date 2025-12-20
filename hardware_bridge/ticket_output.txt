@@ -4,15 +4,17 @@ SIN DIRECCION
 RIF: 414141                                     
 Tel: 12121                                      
 ================================                
-Fecha: 20/12/2025 12:14                         
-Factura: #18                                    
+Fecha: 20/12/2025 17:17                         
+Factura: #22                                    
 Cliente: Consumidor Final                       
 ================================                
 CANT   PRODUCTO         TOTAL                   
 --------------------------------                
-1.0 x Kit Básico Albañil                        
-       22.0 = 22.0                              
+1.0 x Taladro Percutor 600W                     
+       65.0 = 65.0                              
+1.0 x Martillo Carpintero 16oz                  
+       12.5 = 12.5                              
 ================================                
-TOTAL:       22.0                               
+TOTAL:       77.5                               
 ================================                
       Gracias por su compra                     

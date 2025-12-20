@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, Package } from 'lucide-react';
+import { Plus, Search, Package, Filter, X } from 'lucide-react';
 import ProductForm from '../components/products/ProductForm';
 import { useConfig } from '../context/ConfigContext';
 import { useWebSocket } from '../context/WebSocketContext';
@@ -22,6 +22,12 @@ const Products = () => {
     const [products, setProducts] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
 
+    // Filters State
+    const [categories, setCategories] = useState([]);
+    const [exchangeRates, setExchangeRates] = useState([]);
+    const [filterCategory, setFilterCategory] = useState('');
+    const [filterExchangeRate, setFilterExchangeRate] = useState('');
+
     const fetchProducts = async () => {
         try {
             const response = await apiClient.get('/products/');
@@ -33,8 +39,22 @@ const Products = () => {
         }
     };
 
+    const fetchFilters = async () => {
+        try {
+            const [catRes, rateRes] = await Promise.all([
+                apiClient.get('/categories'),
+                apiClient.get('/config/exchange-rates', { params: { is_active: true } })
+            ]);
+            setCategories(catRes.data);
+            setExchangeRates(rateRes.data);
+        } catch (error) {
+            console.error("Error fetching filters:", error);
+        }
+    };
+
     useEffect(() => {
         fetchProducts();
+        fetchFilters();
 
         // WebSocket Subscriptions
         const unsubCreate = subscribe('product:created', (newProduct) => {
@@ -74,9 +94,9 @@ const Products = () => {
                 </button>
             </div>
 
-            {/* Filters */}
-            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 mb-6">
-                <div className="relative max-w-md">
+            {/* Filters Bar */}
+            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 mb-6 flex flex-col md:flex-row gap-4 items-center">
+                <div className="relative flex-1 w-full">
                     <Search className="absolute left-3 top-2.5 text-gray-400" size={20} />
                     <input
                         type="text"
@@ -85,6 +105,61 @@ const Products = () => {
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
+                </div>
+
+                <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
+                    <div className="relative min-w-[150px]">
+                        <select
+                            value={filterCategory}
+                            onChange={(e) => setFilterCategory(e.target.value)}
+                            className="w-full appearance-none pl-3 pr-8 py-2 border rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        >
+                            <option value="">Todas las Categorías</option>
+                            {categories.filter(cat => !cat.parent_id).map(parent => (
+                                <optgroup key={parent.id} label={parent.name}>
+                                    <option value={parent.id}>{parent.name}</option>
+                                    {categories.filter(child => child.parent_id === parent.id).map(child => (
+                                        <option key={child.id} value={child.id}>
+                                            └─ {child.name}
+                                        </option>
+                                    ))}
+                                </optgroup>
+                            ))}
+                            {categories.filter(cat => !cat.parent_id && !categories.some(c => c.parent_id === cat.id)).length === 0 && categories.filter(cat => !cat.parent_id).map(cat => (
+                                <option key={cat.id} value={cat.id}>{cat.name}</option>
+                            ))}
+                        </select>
+                        <Filter className="absolute right-2 top-2.5 text-gray-400 pointer-events-none" size={16} />
+                    </div>
+
+                    <div className="relative min-w-[150px]">
+                        <select
+                            value={filterExchangeRate}
+                            onChange={(e) => setFilterExchangeRate(e.target.value)}
+                            className="w-full appearance-none pl-3 pr-8 py-2 border rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        >
+                            <option value="">Todas las Tasas</option>
+                            {exchangeRates.map(rate => (
+                                <option key={rate.id} value={rate.id}>
+                                    {rate.name}
+                                </option>
+                            ))}
+                        </select>
+                        <Filter className="absolute right-2 top-2.5 text-gray-400 pointer-events-none" size={16} />
+                    </div>
+
+                    {(filterCategory || filterExchangeRate) && (
+                        <button
+                            onClick={() => {
+                                setFilterCategory('');
+                                setFilterExchangeRate('');
+                            }}
+                            className="p-2 text-red-500 hover:bg-red-50 rounded-md transition-colors"
+                            title="Limpiar Filtros"
+                        >
+                            <X size={20} />
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -103,12 +178,27 @@ const Products = () => {
                     <tbody className="bg-white divide-y divide-gray-200">
                         {products
                             .filter(product => {
-                                if (!searchTerm) return true;
-                                const search = searchTerm.toLowerCase();
-                                return (
-                                    product.name.toLowerCase().includes(search) ||
-                                    (product.sku && product.sku.toLowerCase().includes(search))
-                                );
+                                // 1. Search Logic
+                                const matchesSearch = !searchTerm || (() => {
+                                    const search = searchTerm.toLowerCase();
+                                    return (
+                                        product.name.toLowerCase().includes(search) ||
+                                        (product.sku && product.sku.toLowerCase().includes(search))
+                                    );
+                                })();
+
+                                // 2. Category Filter
+                                const matchesCategory = !filterCategory || product.category_id === parseInt(filterCategory);
+
+                                // 3. Exchange Rate Filter
+                                // We check if the product ITSELF uses this rate OR if it inherits it (null) but we can't easily check inheritance here without more logic.
+                                // For now, we filter by explicit assignment. 
+                                // TO IMPROVE: If exchange_rate_id is null, it usually means "Default". 
+                                // But implementing "matches default" requires knowing the default logic.
+                                // We will filter by EXACT match of ID, or if we want to find "Default", maybe filterExchangeRate === 'null'.
+                                const matchesRate = !filterExchangeRate || product.exchange_rate_id === parseInt(filterExchangeRate);
+
+                                return matchesSearch && matchesCategory && matchesRate;
                             })
                             .map(product => (
                                 <tr key={product.id} className="hover:bg-gray-50 transition-colors">
