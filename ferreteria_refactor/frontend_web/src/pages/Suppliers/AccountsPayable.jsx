@@ -27,7 +27,7 @@ const AccountsPayable = () => {
             setSuppliers(suppliersWithDebt);
 
             // Calculate totals
-            const total = suppliersWithDebt.reduce((sum, s) => sum + s.current_balance, 0);
+            const total = suppliersWithDebt.reduce((sum, s) => sum + Number(s.current_balance || 0), 0);
             setTotalDebt(total);
 
             // Get overdue count with improved date comparison
@@ -107,7 +107,7 @@ const AccountsPayable = () => {
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-red-100 text-sm font-medium">Deuda Total</p>
-                                <p className="text-4xl font-bold mt-2">${Number(totalDebt).toFixed(2)}</p>
+                                <p className="text-4xl font-bold mt-2">${Number(totalDebt || 0).toFixed(2)}</p>
                             </div>
                             <DollarSign size={48} className="opacity-30" />
                         </div>
@@ -153,7 +153,7 @@ const AccountsPayable = () => {
                                         <td className="p-4 text-gray-600">{supplier.phone || '-'}</td>
                                         <td className="p-4 text-right">
                                             <span className="text-red-600 font-bold text-lg">
-                                                ${Number(supplier.current_balance).toFixed(2)}
+                                                ${Number(supplier.current_balance || 0).toFixed(2)}
                                             </span>
                                         </td>
                                         <td className="p-4 text-right text-gray-600">
@@ -194,7 +194,7 @@ const AccountsPayable = () => {
                     <div>
                         <p className="text-sm text-gray-600">Deuda Actual</p>
                         <p className="text-2xl font-bold text-red-600">
-                            ${Number(selectedSupplier.current_balance).toFixed(2)}
+                            ${Number(selectedSupplier.current_balance || 0).toFixed(2)}
                         </p>
                     </div>
                     <div>
@@ -237,7 +237,7 @@ const AccountsPayable = () => {
                             </tr>
                         ) : (
                             supplierPurchases.map(purchase => {
-                                const balance = purchase.total_amount - purchase.paid_amount;
+                                const balance = Number(purchase.total_amount || 0) - Number(purchase.paid_amount || 0);
 
                                 // Improved overdue check - compare dates at midnight
                                 const isOverdue = purchase.due_date && purchase.payment_status !== 'PAID' && (() => {
@@ -317,7 +317,7 @@ const AccountsPayable = () => {
 
 // Payment Modal Component
 const PaymentModal = ({ purchase, onClose, onSuccess }) => {
-    const balance = purchase.total_amount - purchase.paid_amount;
+    const balance = Number(purchase.total_amount || 0) - Number(purchase.paid_amount || 0);
     const [formData, setFormData] = useState({
         amount: balance,
         payment_method: 'Transferencia',
@@ -361,11 +361,11 @@ const PaymentModal = ({ purchase, onClose, onSuccess }) => {
                     <div className="bg-blue-50 p-4 rounded-lg">
                         <div className="flex justify-between mb-2">
                             <span className="text-gray-700">Total Factura:</span>
-                            <span className="font-bold">${Number(purchase.total_amount).toFixed(2)}</span>
+                            <span className="font-bold">${Number(purchase.total_amount || 0).toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between mb-2">
                             <span className="text-gray-700">Pagado:</span>
-                            <span className="text-green-600 font-medium">${Number(purchase.paid_amount).toFixed(2)}</span>
+                            <span className="text-green-600 font-medium">${Number(purchase.paid_amount || 0).toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between pt-2 border-t border-blue-200">
                             <span className="font-bold text-gray-800">Saldo Pendiente:</span>
@@ -380,7 +380,7 @@ const PaymentModal = ({ purchase, onClose, onSuccess }) => {
                         <input
                             type="number"
                             value={formData.amount}
-                            onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) || 0 })}
+                            onChange={(e) => setFormData({ ...formData, amount: e.target.value === '' ? '' : parseFloat(e.target.value) })}
                             className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-lg font-bold"
                             step="0.01"
                             min="0.01"

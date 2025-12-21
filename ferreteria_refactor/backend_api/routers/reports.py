@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from typing import Optional
 from datetime import datetime, date
@@ -37,14 +37,8 @@ def get_dashboard_financials(
     start_dt = datetime.combine(start_date, datetime.min.time())
     end_dt = datetime.combine(end_date, datetime.max.time())
     
-    # Get all sale IDs that have returns (voided sales)
-    voided_sale_ids = db.query(models.Return.sale_id).filter(
-        models.Return.date >= start_dt,
-        models.Return.date <= end_dt
-    ).distinct().all()
-    voided_sale_ids = [sid[0] for sid in voided_sale_ids]
-    
-    # Query SalePayment grouped by currency, excluding voided sales
+    # Query SalePayment grouped by currency
+    # Note: We include ALL sales, even if they have returns. Returns are subtracted separately.
     query = db.query(
         models.SalePayment.currency,
         func.sum(models.SalePayment.amount).label('total_collected'),
@@ -54,28 +48,51 @@ def get_dashboard_financials(
         models.Sale.date <= end_dt
     )
     
-    # Exclude voided sales
-    if voided_sale_ids:
-        query = query.filter(models.Sale.id.notin_(voided_sale_ids))
-    
     # Group by currency
     results = query.group_by(models.SalePayment.currency).all()
+    
+    # NEW: Query Returns (CashMovements of type "RETURN")
+    # This captures the actual money leaving the drawer for refunds
+    returns_query = db.query(
+        models.CashMovement.currency,
+        func.sum(models.CashMovement.amount).label('total_refunded')
+    ).filter(
+        models.CashMovement.date >= start_dt,
+        models.CashMovement.date <= end_dt,
+        models.CashMovement.type == "RETURN"
+    ).group_by(models.CashMovement.currency).all()
+    
+    # Convert returns to dict for easy lookup
+    returns_map = {r[0] or "USD": r[1] for r in returns_query}
     
     # Format sales by currency
     sales_by_currency = []
     total_sales_base_usd = Decimal("0.00")
     
     for currency, total_collected, count in results:
+        # Safety check: total_collected usually isn't None but SQL sum can be
+        if total_collected is None:
+            total_collected = Decimal("0.00")
+            
+        # Subtract returns for this currency
+        refunds = returns_map.get(currency or "USD", Decimal("0.00"))
+        # Ensure refunds is Decimal (just in case)
+        if refunds is None: 
+            refunds = Decimal("0.00")
+            
+        net_collected = total_collected - refunds
+        
         sales_by_currency.append({
             "currency": currency or "USD",
-            "total_collected": float(round(total_collected, 2)),
-            "count": count
+            "total_collected": float(round(net_collected, 2)),
+            "count": count,
+            "returns": float(round(refunds, 2)) # Optional: show returns
         })
         
         # Convert to USD for base total
         # If currency is USD, add directly; otherwise use exchange rate
         if currency == "USD":
-            total_sales_base_usd += Decimal(str(total_collected))
+            total_sales_base_usd += Decimal(str(net_collected))
         else:
             # Get average exchange rate for the period
             avg_rate = db.query(func.avg(models.SalePayment.exchange_rate)).filter(
@@ -83,32 +100,67 @@ def get_dashboard_financials(
             ).join(models.Sale).filter(
                 models.Sale.date >= start_dt,
                 models.Sale.date <= end_dt
-            ).scalar() or Decimal("1.0")
+            ).scalar()
+            
+            # Safety checks for avg_rate
+            if avg_rate is None or avg_rate == 0:
+                avg_rate = Decimal("1.0")
             
             # Convert to USD
-            total_sales_base_usd += Decimal(str(total_collected)) / Decimal(str(avg_rate))
+            total_sales_base_usd += Decimal(str(net_collected)) / Decimal(str(avg_rate))
     
     # Calculate profit estimation (Sales - Costs)
-    # Get all sale details for the period (excluding voided sales)
-    sale_details_query = db.query(models.SaleDetail).join(models.Sale).filter(
+    # Get all sale details for the period
+    sale_details = db.query(models.SaleDetail).join(models.Sale).filter(
         models.Sale.date >= start_dt,
         models.Sale.date <= end_dt
-    )
-    
-    if voided_sale_ids:
-        sale_details_query = sale_details_query.filter(models.Sale.id.notin_(voided_sale_ids))
-    
-    sale_details = sale_details_query.all()
+    ).all()
     
     total_cost = Decimal("0.00")
     total_revenue = Decimal("0.00")
     
     for detail in sale_details:
-        total_revenue += detail.subtotal
-        if detail.product and detail.product.cost_price:
+        if detail.subtotal is not None:
+            total_revenue += detail.subtotal
+        if detail.product and detail.product.cost_price and detail.quantity is not None:
             total_cost += Decimal(str(detail.product.cost_price)) * Decimal(str(detail.quantity))
+            
+    # Subtract returns from revenue and add back cost (roughly)
+    # Ideally we'd look at ReturnDetails for exact cost reversal, but for estimation:
+    # We subtract the cash refund from revenue.
+    # Cost reversal is complex because "DAMAGED" items are lost (cost remains), "GOOD" are restored (cost removed).
+    # For now, let's keep it simple: Profit = (Revenue - Returns) - (Cost of Sales - Cost of Good Returns)
+    # Getting exact cost of returned items:
     
-    profit_estimated = total_revenue - total_cost
+    return_details = db.query(models.ReturnDetail).join(models.Return).filter(
+        models.Return.date >= start_dt,
+        models.Return.date <= end_dt
+    ).options(joinedload(models.ReturnDetail.product)).all()
+    
+    total_refunds_revenue = Decimal("0.00")
+    total_refunds_cost = Decimal("0.00")
+    
+    for rd in return_details:
+        quantity = Decimal(str(rd.quantity)) if rd.quantity is not None else Decimal("0")
+        unit_price = Decimal(str(rd.unit_price)) if rd.unit_price is not None else Decimal("0")
+        
+        total_refunds_revenue += (quantity * unit_price)
+        
+        if rd.product and rd.product.cost_price:
+            cost_price = Decimal(str(rd.product.cost_price))
+            total_refunds_cost += (quantity * cost_price)
+
+    # Adjusted Profit
+    # Revenue = (Sales Revenue - Refunds)
+    # Cost = (Sales Cost - Returned Items Cost) -> Assuming returned items go back to stock (value recovered)
+    # Note: If damaged, we effectively lost the cost, so we SHOULD NOT subtract it from cost (cost remains).
+    # Since we don't easily know here, let's assume worst case (lost) or best case (recovered).
+    # Given most returns are "didn't want it", let's assume recovered.
+    
+    final_revenue = total_revenue - total_refunds_revenue
+    final_cost = total_cost - total_refunds_cost
+    
+    profit_estimated = final_revenue - final_cost
     
     return {
         "sales_by_currency": sales_by_currency,

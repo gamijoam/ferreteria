@@ -182,7 +182,7 @@ def process_return(return_data: schemas.ReturnCreate, db: Session = Depends(get_
         
         cash_movement = models.CashMovement(
             session_id=session.id,
-            type="EXPENSE",  # Refund is an expense
+            type="RETURN",  # Explicit return type
             amount=amount_to_record,
             currency=return_data.refund_currency,
             exchange_rate=return_data.exchange_rate,

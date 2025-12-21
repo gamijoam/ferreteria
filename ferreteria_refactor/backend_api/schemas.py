@@ -565,18 +565,6 @@ class PurchaseOrderUpdate(BaseModel):
     invoice_number: Optional[str] = None
     notes: Optional[str] = None
 
-class PurchaseOrderResponse(PurchaseOrderBase):
-    id: int
-    purchase_date: datetime
-    due_date: Optional[datetime] = None
-    total_amount: Decimal
-    paid_amount: Decimal
-    payment_status: str
-    supplier: Optional['SupplierRead'] = None  # Include supplier details
-    
-    class Config:
-        from_attributes = True
-
 class PurchaseItemRead(BaseModel):
     id: int
     product_id: int
