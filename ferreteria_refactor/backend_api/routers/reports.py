@@ -1014,8 +1014,6 @@ async def export_general_report(
                 diff = float(session.final_cash_reported or 0) - float(session.final_cash_expected or 0)
                 row['Dif USD'] = diff
             
-            row['Notas'] = session.notes or ''
-            
             audit_data.append(row)
         
         df_audit = pd.DataFrame(audit_data) if audit_data else pd.DataFrame()
@@ -1029,12 +1027,9 @@ async def export_general_report(
             models.Sale.date,
             models.Customer.name.label('customer_name'),
             models.Sale.total_amount,
-            models.Sale.payment_method,
-            models.User.full_name.label('user_name')
+            models.Sale.payment_method
         ).outerjoin(
             models.Customer, models.Sale.customer_id == models.Customer.id
-        ).outerjoin(
-            models.User, models.Sale.user_id == models.User.id
         ).filter(
             models.Sale.date >= start_dt,
             models.Sale.date <= end_dt
@@ -1045,8 +1040,7 @@ async def export_general_report(
             'Fecha': s.date.strftime('%Y-%m-%d %H:%M') if s.date else '',
             'Cliente': s.customer_name or 'Público General',
             'Total': float(s.total_amount or 0),
-            'Método Pago': s.payment_method or 'N/A',
-            'Usuario': s.user_name or 'N/A'
+            'Método Pago': s.payment_method or 'N/A'
         } for s in sales_query]
         df_sales = pd.DataFrame(sales_data) if sales_data else pd.DataFrame()
         
