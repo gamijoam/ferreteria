@@ -203,6 +203,45 @@ MwIDAQAB
         process = subprocess.Popen(cmd, cwd=BASE_DIR, env=env, stdout=stdout_dest, stderr=stderr_dest)
         return process
 
+    def start_hardware_bridge():
+        """Inicia el Hardware Bridge para impresora térmica y cajón."""
+        log("Iniciando Hardware Bridge...")
+        
+        # Verificar que existe el archivo
+        bridge_file = BASE_DIR / "hardware_bridge.py"
+        if not bridge_file.exists():
+            log(f"   -> WARN: hardware_bridge.py no encontrado en {bridge_file}")
+            log("   -> Impresión térmica NO estará disponible")
+            return None
+        
+        # Comando para ejecutar hardware_bridge
+        cmd = [sys.executable, str(bridge_file)]
+        
+        log(f"Comando: {' '.join(cmd)}")
+        
+        # Entorno
+        env = os.environ.copy()
+        env["PYTHONPATH"] = str(BASE_DIR) + os.pathsep + env.get("PYTHONPATH", "")
+        
+        # Redirigir salida según disponibilidad de consola
+        stdout_dest = None if HAS_CONSOLE else subprocess.DEVNULL
+        stderr_dest = None if HAS_CONSOLE else subprocess.DEVNULL
+        
+        try:
+            process = subprocess.Popen(
+                cmd, 
+                cwd=BASE_DIR, 
+                env=env, 
+                stdout=stdout_dest, 
+                stderr=stderr_dest
+            )
+            log(f"   -> Hardware Bridge iniciado (PID: {process.pid})")
+            return process
+        except Exception as e:
+            log(f"   -> ERROR iniciando Hardware Bridge: {e}")
+            log("   -> Impresión térmica NO estará disponible")
+            return None
+
     def git_update():
         """Intenta actualizar el repositorio."""
         log("Chequeando actualizaciones...")
@@ -254,17 +293,20 @@ MwIDAQAB
         log("Licencia correcta. Arrancando servicios...")
         
         # 2. Start Backend
-        proc = start_backend()
+        backend_proc = start_backend()
         
         # Check inmediato si murio
         try:
-            code = proc.wait(timeout=2)
+            code = backend_proc.wait(timeout=2)
             # Si retorna, murio
             log(f"FATAL: El backend se cerro inmediatamente con codigo {code}")
             messagebox.showerror("Error Critico", f"El servidor backend fallo al iniciar.\nCodigo: {code}\n\nRevise la consola o launcher.log")
             return
         except subprocess.TimeoutExpired:
             log("Backend parece estar corriendo (Timeout de 2s superado)")
+        
+        # 2.5. Start Hardware Bridge (opcional, no bloquea si falla)
+        bridge_proc = start_hardware_bridge()
         
         # 3. Web
         time.sleep(3)
@@ -275,11 +317,19 @@ MwIDAQAB
         # 4. Wait loop
         try:
             log("Launcher esperando terminacion del backend...")
-            proc.wait()
-            log(f"Backend termino con codigo {proc.returncode}")
+            backend_proc.wait()
+            log(f"Backend termino con codigo {backend_proc.returncode}")
         except KeyboardInterrupt:
             log("Interrumpido por usuario")
-            proc.terminate()
+            backend_proc.terminate()
+            if bridge_proc:
+                log("Terminando Hardware Bridge...")
+                bridge_proc.terminate()
+        finally:
+            # Asegurar que ambos procesos terminen
+            if bridge_proc and bridge_proc.poll() is None:
+                log("Cerrando Hardware Bridge...")
+                bridge_proc.terminate()
 
     if __name__ == "__main__":
         main()
