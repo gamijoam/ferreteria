@@ -11,3 +11,12 @@ npm run dev
 
 el credito que se muestra el cierre de caja no se actualiza en base a los creditos pagados
 si ya pagaron todos los creditos no se debe mostrar el credito
+
+la session de caja , no muestra los valores si hay otras monedas y no actualiza las metricas hay que revisar su logica
+
+cuando se paga un credito no me deja colocar la moneda en la que se pago
+solo me sale bs pero si pago en bs en el dashboard si me muestra pero en $
+
+en el pos no maneja la logica bien de multi monedas porque si guardo un producto con la moneda COP
+solo me muestra bs y $ pero no me hace el calculo a cop puedes verificar eso bien? o en su defecto 
+que haga la conversion de $ a COP por la tasa que tiene establecida y verificar cuando se vaya a pagar que se refleje
