@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from typing import Optional
@@ -934,3 +935,267 @@ async def export_excel_report(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error generating report: {str(e)}")
+
+
+@router.get("/export/general")
+async def export_general_report(
+    start_date: Optional[date] = Query(None, description="Start date (YYYY-MM-DD)"),
+    end_date: Optional[date] = Query(None, description="End date (YYYY-MM-DD)"),
+    db: Session = Depends(get_db)
+):
+    """
+    Generate a comprehensive 360° audit report in Excel format with flattened multi-currency columns.
+    
+    Returns a multi-sheet Excel file with:
+    - **Dashboard**: Summary KPIs
+    - **Auditoría de Cajas**: FLATTENED multi-currency columns (USD Reportado, Dif USD, BS Reportado, Dif BS, etc.)
+    - **Ventas Detalladas**: All sales in the period
+    """
+    try:
+        import pandas as pd
+        from io import BytesIO
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment
+    except ImportError:
+        raise HTTPException(
+            status_code=500,
+            detail="pandas and openpyxl are required. Install with: pip install pandas openpyxl"
+        )
+    
+    # Set default dates if not provided (current month)
+    if not end_date:
+        end_date = date.today()
+    if not start_date:
+        start_date = date(end_date.year, end_date.month, 1)
+    
+    try:
+        start_dt = datetime.combine(start_date, datetime.min.time())
+        end_dt = datetime.combine(end_date, datetime.max.time())
+        
+        # ============================================
+        # 1. QUERY CASH SESSIONS WITH CURRENCIES
+        # ============================================
+        
+        cash_sessions = db.query(models.CashSession).options(
+            joinedload(models.CashSession.currencies),
+            joinedload(models.CashSession.user)
+        ).filter(
+            models.CashSession.start_time >= start_dt,
+            models.CashSession.start_time <= end_dt
+        ).all()
+        
+        # ============================================
+        # 2. FLATTEN MULTI-CURRENCY DATA
+        # ============================================
+        
+        audit_data = []
+        
+        for session in cash_sessions:
+            row = {
+                'Fecha Apertura': session.start_time.strftime('%Y-%m-%d %H:%M') if session.start_time else '',
+                'Fecha Cierre': session.end_time.strftime('%Y-%m-%d %H:%M') if session.end_time else 'Abierta',
+                'Cajero': session.user.full_name if session.user and session.user.full_name else (session.user.username if session.user else f'Usuario #{session.user_id}'),
+                'Estado': session.status,
+            }
+            
+            # Process currencies - flatten into separate columns
+            if session.currencies and len(session.currencies) > 0:
+                for curr in session.currencies:
+                    symbol = curr.currency_symbol
+                    row[f'{symbol} Inicial'] = float(curr.initial_amount or 0)
+                    row[f'{symbol} Esperado'] = float(curr.final_expected or 0)
+                    row[f'{symbol} Reportado'] = float(curr.final_reported or 0)
+                    row[f'Dif {symbol}'] = float(curr.difference or 0)
+            else:
+                # Legacy session - only USD
+                row['USD Inicial'] = float(session.initial_cash or 0)
+                row['USD Esperado'] = float(session.final_cash_expected or 0)
+                row['USD Reportado'] = float(session.final_cash_reported or 0)
+                diff = float(session.final_cash_reported or 0) - float(session.final_cash_expected or 0)
+                row['Dif USD'] = diff
+            
+            row['Notas'] = session.notes or ''
+            
+            audit_data.append(row)
+        
+        df_audit = pd.DataFrame(audit_data) if audit_data else pd.DataFrame()
+        
+        # ============================================
+        # 3. QUERY SALES DATA (SIMPLIFIED)
+        # ============================================
+        
+        sales_query = db.query(
+            models.Sale.id,
+            models.Sale.date,
+            models.Customer.name.label('customer_name'),
+            models.Sale.total_amount,
+            models.Sale.payment_method,
+            models.User.full_name.label('user_name')
+        ).outerjoin(
+            models.Customer, models.Sale.customer_id == models.Customer.id
+        ).outerjoin(
+            models.User, models.Sale.user_id == models.User.id
+        ).filter(
+            models.Sale.date >= start_dt,
+            models.Sale.date <= end_dt
+        ).all()
+        
+        sales_data = [{
+            'ID': s.id,
+            'Fecha': s.date.strftime('%Y-%m-%d %H:%M') if s.date else '',
+            'Cliente': s.customer_name or 'Público General',
+            'Total': float(s.total_amount or 0),
+            'Método Pago': s.payment_method or 'N/A',
+            'Usuario': s.user_name or 'N/A'
+        } for s in sales_query]
+        df_sales = pd.DataFrame(sales_data) if sales_data else pd.DataFrame()
+        
+        # ============================================
+        # 4. CALCULATE DASHBOARD KPIS
+        # ============================================
+        
+        total_sales = df_sales['Total'].sum() if not df_sales.empty else 0
+        num_sales = len(df_sales)
+        avg_ticket = total_sales / num_sales if num_sales > 0 else 0
+        
+        # Calculate shortages and overages from audit data
+        total_shortages = 0
+        total_overages = 0
+        
+        if not df_audit.empty:
+            for col in df_audit.columns:
+                if col.startswith('Dif '):
+                    for val in df_audit[col]:
+                        if pd.notna(val):
+                            if val < -0.01:
+                                total_shortages += abs(val)
+                            elif val > 0.01:
+                                total_overages += val
+        
+        dashboard_data = {
+            'Métrica': [
+                'Total Ventas USD',
+                'Número de Ventas',
+                'Ticket Promedio',
+                'Total Faltantes',
+                'Total Sobrantes',
+                'Sesiones Auditadas'
+            ],
+            'Valor': [
+                f"${total_sales:,.2f}",
+                num_sales,
+                f"${avg_ticket:,.2f}",
+                f"${total_shortages:,.2f}",
+                f"${total_overages:,.2f}",
+                len(cash_sessions)
+            ]
+        }
+        df_dashboard = pd.DataFrame(dashboard_data)
+        
+        # ============================================
+        # 5. CREATE EXCEL FILE
+        # ============================================
+        
+        output = BytesIO()
+        
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            # Sheet 1: Dashboard
+            df_dashboard.to_excel(writer, sheet_name='Dashboard', index=False)
+            
+            # Sheet 2: Auditoría de Cajas (FLATTENED)
+            if not df_audit.empty:
+                df_audit.to_excel(writer, sheet_name='Auditoría de Cajas', index=False)
+            else:
+                pd.DataFrame({'Mensaje': ['No hay sesiones de caja en este período']}).to_excel(
+                    writer, sheet_name='Auditoría de Cajas', index=False
+                )
+            
+            # Sheet 3: Ventas Detalladas
+            if not df_sales.empty:
+                df_sales.to_excel(writer, sheet_name='Ventas Detalladas', index=False)
+            else:
+                pd.DataFrame({'Mensaje': ['No hay ventas en este período']}).to_excel(
+                    writer, sheet_name='Ventas Detalladas', index=False
+                )
+        
+        # ============================================
+        # 6. APPLY STYLING
+        # ============================================
+        
+        output.seek(0)
+        workbook = openpyxl.load_workbook(output)
+        
+        # Style Dashboard
+        if 'Dashboard' in workbook.sheetnames:
+            ws = workbook['Dashboard']
+            for cell in ws[1]:
+                cell.font = Font(bold=True, color="FFFFFF", size=12)
+                cell.fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+        
+        # Style Auditoría de Cajas - Highlight differences
+        if 'Auditoría de Cajas' in workbook.sheetnames:
+            ws = workbook['Auditoría de Cajas']
+            
+            # Header styling
+            for cell in ws[1]:
+                cell.font = Font(bold=True, color="FFFFFF", size=11)
+                cell.fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+            
+            # Find all "Dif" columns and highlight
+            diff_cols = []
+            for idx, cell in enumerate(ws[1], 1):
+                if cell.value and str(cell.value).startswith('Dif '):
+                    diff_cols.append(idx)
+            
+            # Apply conditional formatting to difference columns
+            for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
+                for col_idx in diff_cols:
+                    cell = row[col_idx - 1]
+                    if cell.value and isinstance(cell.value, (int, float)):
+                        if cell.value < -0.01:  # Shortage
+                            cell.fill = PatternFill(start_color="FFE6E6", end_color="FFE6E6", fill_type="solid")
+                            cell.font = Font(bold=True, color="CC0000")
+                        elif cell.value > 0.01:  # Overage
+                            cell.fill = PatternFill(start_color="E6FFE6", end_color="E6FFE6", fill_type="solid")
+                            cell.font = Font(bold=True, color="00CC00")
+            
+            # Auto-adjust column widths
+            for column in ws.columns:
+                max_length = 0
+                column_letter = column[0].column_letter
+                for cell in column:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                adjusted_width = min(max_length + 2, 50)
+                ws.column_dimensions[column_letter].width = adjusted_width
+        
+        # Save styled workbook
+        final_output = BytesIO()
+        workbook.save(final_output)
+        final_output.seek(0)
+        
+        # ============================================
+        # 7. RETURN FILE
+        # ============================================
+        
+        filename = f"Auditoria_360_General_{start_date}_{end_date}.xlsx"
+        
+        return StreamingResponse(
+            final_output,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}"
+            }
+        )
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error generating general report: {str(e)}")
+
+

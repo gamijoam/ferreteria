@@ -113,9 +113,14 @@ def get_sessions_history(
 ):
     """
     Get cash session history with optional date filtering
-    Returns all sessions (OPEN and CLOSED) with their closure details
+    Returns all sessions (OPEN and CLOSED) with their closure details and multi-currency info
     """
-    query = db.query(models.CashSession)
+    from sqlalchemy.orm import joinedload
+    
+    query = db.query(models.CashSession).options(
+        joinedload(models.CashSession.currencies),
+        joinedload(models.CashSession.user)
+    )
     
     # Apply date filters if provided
     if start_date:
@@ -137,6 +142,8 @@ def get_sessions_history(
             "user_id": session.user_id,
             "start_time": session.start_time.isoformat() if session.start_time else None,
             "end_time": session.end_time.isoformat() if session.end_time else None,
+            "opened_at": session.start_time.isoformat() if session.start_time else None,  # Alias
+            "closed_at": session.end_time.isoformat() if session.end_time else None,  # Alias
             "status": session.status,
             "initial_cash": float(session.initial_cash) if session.initial_cash else 0.0,
             "initial_cash_bs": float(session.initial_cash_bs) if session.initial_cash_bs else 0.0,
@@ -150,7 +157,18 @@ def get_sessions_history(
                 "id": session.user.id,
                 "username": session.user.username,
                 "full_name": session.user.full_name
-            } if session.user else None
+            } if session.user else None,
+            "currencies": [
+                {
+                    "id": curr.id,
+                    "currency_symbol": curr.currency_symbol,
+                    "initial_amount": float(curr.initial_amount) if curr.initial_amount else 0.0,
+                    "final_reported": float(curr.final_reported) if curr.final_reported else 0.0,
+                    "final_expected": float(curr.final_expected) if curr.final_expected else 0.0,
+                    "difference": float(curr.difference) if curr.difference else 0.0
+                }
+                for curr in session.currencies
+            ] if session.currencies else []
         }
         result.append(session_dict)
     
@@ -311,24 +329,90 @@ async def close_cash_session(
     payments = sales_query.all()
     movements = db.query(models.CashMovement).filter(models.CashMovement.session_id == session.id).all()
     
-    # Calculate cash sales using same logic as session details
-    cash_methods = ["Efectivo", "CASH", "Cash", "efectivo"]
-    cash_sales_usd = Decimal("0.00")
-    cash_sales_bs = Decimal("0.00")
+    # ============================================
+    # CALCULATE EXPECTED BY CURRENCY
+    # ============================================
     
+    cash_methods = ["Efectivo", "CASH", "Cash", "efectivo"]
+    
+    # Track sales and movements by currency
+    cash_sales_by_currency = {}  # {currency_symbol: amount}
+    movements_by_currency = {}   # {currency_symbol: {'deposits': X, 'expenses': Y}}
+    
+    # Process payments
     for p in payments:
         if p.payment_method in cash_methods:
-            if p.currency and p.currency.upper() in ["BS", "VES", "VEF"]:
-                cash_sales_bs += p.amount
-            else:
-                cash_sales_usd += p.amount
+            curr = p.currency or "USD"
+            # Normalize currency symbols
+            if curr.upper() in ["BS", "VES", "VEF"]:
+                curr = "Bs"
+            
+            if curr not in cash_sales_by_currency:
+                cash_sales_by_currency[curr] = Decimal("0.00")
+            cash_sales_by_currency[curr] += p.amount
     
-    # Calculate movements with case-insensitive currency check
-    expenses_usd = sum((m.amount for m in movements if m.type == "EXPENSE" and m.currency == "USD"), Decimal("0.00"))
-    expenses_bs = sum((m.amount for m in movements if m.type == "EXPENSE" and (m.currency and m.currency.upper() in ["BS", "VES", "VEF"])), Decimal("0.00"))
+    # Process movements
+    for m in movements:
+        curr = m.currency or "USD"
+        # Normalize currency symbols
+        if curr.upper() in ["BS", "VES", "VEF"]:
+            curr = "Bs"
+        
+        if curr not in movements_by_currency:
+            movements_by_currency[curr] = {'deposits': Decimal("0.00"), 'expenses': Decimal("0.00")}
+        
+        if m.type == "DEPOSIT":
+            movements_by_currency[curr]['deposits'] += m.amount
+        elif m.type == "EXPENSE":
+            movements_by_currency[curr]['expenses'] += m.amount
     
-    deposits_usd = sum((m.amount for m in movements if m.type == "DEPOSIT" and m.currency == "USD"), Decimal("0.00"))
-    deposits_bs = sum((m.amount for m in movements if m.type == "DEPOSIT" and (m.currency and m.currency.upper() in ["BS", "VES", "VEF"])), Decimal("0.00"))
+    # ============================================
+    # UPDATE CURRENCY RECORDS
+    # ============================================
+    
+    # Get all currency records for this session
+    currency_records = db.query(models.CashSessionCurrency).filter(
+        models.CashSessionCurrency.session_id == session.id
+    ).all()
+    
+    for curr_record in currency_records:
+        symbol = curr_record.currency_symbol
+        
+        # Calculate expected
+        initial = curr_record.initial_amount or Decimal("0.00")
+        sales = cash_sales_by_currency.get(symbol, Decimal("0.00"))
+        deposits = movements_by_currency.get(symbol, {}).get('deposits', Decimal("0.00"))
+        expenses = movements_by_currency.get(symbol, {}).get('expenses', Decimal("0.00"))
+        
+        expected = initial + sales + deposits - expenses
+        
+        # Get reported from close_data
+        # close_data should have currencies array with {currency_symbol, final_reported}
+        reported = Decimal("0.00")
+        if hasattr(close_data, 'currencies') and close_data.currencies:
+            for curr_data in close_data.currencies:
+                if curr_data.currency_symbol == symbol:
+                    reported = Decimal(str(curr_data.final_reported))
+                    break
+        
+        # Update currency record
+        curr_record.final_expected = expected
+        curr_record.final_reported = reported
+        curr_record.difference = reported - expected
+    
+    # ============================================
+    # UPDATE LEGACY FIELDS (for backward compatibility)
+    # ============================================
+    
+    # Calculate legacy USD and BS totals
+    cash_sales_usd = cash_sales_by_currency.get("USD", Decimal("0.00"))
+    cash_sales_bs = cash_sales_by_currency.get("Bs", Decimal("0.00"))
+    
+    expenses_usd = movements_by_currency.get("USD", {}).get('expenses', Decimal("0.00"))
+    expenses_bs = movements_by_currency.get("Bs", {}).get('expenses', Decimal("0.00"))
+    
+    deposits_usd = movements_by_currency.get("USD", {}).get('deposits', Decimal("0.00"))
+    deposits_bs = movements_by_currency.get("Bs", {}).get('deposits', Decimal("0.00"))
     
     expected_usd = session.initial_cash + cash_sales_usd + deposits_usd - expenses_usd
     expected_bs = session.initial_cash_bs + cash_sales_bs + deposits_bs - expenses_bs
@@ -369,3 +453,4 @@ async def close_cash_session(
     })
     
     return session
+

@@ -333,13 +333,14 @@ class CashSessionCreate(BaseModel):
     initial_cash_bs: Decimal = Decimal("0.00")
     currencies: List[CashSessionCurrencyCreate] = []
 
+class CurrencyClose(BaseModel):
+    currency_symbol: str
+    final_reported: Decimal
+
 class CashSessionClose(BaseModel):
     final_cash_reported: Decimal
     final_cash_reported_bs: Decimal
-    currencies: List[Dict] = []  # [{"symbol": "USD", "amount": 100}, ...]
-    # Note: currencies list items will need manual parsing if generic Dict, 
-    # but we can trust API consumer to send numbers which Pydantic might parse if defined.
-    # Leaving as Dict for flexibility but values should be cast to Decimal in logic.
+    currencies: List[CurrencyClose] = []  # List of currency amounts reported
 
 class CashSessionRead(BaseModel):
     id: int
