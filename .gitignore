@@ -13,9 +13,17 @@ env.bak/
 venv.bak/
 
 # Distribution / Build
+# Ignore Python build/dist
 build/
-dist/
-!ferreteria_refactor/frontend_web/dist/
+*.egg-info/
+
+# Ignore deployment dist folders
+deployment/dist/
+deployment/build/
+
+# IMPORTANT: Allow frontend_web/dist for client deployments
+# (Clients pull from Git and backend serves this directly)
+# DO NOT add dist/ here globally - it would ignore frontend_web/dist too
 
 
 # IDEs
@@ -31,8 +39,6 @@ dist/
 
 # Specific to this project
 src.rar
-deployment/dist/
-deployment/build/
 
 # Exceptions (Allow these zips)
 !landing_page/downloads/*.zip
