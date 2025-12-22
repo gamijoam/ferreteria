@@ -93,7 +93,7 @@ def validate_pin(pin_data: dict, db: Session = Depends(get_db)):
         }
 
 def init_admin_user(db: Session):
-    """Check if any user exists, if not create admin. ALSO FIX ADMIN HASH IF BROKEN."""
+    """Check if any user exists, if not create admin."""
     admin = db.query(models.User).filter(models.User.username == "admin").first()
     
     if not admin:
@@ -108,10 +108,6 @@ def init_admin_user(db: Session):
         )
         db.add(new_admin)
         db.commit()
+        print("✅ Admin user created with default password 'admin123'")
     else:
-        # Safety Check: Update admin password hash to ensure it's compatible with new bcrypt
-        # This is useful during development/migration to fix "UnknownHashError"
-        print("Updating admin user hash to ensure compatibility...")
-        p_hash = get_password_hash("admin123")
-        admin.password_hash = p_hash
-        db.commit()
+        print("✅ Admin user already exists, skipping initialization")
