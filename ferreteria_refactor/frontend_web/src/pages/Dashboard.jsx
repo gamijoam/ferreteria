@@ -87,7 +87,7 @@ const Dashboard = () => {
         <div className="p-6 bg-gray-50 min-h-screen">
             {/* Header */}
             <div className="mb-8">
-                <h1 className="text-3xl font-bold text-gray-800 mb-2">Dashboar Financierooo</h1>
+                <h1 className="text-3xl font-bold text-gray-800 mb-2">Dashboar Financiero</h1>
                 <p className="text-gray-600">Resumen de ventas y métricas en tiempo real</p>
             </div>
 
