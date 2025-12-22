@@ -65,6 +65,7 @@ class ProductUnitBase(BaseModel):
     unit_name: str
     conversion_factor: Decimal
     barcode: Optional[str] = None
+    cost_price: Optional[Decimal] = None  # Calculated: base_cost * factor
     price_usd: Optional[Decimal] = None
     
     # Pricing System Fields

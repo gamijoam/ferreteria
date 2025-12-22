@@ -147,6 +147,7 @@ class ProductUnit(Base):
     unit_name = Column(String, nullable=False)  # Ej: "Saco", "Caja", "Gramo"
     conversion_factor = Column(Numeric(14, 4), nullable=False) # Ej: 50.0 (Saco), 0.001 (Gramo)
     barcode = Column(String, nullable=True) # Código específico de la presentación
+    cost_price = Column(Numeric(14, 4), nullable=True)  # Cost calculated: base_cost * factor
     price_usd = Column(Numeric(12, 2), nullable=True) # Precio específico (opcional)
     
     # Pricing System Fields

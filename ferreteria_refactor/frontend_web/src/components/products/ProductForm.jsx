@@ -650,6 +650,7 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
                             onUnitsChange={(newUnits) => setFormData(prev => ({ ...prev, units: newUnits }))}
                             baseUnitType={formData.unit_type}
                             basePrice={formData.price}
+                            baseCost={formData.cost}
                             exchangeRates={exchangeRates}
                             productExchangeRateId={formData.exchange_rate_id}
                         />
