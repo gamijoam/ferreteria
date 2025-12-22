@@ -208,9 +208,9 @@ MwIDAQAB
         log("Iniciando Hardware Bridge...")
         
         # Verificar que existe el archivo
-        bridge_file = BASE_DIR / "hardware_bridge.py"
+        bridge_file = BASE_DIR / "hardware_bridge" / "main.py"
         if not bridge_file.exists():
-            log(f"   -> WARN: hardware_bridge.py no encontrado en {bridge_file}")
+            log(f"   -> WARN: hardware_bridge/main.py no encontrado en {bridge_file}")
             log("   -> Impresión térmica NO estará disponible")
             return None
         
