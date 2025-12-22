@@ -75,9 +75,10 @@ const CashClose = () => {
         }
 
         if (window.confirm("¿Seguro que deseas cerrar el turno? Esto generará el Reporte Z.")) {
+            // Build currencies array with correct format
             const currenciesData = session.currencies?.map(curr => ({
-                symbol: curr.currency_symbol,
-                amount: parseFloat(physicalCounts[curr.currency_symbol]) || 0
+                currency_symbol: curr.currency_symbol,
+                final_reported: parseFloat(physicalCounts[curr.currency_symbol]) || 0
             })) || [];
 
             const closeData = {
@@ -85,6 +86,8 @@ const CashClose = () => {
                 final_cash_reported_bs: parseFloat(physicalCounts['Bs']) || 0,
                 currencies: currenciesData
             };
+
+            console.log('Closing session with data:', closeData);
 
             const success = await closeSession(closeData);
             if (success) {

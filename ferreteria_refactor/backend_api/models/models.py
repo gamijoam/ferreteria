@@ -90,7 +90,13 @@ class Product(Base):
     price = Column(Numeric(12, 2), nullable=False, default=0.00)
     price_mayor_1 = Column(Numeric(12, 2), default=0.00) # Wholesale Price 1
     price_mayor_2 = Column(Numeric(12, 2), default=0.00) # Wholesale Price 2
-    cost_price = Column(Numeric(14, 4), default=0.0000)  # NEW: Cost for profit margin calculation
+    cost_price = Column(Numeric(14, 4), default=0.0000)  # Cost for profit margin calculation
+    
+    # Pricing System Fields
+    profit_margin = Column(Numeric(5, 2), nullable=True)  # Profit margin percentage (e.g., 30.00 = 30%)
+    discount_percentage = Column(Numeric(5, 2), default=0.00)  # Promotional discount percentage
+    is_discount_active = Column(Boolean, default=False)  # Enable/disable promotional discount
+    
     stock = Column(Numeric(12, 3), default=0.000) # Base units
     min_stock = Column(Numeric(12, 3), default=5.000) # Low stock alert threshold
     is_active = Column(Boolean, default=True) # Logical delete
@@ -141,7 +147,14 @@ class ProductUnit(Base):
     unit_name = Column(String, nullable=False)  # Ej: "Saco", "Caja", "Gramo"
     conversion_factor = Column(Numeric(14, 4), nullable=False) # Ej: 50.0 (Saco), 0.001 (Gramo)
     barcode = Column(String, nullable=True) # Código específico de la presentación
+    cost_price = Column(Numeric(14, 4), nullable=True)  # Cost calculated: base_cost * factor
     price_usd = Column(Numeric(12, 2), nullable=True) # Precio específico (opcional)
+    
+    # Pricing System Fields
+    profit_margin = Column(Numeric(5, 2), nullable=True)  # Unit-specific profit margin
+    discount_percentage = Column(Numeric(5, 2), default=0.00)  # Unit-specific discount
+    is_discount_active = Column(Boolean, default=False)  # Enable/disable unit discount
+    
     is_default = Column(Boolean, default=False)
     exchange_rate_id = Column(Integer, ForeignKey("exchange_rates.id"), nullable=True)  # Unit-specific rate
 

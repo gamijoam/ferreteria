@@ -18,6 +18,12 @@ class ProductBase(BaseModel):
     stock: Decimal = Field(..., description="Cantidad actual en inventario físico", example="10.000")
     description: Optional[str] = Field(None, description="Descripción detallada del producto", example="Incluye maletín y brocas")
     cost_price: Optional[Decimal] = Field(Decimal("0.0000"), description="Costo de adquisición en USD", example="25.0000")
+    
+    # Pricing System Fields
+    profit_margin: Optional[Decimal] = Field(None, description="Margen de ganancia en porcentaje", example="30.00")
+    discount_percentage: Optional[Decimal] = Field(Decimal("0.00"), description="Descuento promocional en porcentaje", example="10.00")
+    is_discount_active: bool = Field(False, description="Activar/desactivar descuento promocional")
+    
     min_stock: Optional[Decimal] = Field(Decimal("5.000"), description="Nivel mínimo para alerta de reabastecimiento", example="5.000")
     unit_type: Optional[str] = Field("Unidad", description="Unidad de medida base", example="Unidad")
     is_box: bool = Field(False, description="Indica si es vendido por caja (Legacy)")
@@ -59,7 +65,14 @@ class ProductUnitBase(BaseModel):
     unit_name: str
     conversion_factor: Decimal
     barcode: Optional[str] = None
+    cost_price: Optional[Decimal] = None  # Calculated: base_cost * factor
     price_usd: Optional[Decimal] = None
+    
+    # Pricing System Fields
+    profit_margin: Optional[Decimal] = None
+    discount_percentage: Optional[Decimal] = Decimal("0.00")
+    is_discount_active: bool = False
+    
     is_default: bool = False
     exchange_rate_id: Optional[int] = None  # NEW: Specific rate for this unit
 
@@ -320,13 +333,14 @@ class CashSessionCreate(BaseModel):
     initial_cash_bs: Decimal = Decimal("0.00")
     currencies: List[CashSessionCurrencyCreate] = []
 
+class CurrencyClose(BaseModel):
+    currency_symbol: str
+    final_reported: Decimal
+
 class CashSessionClose(BaseModel):
     final_cash_reported: Decimal
     final_cash_reported_bs: Decimal
-    currencies: List[Dict] = []  # [{"symbol": "USD", "amount": 100}, ...]
-    # Note: currencies list items will need manual parsing if generic Dict, 
-    # but we can trust API consumer to send numbers which Pydantic might parse if defined.
-    # Leaving as Dict for flexibility but values should be cast to Decimal in logic.
+    currencies: List[CurrencyClose] = []  # List of currency amounts reported
 
 class CashSessionRead(BaseModel):
     id: int
