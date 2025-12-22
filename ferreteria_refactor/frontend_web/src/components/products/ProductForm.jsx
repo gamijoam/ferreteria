@@ -24,10 +24,19 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
         margin: 0,
         unit_type: 'UNID',
         exchange_rate_id: null,
-        is_combo: false,  // NEW: Combo flag
+        is_combo: false,
+        // Pricing System Fields
+        profit_margin: null,
+        discount_percentage: 0,
+        is_discount_active: false,
         units: [],
-        combo_items: []  // NEW: Combo components
+        combo_items: []
     });
+
+    // Calculated values for display
+    const [calculatedPrice, setCalculatedPrice] = useState(null);
+    const [calculatedMargin, setCalculatedMargin] = useState(null);
+    const [finalPriceWithDiscount, setFinalPriceWithDiscount] = useState(null);
 
     // Reset or Populate on simple change
     useEffect(() => {
@@ -93,6 +102,58 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
             setActiveTab('general');
         }
     }, [isOpen, initialData]);
+
+    // ========================================
+    // PRICING CALCULATIONS
+    // ========================================
+
+    // Auto-calculate price from cost + profit margin
+    useEffect(() => {
+        if (formData.cost && formData.profit_margin) {
+            const cost = parseFloat(formData.cost);
+            const margin = parseFloat(formData.profit_margin);
+            if (cost > 0 && margin >= 0) {
+                const price = cost * (1 + margin / 100);
+                setCalculatedPrice(price.toFixed(2));
+                // Auto-update price field
+                setFormData(prev => ({ ...prev, price: price.toFixed(2) }));
+            }
+        } else {
+            setCalculatedPrice(null);
+        }
+    }, [formData.cost, formData.profit_margin]);
+
+    // Reverse-calculate margin from cost + price (when margin is not set)
+    useEffect(() => {
+        if (formData.cost && formData.price && !formData.profit_margin) {
+            const cost = parseFloat(formData.cost);
+            const price = parseFloat(formData.price);
+            if (cost > 0) {
+                const margin = ((price - cost) / cost) * 100;
+                setCalculatedMargin(margin.toFixed(2));
+            } else {
+                setCalculatedMargin(null);
+            }
+        } else {
+            setCalculatedMargin(null);
+        }
+    }, [formData.cost, formData.price, formData.profit_margin]);
+
+    // Calculate final price with discount
+    useEffect(() => {
+        if (formData.price && formData.is_discount_active && formData.discount_percentage) {
+            const price = parseFloat(formData.price);
+            const discount = parseFloat(formData.discount_percentage);
+            if (price > 0 && discount > 0) {
+                const final = price * (1 - discount / 100);
+                setFinalPriceWithDiscount(final.toFixed(2));
+            } else {
+                setFinalPriceWithDiscount(null);
+            }
+        } else {
+            setFinalPriceWithDiscount(null);
+        }
+    }, [formData.price, formData.discount_percentage, formData.is_discount_active]);
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -189,8 +250,12 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
             min_stock: parseFloat(formData.min_stock) || 0,
             unit_type: formData.unit_type,
             location: formData.location,
-            exchange_rate_id: formData.exchange_rate_id ? parseInt(formData.exchange_rate_id) : null,  // Parse as integer
-            is_combo: formData.is_combo,  // NEW: Combo flag
+            exchange_rate_id: formData.exchange_rate_id ? parseInt(formData.exchange_rate_id) : null,
+            is_combo: formData.is_combo,
+            // Pricing System Fields
+            profit_margin: formData.profit_margin ? parseFloat(formData.profit_margin) : null,
+            discount_percentage: parseFloat(formData.discount_percentage) || 0,
+            is_discount_active: formData.is_discount_active,
             units: formData.units.map(u => {
                 let factor = parseFloat(u.user_input);
                 if (u.type === 'fraction') factor = factor !== 0 ? 1 / factor : 0;
@@ -200,10 +265,10 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
                     barcode: u.barcode,
                     price_usd: parseFloat(u.price_usd) || null,
                     is_default: false,
-                    exchange_rate_id: u.exchange_rate_id ? parseInt(u.exchange_rate_id) : null  // Parse as integer
+                    exchange_rate_id: u.exchange_rate_id ? parseInt(u.exchange_rate_id) : null
                 };
             }),
-            combo_items: formData.is_combo ? formData.combo_items.map(ci => ({  // NEW: Combo items
+            combo_items: formData.is_combo ? formData.combo_items.map(ci => ({
                 child_product_id: ci.child_product_id,
                 quantity: parseFloat(ci.quantity)
             })) : []
@@ -417,7 +482,119 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
                                 </div>
                             </div>
 
-                            {/* NEW: Exchange Rate Selector */}
+                            {/* NEW: Profit Margin Section */}
+                            <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 border border-green-200">
+                                <h4 className="text-lg font-bold text-green-800 mb-4 flex items-center">
+                                    📊 Margen de Ganancia
+                                </h4>
+
+                                <div className="grid grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-1">
+                                            % Ganancia Deseado
+                                        </label>
+                                        <div className="relative">
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                value={formData.profit_margin || ''}
+                                                onChange={(e) => setFormData({ ...formData, profit_margin: e.target.value })}
+                                                className="w-full pr-8 border-green-300 rounded-lg shadow-sm focus:border-green-500 focus:ring-green-500 py-3 text-lg"
+                                                placeholder="Ej: 30 para 30%"
+                                            />
+                                            <span className="absolute right-3 top-3 text-gray-500 font-bold">%</span>
+                                        </div>
+                                        <p className="text-xs text-green-600 mt-1">
+                                            El precio se calculará automáticamente
+                                        </p>
+                                    </div>
+
+                                    <div>
+                                        {calculatedPrice && (
+                                            <div className="bg-white rounded-lg p-4 border border-green-300">
+                                                <p className="text-xs text-gray-600 mb-1">💰 Precio Calculado:</p>
+                                                <p className="text-2xl font-bold text-green-700">
+                                                    {anchorCurrency.symbol}{calculatedPrice}
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {calculatedMargin && !formData.profit_margin && (
+                                            <div className="bg-white rounded-lg p-4 border border-blue-300">
+                                                <p className="text-xs text-gray-600 mb-1">📈 Margen Calculado:</p>
+                                                <p className="text-2xl font-bold text-blue-700">
+                                                    {calculatedMargin}%
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* NEW: Discount Section */}
+                            <div className="bg-gradient-to-r from-red-50 to-orange-50 rounded-xl p-6 border border-red-200">
+                                <h4 className="text-lg font-bold text-red-800 mb-4 flex items-center">
+                                    🏷️ Descuento Promocional
+                                </h4>
+
+                                <label className="flex items-center gap-3 mb-4 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.is_discount_active}
+                                        onChange={(e) => setFormData({ ...formData, is_discount_active: e.target.checked })}
+                                        className="w-5 h-5 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                                    />
+                                    <span className="text-sm font-semibold text-gray-900">
+                                        Activar descuento para este producto
+                                    </span>
+                                </label>
+
+                                {formData.is_discount_active && (
+                                    <div className="space-y-4">
+                                        <div className="grid grid-cols-2 gap-6">
+                                            <div>
+                                                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                                                    % Descuento
+                                                </label>
+                                                <div className="relative">
+                                                    <input
+                                                        type="number"
+                                                        step="0.01"
+                                                        min="0"
+                                                        max="100"
+                                                        value={formData.discount_percentage}
+                                                        onChange={(e) => setFormData({ ...formData, discount_percentage: e.target.value })}
+                                                        className="w-full pr-8 border-red-300 rounded-lg shadow-sm focus:border-red-500 focus:ring-red-500 py-3 text-lg"
+                                                        placeholder="Ej: 10"
+                                                    />
+                                                    <span className="absolute right-3 top-3 text-gray-500 font-bold">%</span>
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                {finalPriceWithDiscount && (
+                                                    <div className="bg-white rounded-lg p-4 border border-red-300">
+                                                        <p className="text-xs text-gray-600 mb-2">Precio Final:</p>
+                                                        <div className="flex items-center gap-3">
+                                                            <span className="line-through text-gray-400 text-lg">
+                                                                {anchorCurrency.symbol}{formData.price}
+                                                            </span>
+                                                            <span className="text-2xl font-bold text-red-600">
+                                                                {anchorCurrency.symbol}{finalPriceWithDiscount}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-sm text-green-600 font-semibold mt-2">
+                                                            💰 Ahorras: {anchorCurrency.symbol}{(formData.price - finalPriceWithDiscount).toFixed(2)}
+                                                        </p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Exchange Rate Selector */}
                             <div className="bg-purple-50 rounded-xl p-6 border border-purple-100">
                                 <h4 className="text-lg font-bold text-purple-800 mb-2 flex items-center">
                                     <Coins className="mr-2" size={20} /> Perfil de Tasa de Cambio

@@ -18,6 +18,12 @@ class ProductBase(BaseModel):
     stock: Decimal = Field(..., description="Cantidad actual en inventario físico", example="10.000")
     description: Optional[str] = Field(None, description="Descripción detallada del producto", example="Incluye maletín y brocas")
     cost_price: Optional[Decimal] = Field(Decimal("0.0000"), description="Costo de adquisición en USD", example="25.0000")
+    
+    # Pricing System Fields
+    profit_margin: Optional[Decimal] = Field(None, description="Margen de ganancia en porcentaje", example="30.00")
+    discount_percentage: Optional[Decimal] = Field(Decimal("0.00"), description="Descuento promocional en porcentaje", example="10.00")
+    is_discount_active: bool = Field(False, description="Activar/desactivar descuento promocional")
+    
     min_stock: Optional[Decimal] = Field(Decimal("5.000"), description="Nivel mínimo para alerta de reabastecimiento", example="5.000")
     unit_type: Optional[str] = Field("Unidad", description="Unidad de medida base", example="Unidad")
     is_box: bool = Field(False, description="Indica si es vendido por caja (Legacy)")
@@ -60,6 +66,12 @@ class ProductUnitBase(BaseModel):
     conversion_factor: Decimal
     barcode: Optional[str] = None
     price_usd: Optional[Decimal] = None
+    
+    # Pricing System Fields
+    profit_margin: Optional[Decimal] = None
+    discount_percentage: Optional[Decimal] = Decimal("0.00")
+    is_discount_active: bool = False
+    
     is_default: bool = False
     exchange_rate_id: Optional[int] = None  # NEW: Specific rate for this unit
 
