@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
-import { DollarSign, TrendingUp, ShoppingCart, Users, Calendar } from 'lucide-react';
+import { DollarSign, TrendingUp, ShoppingCart, Users, Calendar, Download } from 'lucide-react';
 import apiClient from '../config/axios';
+import reportService from '../services/reportService';
 
 const Dashboard = () => {
     const [financials, setFinancials] = useState(null);
     const [loading, setLoading] = useState(true);
     const [dateRange, setDateRange] = useState('today');
+    const [downloading, setDownloading] = useState(false);
 
     useEffect(() => {
         fetchFinancials();
@@ -75,6 +77,44 @@ const Dashboard = () => {
         return symbols[currency] || currency;
     };
 
+    const handleDownloadExcel = async () => {
+        setDownloading(true);
+        try {
+            // Calculate date range based on current selection
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const today = `${year}-${month}-${day}`;
+
+            let startDate = today;
+            let endDate = today;
+
+            if (dateRange === 'week') {
+                const weekAgo = new Date();
+                weekAgo.setDate(weekAgo.getDate() - 7);
+                const wYear = weekAgo.getFullYear();
+                const wMonth = String(weekAgo.getMonth() + 1).padStart(2, '0');
+                const wDay = String(weekAgo.getDate()).padStart(2, '0');
+                startDate = `${wYear}-${wMonth}-${wDay}`;
+            } else if (dateRange === 'month') {
+                const monthAgo = new Date();
+                monthAgo.setMonth(monthAgo.getMonth() - 1);
+                const mYear = monthAgo.getFullYear();
+                const mMonth = String(monthAgo.getMonth() + 1).padStart(2, '0');
+                const mDay = String(monthAgo.getDate()).padStart(2, '0');
+                startDate = `${mYear}-${mMonth}-${mDay}`;
+            }
+
+            await reportService.downloadExcelReport(startDate, endDate);
+        } catch (error) {
+            console.error('Error downloading Excel:', error);
+            alert('Error al descargar el reporte. Por favor intenta de nuevo.');
+        } finally {
+            setDownloading(false);
+        }
+    };
+
     if (loading) {
         return (
             <div className="flex items-center justify-center h-screen">
@@ -86,9 +126,19 @@ const Dashboard = () => {
     return (
         <div className="p-6 bg-gray-50 min-h-screen">
             {/* Header */}
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold text-gray-800 mb-2">Dashboar Financiero</h1>
-                <p className="text-gray-600">Resumen de ventas y métricas en tiempo real</p>
+            <div className="mb-8 flex items-center justify-between">
+                <div>
+                    <h1 className="text-3xl font-bold text-gray-800 mb-2">Dashboard Financiero</h1>
+                    <p className="text-gray-600">Resumen de ventas y métricas en tiempo real</p>
+                </div>
+                <button
+                    onClick={handleDownloadExcel}
+                    disabled={downloading}
+                    className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold rounded-xl hover:from-green-700 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg flex items-center gap-2"
+                >
+                    <Download size={20} />
+                    {downloading ? 'Generando...' : 'Exportar a Excel'}
+                </button>
             </div>
 
             {/* Date Range Selector */}

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Calendar, Search, TrendingUp, TrendingDown, AlertTriangle, DollarSign, Clock, User, CheckCircle, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Calendar, Search, TrendingUp, TrendingDown, AlertTriangle, DollarSign, Clock, User, CheckCircle, XCircle, ChevronDown, ChevronUp, Minus, Plus } from 'lucide-react';
 import cashService from '../services/cashService';
 
 const CashHistory = () => {
@@ -70,22 +70,40 @@ const CashHistory = () => {
     };
 
     const calculateDifference = (session) => {
-        const expected = parseFloat(session.expected_cash || 0);
-        const actual = parseFloat(session.final_cash || 0);
+        const expected = parseFloat(session.final_cash_expected || session.expected_cash || 0);
+        const actual = parseFloat(session.final_cash_reported || session.final_cash || 0);
         return actual - expected;
     };
 
-    const getDifferenceColor = (diff) => {
-        if (Math.abs(diff) < 0.01) return 'text-green-600 bg-green-50 border-green-200';
-        if (diff > 0) return 'text-green-600 bg-green-50 border-green-200';
-        return 'text-red-600 bg-red-50 border-red-200';
+    // Calculate KPIs for the period
+    const calculateKPIs = () => {
+        const closedSessions = sessions.filter(s => s.status === 'CLOSED');
+
+        let totalShortages = 0;
+        let totalOverages = 0;
+        let totalCashSales = 0;
+
+        closedSessions.forEach(session => {
+            const diff = calculateDifference(session);
+            if (diff < -0.01) {
+                totalShortages += Math.abs(diff);
+            } else if (diff > 0.01) {
+                totalOverages += diff;
+            }
+
+            // Calculate cash sales (final_expected - initial)
+            const expected = parseFloat(session.final_cash_expected || session.expected_cash || 0);
+            const initial = parseFloat(session.initial_cash || 0);
+            const sales = expected - initial;
+            if (sales > 0) {
+                totalCashSales += sales;
+            }
+        });
+
+        return { totalShortages, totalOverages, totalCashSales };
     };
 
-    const getDifferenceIcon = (diff) => {
-        if (Math.abs(diff) < 0.01) return <CheckCircle size={20} />;
-        if (diff > 0) return <TrendingUp size={20} />;
-        return <TrendingDown size={20} />;
-    };
+    const kpis = calculateKPIs();
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-6">
@@ -98,9 +116,9 @@ const CashHistory = () => {
                                 <div className="p-3 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl shadow-lg">
                                     <DollarSign className="text-white" size={32} />
                                 </div>
-                                Historial de Caja
+                                Panel de Auditoría de Cajas
                             </h1>
-                            <p className="text-gray-600 mt-2">Auditoría de cierres de caja y movimientos financieros</p>
+                            <p className="text-gray-600 mt-2">Monitoreo y control de cierres de caja</p>
                         </div>
                     </div>
 
@@ -143,6 +161,50 @@ const CashHistory = () => {
                     </div>
                 </div>
 
+                {/* KPI Cards */}
+                {!loading && sessions.length > 0 && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                        {/* Total Shortages */}
+                        <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-2xl shadow-xl p-6 text-white">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="p-3 bg-white/20 rounded-xl">
+                                    <TrendingDown size={28} />
+                                </div>
+                                <AlertTriangle size={24} className="opacity-70" />
+                            </div>
+                            <p className="text-sm font-medium opacity-90 mb-1">Total Faltantes del Período</p>
+                            <p className="text-3xl font-black">{formatCurrency(kpis.totalShortages)}</p>
+                            <p className="text-xs mt-2 opacity-75">Dinero faltante en cierres</p>
+                        </div>
+
+                        {/* Total Overages */}
+                        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl shadow-xl p-6 text-white">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="p-3 bg-white/20 rounded-xl">
+                                    <TrendingUp size={28} />
+                                </div>
+                                <CheckCircle size={24} className="opacity-70" />
+                            </div>
+                            <p className="text-sm font-medium opacity-90 mb-1">Total Sobrantes del Período</p>
+                            <p className="text-3xl font-black">{formatCurrency(kpis.totalOverages)}</p>
+                            <p className="text-xs mt-2 opacity-75">Dinero sobrante en cierres</p>
+                        </div>
+
+                        {/* Total Cash Sales */}
+                        <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl shadow-xl p-6 text-white">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="p-3 bg-white/20 rounded-xl">
+                                    <DollarSign size={28} />
+                                </div>
+                                <Plus size={24} className="opacity-70" />
+                            </div>
+                            <p className="text-sm font-medium opacity-90 mb-1">Total Ventas en Efectivo</p>
+                            <p className="text-3xl font-black">{formatCurrency(kpis.totalCashSales)}</p>
+                            <p className="text-xs mt-2 opacity-75">Ingresos en efectivo del período</p>
+                        </div>
+                    </div>
+                )}
+
                 {/* Error Message */}
                 {error && (
                     <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4 mb-6 flex items-center gap-3">
@@ -159,7 +221,7 @@ const CashHistory = () => {
                     </div>
                 )}
 
-                {/* Sessions List */}
+                {/* Empty State */}
                 {!loading && sessions.length === 0 && (
                     <div className="bg-white rounded-2xl shadow-sm p-12 text-center">
                         <DollarSign className="mx-auto text-gray-300 mb-4" size={64} />
@@ -168,212 +230,251 @@ const CashHistory = () => {
                     </div>
                 )}
 
+                {/* Professional Table */}
                 {!loading && sessions.length > 0 && (
-                    <div className="space-y-4">
-                        {sessions.map((session) => {
-                            const difference = calculateDifference(session);
-                            const isExpanded = expandedId === session.id;
-                            const isClosed = session.status === 'CLOSED';
+                    <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <thead className="bg-gradient-to-r from-gray-800 to-gray-900 text-white">
+                                    <tr>
+                                        <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">Fecha/Hora</th>
+                                        <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">Cajero</th>
+                                        <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-wider">Inicial</th>
+                                        <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-wider">Ventas</th>
+                                        <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-wider">Esperado</th>
+                                        <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-wider">Real</th>
+                                        <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-wider">Diferencia</th>
+                                        <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider">Estado</th>
+                                        <th className="px-6 py-4"></th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-200">
+                                    {sessions.map((session) => {
+                                        const difference = calculateDifference(session);
+                                        const isExpanded = expandedId === session.id;
+                                        const isClosed = session.status === 'CLOSED';
 
-                            return (
-                                <div
-                                    key={session.id}
-                                    className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all overflow-hidden border-2 border-gray-100"
-                                >
-                                    {/* Card Header */}
-                                    <div
-                                        className="p-6 cursor-pointer hover:bg-gray-50 transition-colors"
-                                        onClick={() => toggleExpand(session.id)}
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-4 flex-1">
-                                                {/* Status Badge */}
-                                                <div className={`p-3 rounded-xl ${isClosed ? 'bg-green-100' : 'bg-yellow-100'}`}>
-                                                    {isClosed ? (
-                                                        <CheckCircle className="text-green-600" size={24} />
-                                                    ) : (
-                                                        <Clock className="text-yellow-600" size={24} />
-                                                    )}
-                                                </div>
+                                        const initial = parseFloat(session.initial_cash || 0);
+                                        const expected = parseFloat(session.final_cash_expected || session.expected_cash || 0);
+                                        const sales = expected - initial;
 
-                                                {/* Session Info */}
-                                                <div className="flex-1">
-                                                    <div className="flex items-center gap-3 mb-2">
-                                                        <h3 className="text-lg font-bold text-gray-800">
-                                                            Sesión #{session.id}
-                                                        </h3>
-                                                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${isClosed ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                                                            }`}>
-                                                            {isClosed ? 'CERRADA' : 'ABIERTA'}
-                                                        </span>
-                                                    </div>
+                                        // Determine difference styling
+                                        let diffClass = 'bg-green-50 text-green-700 border-l-4 border-green-500';
+                                        let diffIcon = <CheckCircle size={18} />;
 
-                                                    <div className="flex flex-wrap gap-4 text-sm text-gray-600">
-                                                        <div className="flex items-center gap-1">
-                                                            <User size={14} />
-                                                            <span>{session.user?.full_name || session.user?.username || `Usuario #${session.user_id}`}</span>
-                                                        </div>
-                                                        <div className="flex items-center gap-1">
-                                                            <Clock size={14} />
-                                                            <span>{formatDate(session.opened_at)}</span>
-                                                        </div>
-                                                        {isClosed && session.closed_at && (
-                                                            <div className="flex items-center gap-1">
-                                                                <XCircle size={14} />
-                                                                <span>Cerrado: {formatDate(session.closed_at)}</span>
+                                        if (Math.abs(difference) < 0.01) {
+                                            diffClass = 'bg-green-50 text-green-700 border-l-4 border-green-500';
+                                            diffIcon = <CheckCircle size={18} />;
+                                        } else if (difference < 0) {
+                                            diffClass = 'bg-red-50 text-red-700 border-l-4 border-red-500';
+                                            diffIcon = <AlertTriangle size={18} />;
+                                        } else {
+                                            diffClass = 'bg-green-50 text-green-700 border-l-4 border-green-500';
+                                            diffIcon = <TrendingUp size={18} />;
+                                        }
+
+                                        return (
+                                            <>
+                                                <tr
+                                                    key={session.id}
+                                                    className="hover:bg-gray-50 transition-colors cursor-pointer"
+                                                    onClick={() => toggleExpand(session.id)}
+                                                >
+                                                    <td className="px-6 py-4 whitespace-nowrap">
+                                                        <div className="flex items-center gap-2">
+                                                            <Clock size={16} className="text-gray-400" />
+                                                            <div>
+                                                                <div className="text-sm font-medium text-gray-900">
+                                                                    {formatDate(session.opened_at)}
+                                                                </div>
+                                                                {isClosed && session.closed_at && (
+                                                                    <div className="text-xs text-gray-500">
+                                                                        Cerrado: {formatDate(session.closed_at)}
+                                                                    </div>
+                                                                )}
                                                             </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-
-                                                {/* Financial Summary */}
-                                                <div className="text-right">
-                                                    <p className="text-sm text-gray-500 mb-1">Efectivo Final</p>
-                                                    <p className="text-2xl font-black text-gray-800">
-                                                        {formatCurrency(session.final_cash || session.initial_cash)}
-                                                    </p>
-                                                    {isClosed && (
-                                                        <div className={`mt-2 px-3 py-1 rounded-lg border-2 inline-flex items-center gap-2 ${getDifferenceColor(difference)}`}>
-                                                            {getDifferenceIcon(difference)}
-                                                            <span className="text-sm font-bold">
-                                                                {Math.abs(difference) < 0.01 ? 'Cuadrado' :
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap">
+                                                        <div className="flex items-center gap-2">
+                                                            <User size={16} className="text-gray-400" />
+                                                            <span className="text-sm font-medium text-gray-900">
+                                                                {session.user?.full_name || session.user?.username || `Usuario #${session.user_id}`}
+                                                            </span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                                                        <span className="text-sm font-mono font-semibold text-gray-700">
+                                                            {formatCurrency(session.initial_cash)}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                                                        <span className="text-sm font-mono font-semibold text-blue-600">
+                                                            {formatCurrency(sales)}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                                                        <span className="text-sm font-mono font-semibold text-purple-600">
+                                                            {formatCurrency(expected)}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                                                        <span className="text-sm font-mono font-semibold text-gray-900">
+                                                            {formatCurrency(session.final_cash_reported || session.final_cash)}
+                                                        </span>
+                                                    </td>
+                                                    <td className={`px-6 py-4 whitespace-nowrap text-right ${diffClass}`}>
+                                                        <div className="flex items-center justify-end gap-2">
+                                                            {diffIcon}
+                                                            <span className="text-sm font-mono font-bold">
+                                                                {Math.abs(difference) < 0.01 ? '$0.00' :
                                                                     difference > 0 ? `+${formatCurrency(difference)}` :
                                                                         formatCurrency(difference)}
                                                             </span>
                                                         </div>
-                                                    )}
-                                                </div>
-                                            </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${isClosed ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                                                            }`}>
+                                                            {isClosed ? 'CERRADA' : 'ABIERTA'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                        {isExpanded ? (
+                                                            <ChevronUp className="text-gray-400" size={20} />
+                                                        ) : (
+                                                            <ChevronDown className="text-gray-400" size={20} />
+                                                        )}
+                                                    </td>
+                                                </tr>
 
-                                            {/* Expand Icon */}
-                                            <div className="ml-4">
-                                                {isExpanded ? (
-                                                    <ChevronUp className="text-gray-400" size={24} />
-                                                ) : (
-                                                    <ChevronDown className="text-gray-400" size={24} />
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Expanded Details */}
-                                    {isExpanded && (
-                                        <div className="border-t-2 border-gray-100 bg-gray-50 p-6">
-                                            {session.currencies && session.currencies.length > 0 ? (
-                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                                    {session.currencies.map((curr) => {
-                                                        const diff = curr.difference || 0;
-                                                        const hasDiff = Math.abs(diff) >= 0.01;
-
-                                                        return (
-                                                            <div key={curr.id} className="bg-white rounded-xl p-4 border-2 border-gray-100 shadow-sm">
-                                                                <div className="flex justify-between items-center mb-3 pb-2 border-b border-gray-100">
-                                                                    <span className="font-bold text-gray-700">{curr.currency_symbol}</span>
-                                                                    {isClosed && hasDiff && (
-                                                                        <span className={`text-xs font-bold px-2 py-1 rounded-full ${diff > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                                                            {diff > 0 ? 'Sobró' : 'Faltó'}
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-
-                                                                <div className="space-y-3">
+                                                {/* Expanded Details Row */}
+                                                {isExpanded && (
+                                                    <tr>
+                                                        <td colSpan="9" className="px-6 py-6 bg-gray-50 border-t-2 border-gray-200">
+                                                            <div className="space-y-4">
+                                                                {/* Currency Breakdown */}
+                                                                {session.currencies && session.currencies.length > 0 ? (
                                                                     <div>
-                                                                        <p className="text-xs text-gray-500 uppercase">Inicial</p>
-                                                                        <p className="font-mono font-bold text-gray-800">{formatCurrency(curr.initial_amount, curr.currency_symbol)}</p>
-                                                                    </div>
+                                                                        <h4 className="text-sm font-bold text-gray-700 mb-3 uppercase">Desglose por Moneda</h4>
+                                                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                                                            {session.currencies.map((curr) => {
+                                                                                const diff = curr.difference || 0;
+                                                                                const hasDiff = Math.abs(diff) >= 0.01;
 
-                                                                    {isClosed && (
-                                                                        <>
-                                                                            <div>
-                                                                                <p className="text-xs text-gray-500 uppercase">Esperado</p>
-                                                                                <p className="font-mono font-bold text-blue-600">{formatCurrency(curr.final_expected, curr.currency_symbol)}</p>
-                                                                            </div>
-                                                                            <div>
-                                                                                <p className="text-xs text-gray-500 uppercase">Reportado (Cierre)</p>
-                                                                                <p className="font-mono font-bold text-purple-600">{formatCurrency(curr.final_reported, curr.currency_symbol)}</p>
-                                                                            </div>
-                                                                            {hasDiff && (
-                                                                                <div className={`mt-2 p-2 rounded-lg ${diff > 0 ? 'bg-green-50' : 'bg-red-50'}`}>
-                                                                                    <p className="text-xs text-gray-500 uppercase">Diferencia</p>
-                                                                                    <p className={`font-mono font-bold ${diff > 0 ? 'text-green-700' : 'text-red-700'}`}>
-                                                                                        {diff > 0 ? '+' : ''}{formatCurrency(diff, curr.currency_symbol)}
+                                                                                return (
+                                                                                    <div key={curr.id} className="bg-white rounded-xl p-4 border-2 border-gray-200 shadow-sm">
+                                                                                        <div className="flex justify-between items-center mb-3 pb-2 border-b border-gray-100">
+                                                                                            <span className="font-bold text-gray-700">{curr.currency_symbol}</span>
+                                                                                            {isClosed && hasDiff && (
+                                                                                                <span className={`text-xs font-bold px-2 py-1 rounded-full ${diff > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                                                                                    }`}>
+                                                                                                    {diff > 0 ? 'Sobró' : 'Faltó'}
+                                                                                                </span>
+                                                                                            )}
+                                                                                        </div>
+
+                                                                                        <div className="space-y-2">
+                                                                                            <div>
+                                                                                                <p className="text-xs text-gray-500 uppercase">Inicial</p>
+                                                                                                <p className="font-mono font-bold text-gray-800">
+                                                                                                    {formatCurrency(curr.initial_amount, curr.currency_symbol)}
+                                                                                                </p>
+                                                                                            </div>
+
+                                                                                            {isClosed && (
+                                                                                                <>
+                                                                                                    <div>
+                                                                                                        <p className="text-xs text-gray-500 uppercase">Esperado</p>
+                                                                                                        <p className="font-mono font-bold text-blue-600">
+                                                                                                            {formatCurrency(curr.final_expected, curr.currency_symbol)}
+                                                                                                        </p>
+                                                                                                    </div>
+                                                                                                    <div>
+                                                                                                        <p className="text-xs text-gray-500 uppercase">Reportado</p>
+                                                                                                        <p className="font-mono font-bold text-purple-600">
+                                                                                                            {formatCurrency(curr.final_reported, curr.currency_symbol)}
+                                                                                                        </p>
+                                                                                                    </div>
+                                                                                                    {hasDiff && (
+                                                                                                        <div className={`p-2 rounded-lg ${diff > 0 ? 'bg-green-50' : 'bg-red-50'}`}>
+                                                                                                            <p className="text-xs text-gray-500 uppercase">Diferencia</p>
+                                                                                                            <p className={`font-mono font-bold ${diff > 0 ? 'text-green-700' : 'text-red-700'}`}>
+                                                                                                                {diff > 0 ? '+' : ''}{formatCurrency(diff, curr.currency_symbol)}
+                                                                                                            </p>
+                                                                                                        </div>
+                                                                                                    )}
+                                                                                                </>
+                                                                                            )}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                );
+                                                                            })}
+                                                                        </div>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                                        <div className="bg-white rounded-xl p-4 border-2 border-blue-100">
+                                                                            <p className="text-xs font-bold text-gray-500 uppercase mb-2">Efectivo Inicial</p>
+                                                                            <p className="text-xl font-black text-blue-600">
+                                                                                {formatCurrency(session.initial_cash)}
+                                                                            </p>
+                                                                        </div>
+
+                                                                        {isClosed && (
+                                                                            <>
+                                                                                <div className="bg-white rounded-xl p-4 border-2 border-purple-100">
+                                                                                    <p className="text-xs font-bold text-gray-500 uppercase mb-2">Efectivo Esperado</p>
+                                                                                    <p className="text-xl font-black text-purple-600">
+                                                                                        {formatCurrency(expected)}
                                                                                     </p>
                                                                                 </div>
-                                                                            )}
-                                                                        </>
-                                                                    )}
-                                                                </div>
+
+                                                                                <div className="bg-white rounded-xl p-4 border-2 border-green-100">
+                                                                                    <p className="text-xs font-bold text-gray-500 uppercase mb-2">Efectivo Contado</p>
+                                                                                    <p className="text-xl font-black text-green-600">
+                                                                                        {formatCurrency(session.final_cash_reported || session.final_cash)}
+                                                                                    </p>
+                                                                                </div>
+                                                                            </>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+
+                                                                {/* Notes */}
+                                                                {session.notes && (
+                                                                    <div className="bg-yellow-50 border-2 border-yellow-200 rounded-xl p-4">
+                                                                        <p className="text-xs font-bold text-yellow-800 uppercase mb-2">Notas del Cierre</p>
+                                                                        <p className="text-sm text-yellow-900">{session.notes}</p>
+                                                                    </div>
+                                                                )}
+
+                                                                {/* Difference Alert */}
+                                                                {isClosed && Math.abs(difference) >= 0.01 && (
+                                                                    <div className={`border-2 rounded-xl p-4 flex items-start gap-3 ${difference > 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
+                                                                        }`}>
+                                                                        <AlertTriangle className={difference > 0 ? 'text-green-600' : 'text-red-600'} size={20} />
+                                                                        <div>
+                                                                            <p className={`font-bold text-sm ${difference > 0 ? 'text-green-900' : 'text-red-900'}`}>
+                                                                                {difference > 0 ? 'Sobrante Detectado' : 'Faltante Detectado'}
+                                                                            </p>
+                                                                            <p className={`text-xs mt-1 ${difference > 0 ? 'text-green-700' : 'text-red-700'}`}>
+                                                                                Diferencia de {formatCurrency(Math.abs(difference))}.
+                                                                                {difference > 0 ? ' Hay más dinero del esperado.' : ' Falta dinero en el conteo.'}
+                                                                            </p>
+                                                                        </div>
+                                                                    </div>
+                                                                )}
                                                             </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                            ) : (
-                                                /* Fallback for old sessions without concurrency data */
-                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                                    {/* Initial Cash */}
-                                                    <div className="bg-white rounded-xl p-4 border-2 border-blue-100">
-                                                        <p className="text-xs font-bold text-gray-500 uppercase mb-2">Efectivo Inicial</p>
-                                                        <p className="text-2xl font-black text-blue-600">
-                                                            {formatCurrency(session.initial_cash)}
-                                                        </p>
-                                                        {session.initial_cash_bs && (
-                                                            <p className="text-sm text-gray-600 mt-1">
-                                                                {formatCurrency(session.initial_cash_bs, 'BS')}
-                                                            </p>
-                                                        )}
-                                                    </div>
-
-                                                    {/* Expected Cash */}
-                                                    {isClosed && (
-                                                        <div className="bg-white rounded-xl p-4 border-2 border-purple-100">
-                                                            <p className="text-xs font-bold text-gray-500 uppercase mb-2">Efectivo Esperado</p>
-                                                            <p className="text-2xl font-black text-purple-600">
-                                                                {formatCurrency(session.final_cash_expected ?? session.expected_cash)}
-                                                            </p>
-                                                        </div>
-                                                    )}
-
-                                                    {/* Final Cash */}
-                                                    {isClosed && (
-                                                        <div className="bg-white rounded-xl p-4 border-2 border-green-100">
-                                                            <p className="text-xs font-bold text-gray-500 uppercase mb-2">Efectivo Contado</p>
-                                                            <p className="text-2xl font-black text-green-600">
-                                                                {formatCurrency(session.final_cash_reported ?? session.final_cash)}
-                                                            </p>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
-
-                                            {/* Notes */}
-                                            {session.notes && (
-                                                <div className="mt-4 bg-yellow-50 border-2 border-yellow-200 rounded-xl p-4">
-                                                    <p className="text-xs font-bold text-yellow-800 uppercase mb-2">Notas del Cierre</p>
-                                                    <p className="text-sm text-yellow-900">{session.notes}</p>
-                                                </div>
-                                            )}
-
-                                            {/* Difference Alert */}
-                                            {isClosed && Math.abs(difference) >= 0.01 && (
-                                                <div className={`mt-4 border-2 rounded-xl p-4 flex items-start gap-3 ${difference > 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
-                                                    }`}>
-                                                    <AlertTriangle className={difference > 0 ? 'text-green-600' : 'text-red-600'} size={20} />
-                                                    <div>
-                                                        <p className={`font-bold text-sm ${difference > 0 ? 'text-green-900' : 'text-red-900'}`}>
-                                                            {difference > 0 ? 'Sobrante Detectado' : 'Faltante Detectado'}
-                                                        </p>
-                                                        <p className={`text-xs mt-1 ${difference > 0 ? 'text-green-700' : 'text-red-700'}`}>
-                                                            Diferencia de {formatCurrency(Math.abs(difference))}.
-                                                            {difference > 0 ? ' Hay más dinero del esperado.' : ' Falta dinero en el conteo.'}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })}
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 )}
             </div>
