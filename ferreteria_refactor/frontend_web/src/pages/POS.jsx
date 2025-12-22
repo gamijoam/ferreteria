@@ -12,6 +12,7 @@ import PaymentModal from '../components/pos/PaymentModal';
 import CashOpeningModal from '../components/cash/CashOpeningModal';
 import CashMovementModal from '../components/cash/CashMovementModal';
 import SaleSuccessModal from '../components/pos/SaleSuccessModal';
+import useBarcodeScanner from '../hooks/useBarcodeScanner';
 
 import apiClient from '../config/axios';
 
@@ -155,6 +156,78 @@ const POS = () => {
         }
     }, { enableOnFormTags: true });
 
+    // ========================================
+    // BARCODE SCANNER INTEGRATION
+    // ========================================
+
+    /**
+     * Handler para cuando se escanea un código de barras
+     * Busca el producto en el catálogo y lo agrega al carrito
+     */
+    const handleGlobalScan = (code) => {
+        console.log('🔍 Buscando producto con código:', code);
+        console.log('📦 Total productos en catálogo:', catalog.length);
+
+        // Buscar producto por SKU, nombre, ID, o barcode en units
+        const foundProduct = catalog.find(p => {
+            // Check SKU (handle both string and numeric)
+            const matchesSku = p.sku && (
+                p.sku.toString().toLowerCase() === code.toLowerCase() ||
+                p.sku.toString() === code
+            );
+
+            // Check name and ID
+            const matchesName = p.name.toLowerCase().includes(code.toLowerCase());
+            const matchesId = p.id.toString() === code;
+
+            // Check barcodes in product units
+            const matchesUnitBarcode = p.units && p.units.some(unit =>
+                unit.barcode && (
+                    unit.barcode.toString().toLowerCase() === code.toLowerCase() ||
+                    unit.barcode.toString() === code
+                )
+            );
+
+            const matches = matchesSku || matchesName || matchesId || matchesUnitBarcode;
+
+            // Debug log for each product checked
+            if (p.sku && p.sku.toString().includes(code)) {
+                console.log('🔎 Producto candidato:', {
+                    name: p.name,
+                    sku: p.sku,
+                    skuType: typeof p.sku,
+                    code: code,
+                    codeType: typeof code,
+                    matchesSku,
+                    matches
+                });
+            }
+
+            return matches;
+        });
+
+        if (foundProduct) {
+            console.log('✅ Producto encontrado:', foundProduct.name);
+            handleProductClick(foundProduct);
+        } else {
+            console.error('❌ Producto no encontrado para código:', code);
+            console.log('📋 Primeros 3 productos del catálogo:', catalog.slice(0, 3).map(p => ({
+                name: p.name,
+                sku: p.sku,
+                skuType: typeof p.sku
+            })));
+            alert(`Producto no encontrado: ${code}`);
+        }
+    };
+
+    // Activar el hook de escaneo
+    useBarcodeScanner(handleGlobalScan, {
+        minLength: 3,           // Códigos de al menos 3 caracteres
+        maxTimeBetweenKeys: 50, // Scanners escriben <50ms entre teclas
+        ignoreIfFocused: false  // Capturar incluso si hay un input enfocado
+    });
+
+
     // Fetch Catalog and Categories on Mount
     useEffect(() => {
         const fetchData = async () => {
@@ -201,7 +274,29 @@ const POS = () => {
 
     // Filter by search and category
     const filteredCatalog = catalog.filter(p => {
-        const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
+        // Search by name, SKU, or barcode in units
+        const searchLower = searchTerm.toLowerCase();
+
+        // Check product name and SKU
+        const matchesName = p.name.toLowerCase().includes(searchLower);
+
+        // SKU comparison - handle both string and numeric
+        const matchesSku = p.sku && (
+            p.sku.toString().toLowerCase().includes(searchLower) ||
+            p.sku.toString() === searchTerm
+        );
+
+        const matchesNameOrSku = matchesName || matchesSku;
+
+        // Check barcodes in product units (alternative presentations)
+        const matchesUnitBarcode = p.units && p.units.some(unit =>
+            unit.barcode && (
+                unit.barcode.toString().toLowerCase().includes(searchLower) ||
+                unit.barcode.toString() === searchTerm
+            )
+        );
+
+        const matchesSearch = matchesNameOrSku || matchesUnitBarcode;
 
         if (!selectedCategory) return matchesSearch;
 
