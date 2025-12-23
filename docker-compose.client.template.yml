@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  # ============================================
+  # BACKEND DEL CLIENTE
+  # ============================================
+  backend:
+    image: ghcr.io/gamijoam/ferreteria-backend:latest
+    container_name: ${CLIENT_NAME}-backend
+    restart: unless-stopped
+    environment:
+      # Conexión al Cluster compartido
+      DATABASE_URL: postgresql://${CLIENT_NAME}:${CLIENT_DB_PASSWORD}@pg-cluster:5432/${CLIENT_NAME}_db
+      
+      # Licenciamiento Cloud
+      LICENSE_MODE: CLOUD
+      CLOUD_LICENSE_KEY: ${CLIENT_LICENSE_KEY}
+      VIRTUAL_HOST: ${DOMAIN}
+      
+      # Configuración App
+      SECRET_KEY: ${CLIENT_SECRET_KEY}
+      ALLOWED_ORIGINS: "https://${DOMAIN},https://www.${DOMAIN}"
+    networks:
+      - proxy-public
+    labels:
+      # Router interno (para que el frontend local lo vea, pero no EXPUESTO al mundo directamente si no quieres)
+      - "traefik.enable=true"
+      - "traefik.http.routers.${CLIENT_NAME}-api.rule=Host(`${DOMAIN}`) && PathPrefix(`/api`, `/ws`, `/docs`, `/openapi.json`)"
+      - "traefik.http.routers.${CLIENT_NAME}-api.entrypoints=websecure"
+      - "traefik.http.routers.${CLIENT_NAME}-api.tls.certresolver=myresolver"
+
+  # ============================================
+  # FRONTEND DEL CLIENTE
+  # ============================================
+  frontend:
+    image: ghcr.io/gamijoam/ferreteria-frontend:latest
+    container_name: ${CLIENT_NAME}-frontend
+    restart: unless-stopped
+    environment:
+      # El frontend Nginx pasará esta variable si fuera necesario, pero la magia está en el navegador
+      # En producción Nginx sirve estáticos, la URL API se define en el navegador
+      - VITE_API_URL=/api/v1  
+    networks:
+      - proxy-public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${CLIENT_NAME}-web.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.${CLIENT_NAME}-web.entrypoints=websecure"
+      - "traefik.http.routers.${CLIENT_NAME}-web.tls.certresolver=myresolver"
+      # Redirección de API requests al backend container correcto (opcional si lo maneja Nginx interno)
+      
+networks:
+  proxy-public:
+    external: true

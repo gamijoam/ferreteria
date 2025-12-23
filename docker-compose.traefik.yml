@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  # ============================================
+  # TRAEFIK (Reverse Proxy & SSL Manager)
+  # ============================================
+  # Este servicio maneja TODO el tráfico entrante (puertos 80 y 443)
+  # y genera certificados SSL automáticamente.
+  traefik:
+    image: traefik:v2.10
+    container_name: traefik
+    command:
+      # Habilitar Dashboard (para ver estado)
+      - "--api.dashboard=true"
+      # Configurar EntryPoints (puertos de entrada)
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      # Redirección automática HTTP -> HTTPS
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      # Proveedor Docker (detecta contenedores automáticamente)
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      # Configuración de Certificados (Let's Encrypt - Producción)
+      # CAMBIAR ESTO en producción real
+      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
+      #- "--certificatesresolvers.myresolver.acme.email=tu-email@tudominio.com"
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+      # Puerto del Dashboard (proteger en producción con BasicAuth)
+      - "8080:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./letsencrypt:/letsencrypt"
+    networks:
+      - proxy-public
+    restart: unless-stopped
+
+  # ============================================
+  # DATABASE CLUSTER (PostgreSQL Compartido)
+  # ============================================
+  # Una sola instancia de Postgres para todos los clientes (bases separadas)
+  pg-cluster:
+    image: postgres:15-alpine
+    container_name: pg-cluster
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: admin_cluster
+      POSTGRES_PASSWORD: ${CLUSTER_DB_PASSWORD:-super_secure_password_for_all_clients}
+      # No creamos DB por defecto, las crearemos por cliente
+    volumes:
+      - pg_cluster_data:/var/lib/postgresql/data
+    networks:
+      - proxy-public
+    # Healthcheck para asegurar disponibilidad
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin_cluster"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  proxy-public:
+    name: proxy-public
+    driver: bridge
+
+volumes:
+  pg_cluster_data:
+    name: pg_cluster_data

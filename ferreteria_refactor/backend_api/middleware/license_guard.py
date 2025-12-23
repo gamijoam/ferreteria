@@ -10,6 +10,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from jose import jwt, JWTError
 from pathlib import Path
 import uuid
+import os
 from datetime import datetime
 
 
@@ -56,29 +57,56 @@ def validate_license():
     Raises:
         HTTPException: Si la licencia es inválida
     """
-    # Verificar que existe el archivo de licencia
-    if not LICENSE_FILE.exists():
-        raise HTTPException(
-            status_code=402,
-            detail={
-                "error": "NO_LICENSE",
-                "message": "No se encontró archivo de licencia. Por favor, active una licencia válida.",
-                "machine_id": get_machine_id()
-            }
-        )
-    
-    # Leer el token
-    try:
-        with open(LICENSE_FILE, 'r') as f:
-            token = f.read().strip()
-    except Exception as e:
-        raise HTTPException(
-            status_code=402,
-            detail={
-                "error": "LICENSE_READ_ERROR",
-                "message": f"Error al leer el archivo de licencia: {str(e)}"
-            }
-        )
+    # Verificar modo de licencia
+    license_mode = os.getenv("LICENSE_MODE", "OFFLINE").upper()
+    token = None
+
+    if license_mode == "CLOUD":
+        # En modo Cloud, intentamos leer la licencia de la variable de entorno
+        token = os.getenv("CLOUD_LICENSE_KEY")
+        if not token:
+             # Fallback: intentar leer archivo si no hay variable environment
+             if LICENSE_FILE.exists():
+                try:
+                    with open(LICENSE_FILE, 'r') as f:
+                        token = f.read().strip()
+                except Exception:
+                    pass
+        
+        if not token:
+            raise HTTPException(
+                status_code=402,
+                detail={
+                    "error": "NO_CLOUD_LICENSE",
+                    "message": "No se encontró configuración de licencia Cloud (CLOUD_LICENSE_KEY).",
+                    "machine_id": "CLOUD-INSTANCE"
+                }
+            )
+
+    else:
+        # Modo Offline: Requiere archivo físico
+        if not LICENSE_FILE.exists():
+            raise HTTPException(
+                status_code=402,
+                detail={
+                    "error": "NO_LICENSE",
+                    "message": "No se encontró archivo de licencia. Por favor, active una licencia válida.",
+                    "machine_id": get_machine_id()
+                }
+            )
+        
+        # Leer el token del archivo
+        try:
+            with open(LICENSE_FILE, 'r') as f:
+                token = f.read().strip()
+        except Exception as e:
+            raise HTTPException(
+                status_code=402,
+                detail={
+                    "error": "LICENSE_READ_ERROR",
+                    "message": f"Error al leer el archivo de licencia: {str(e)}"
+                }
+            )
     
     # Validar el token JWT
     try:
@@ -110,22 +138,44 @@ def validate_license():
                 }
             )
     
-    # Verificar hardware ID (solo para licencias FULL)
+    # Lógica Híbrida: CLOUD vs OFFLINE
+    license_mode = os.getenv("LICENSE_MODE", "OFFLINE").upper()
     license_type = payload.get("type", "FULL")
-    if license_type == "FULL":
-        license_hw_id = payload.get("hw_id")
-        current_hw_id = get_machine_id()
+
+    if license_mode == "CLOUD":
+        # Validación Modo Cloud (SaaS)
+        # En modo cloud, validamos que la licencia autorice este dominio/instancia
+        allowed_domain = payload.get("domain")
+        current_domain = os.getenv("VIRTUAL_HOST", "unknown")
         
-        if license_hw_id and license_hw_id != current_hw_id:
-            raise HTTPException(
+        # Si la licencia tiene restricción de dominio, validarla
+        if allowed_domain and allowed_domain not in current_domain:
+             raise HTTPException(
                 status_code=402,
                 detail={
-                    "error": "HARDWARE_MISMATCH",
-                    "message": "Esta licencia no es válida para este equipo.",
-                    "expected_hw_id": license_hw_id,
-                    "current_hw_id": current_hw_id
+                    "error": "DOMAIN_MISMATCH",
+                    "message": "Esta licencia no es válida para este dominio.",
+                    "expected_domain": allowed_domain,
+                    "current_domain": current_domain
                 }
             )
+            
+    else:
+        # Validación Modo Offline (Hardware ID)
+        if license_type == "FULL":
+            license_hw_id = payload.get("hw_id")
+            current_hw_id = get_machine_id()
+            
+            if license_hw_id and license_hw_id != current_hw_id:
+                raise HTTPException(
+                    status_code=402,
+                    detail={
+                        "error": "HARDWARE_MISMATCH",
+                        "message": "Esta licencia no es válida para este equipo.",
+                        "expected_hw_id": license_hw_id,
+                        "current_hw_id": current_hw_id
+                    }
+                )
     
     return payload
 
