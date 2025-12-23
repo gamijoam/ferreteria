@@ -38,3 +38,4 @@ websockets
 # Hardware Bridge (Thermal Printer)
 python-escpos
 jinja2==3.1.2
+aiofiles
