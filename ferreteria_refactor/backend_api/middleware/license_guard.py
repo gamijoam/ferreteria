@@ -61,7 +61,11 @@ def validate_license():
     license_mode = os.getenv("LICENSE_MODE", "OFFLINE").upper()
     token = None
 
-    if license_mode == "CLOUD":
+    # Prioridad 1: Variable de Entorno Directa (SaaS/Docker)
+    env_license_key = os.getenv("LICENSE_KEY")
+    if env_license_key:
+        token = env_license_key
+    elif license_mode == "CLOUD":
         # En modo Cloud, intentamos leer la licencia de la variable de entorno
         token = os.getenv("CLOUD_LICENSE_KEY")
         if not token:

@@ -14,7 +14,7 @@ services:
   db:
     image: postgres:15-alpine
     container_name: ferreteria_db
-    restart: unless-stopped
+    restart: always # Auto-restart
     environment:
       POSTGRES_DB: ferreteria
       POSTGRES_USER: ferreteria_user
@@ -40,7 +40,7 @@ services:
       context: .  # Contexto en la raíz para acceder a requirements.txt
       dockerfile: ferreteria_refactor/backend_api/Dockerfile
     container_name: ferreteria_backend
-    restart: unless-stopped
+    restart: always # Auto-restart
     environment:
       # Database connection
       DATABASE_URL: postgresql://ferreteria_user:${DB_PASSWORD:-changeme_in_production}@db:5432/ferreteria
@@ -49,6 +49,7 @@ services:
       SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-in-production}
       ALGORITHM: HS256
       ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      LICENSE_KEY: ${LICENSE_KEY} # Passing LICENSE_KEY env var
       
       # CORS (ajustar según dominio en producción)
       ALLOWED_ORIGINS: http://localhost,http://localhost:5173,http://localhost:8001
@@ -85,13 +86,13 @@ services:
       args:
         VITE_API_URL: /api/v1  # Relative URL - Nginx proxy handles routing
     container_name: ferreteria_frontend
-    restart: unless-stopped
+    restart: always # Auto-restart
     depends_on:
       - backend
     networks:
       - ferreteria-network
     ports:
-      - "5173:80"  # Puerto 5173 externo -> 80 interno (nginx)
+      - "80:80"  # Exposing port 80
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/"]
       interval: 30s
