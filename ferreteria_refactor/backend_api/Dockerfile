@@ -16,17 +16,25 @@ RUN apt-get update && apt-get install -y \
     postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements from root
-COPY ../../requirements.txt /app/requirements.txt
+# Upgrade pip
+RUN pip install --no-cache-dir --upgrade pip
+
+# Install uvicorn explicitly first (critical dependency)
+RUN pip install --no-cache-dir uvicorn[standard]
+
+# Copy requirements from root (build context is project root)
+COPY requirements.txt .
 
 # Install Python dependencies
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy backend code
-COPY . /app/backend_api
+# Verify uvicorn installation (debug step)
+RUN which uvicorn && uvicorn --version
 
-# Set PYTHONPATH to include the parent directory
+# Copy entire project structure
+COPY ferreteria_refactor/ /app/ferreteria_refactor/
+
+# Set PYTHONPATH to include the app directory
 ENV PYTHONPATH=/app
 
 # Create non-root user for security
@@ -39,7 +47,7 @@ EXPOSE 8000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8000/api/v1/system/health')" || exit 1
+    CMD python -c "import requests; requests.get('http://localhost:8000/api/v1/system/health', timeout=5)" || exit 1
 
-# Run uvicorn
-CMD ["uvicorn", "backend_api.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+# Run uvicorn using python -m for maximum compatibility
+CMD ["python", "-m", "uvicorn", "ferreteria_refactor.backend_api.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

@@ -1,5 +1,3 @@
-PySide6
-PySide6-Addons
 SQLAlchemy
 psycopg2-binary
 python-dotenv
@@ -10,3 +8,18 @@ xlrd
 passlib
 bcrypt==3.2.2
 websockets
+fastapi
+uvicorn
+sqlalchemy
+pydantic
+requests
+python-dotenv
+psycopg2-binary
+pandas
+openpyxl
+reportlab
+python-jose[cryptography]
+passlib[bcrypt]
+python-multipart
+xlrd
+alembic
