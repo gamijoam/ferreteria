@@ -1,25 +1,40 @@
+# ============================================
+# Requirements - Sistema de Ferretería
+# ============================================
+
+# Web Framework
+fastapi
+uvicorn[standard]
+python-multipart
+
+# Database
 SQLAlchemy
 psycopg2-binary
-python-dotenv
-pandas
-openpyxl
-reportlab
-xlrd
-passlib
-bcrypt==3.2.2
-websockets
-fastapi
-uvicorn
-sqlalchemy
+alembic
+
+# Data Models & Validation
 pydantic
-requests
-python-dotenv
-psycopg2-binary
-pandas
-openpyxl
-reportlab
+
+# Security & Authentication
 python-jose[cryptography]
 passlib[bcrypt]
-python-multipart
+bcrypt==3.2.2
+
+# Configuration
+python-dotenv
+
+# Data Processing & Reports
+pandas
+openpyxl
+reportlab
 xlrd
-alembic
+
+# HTTP Client
+requests
+
+# WebSocket
+websockets
+
+# Hardware Bridge (Thermal Printer)
+python-escpos
+jinja2==3.1.2
