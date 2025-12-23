@@ -19,17 +19,33 @@ export const WebSocketProvider = ({ children }) => {
             return;
         }
 
-        // Calculate WebSocket URL from environment variable
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api/v1';
+        // Calculate WebSocket URL dynamically
+        const getWsUrl = () => {
+            // Get base API URL from environment or axios config
+            let url = import.meta.env.VITE_API_URL || apiClient.defaults.baseURL || 'http://127.0.0.1:8000/api/v1';
 
-        // Convert http/https to ws/wss
-        const wsBaseUrl = apiUrl
-            .replace(/^https:/, 'wss:')
-            .replace(/^http:/, 'ws:')
-            .replace('/api/v1', ''); // Remove API version path
+            // Determine protocol based on current page protocol
+            if (window.location.protocol === 'https:') {
+                // HTTPS -> WSS (secure WebSocket)
+                url = url.replace(/^http:/, 'https:').replace(/^https:/, 'wss:');
+            } else {
+                // HTTP -> WS
+                url = url.replace(/^https:/, 'http:').replace(/^http:/, 'ws:');
+            }
 
-        // Construct WebSocket URL
-        const wsUrl = `${wsBaseUrl}/ws`;
+            // Ensure /ws endpoint
+            // If URL ends with /api/v1, append /ws
+            if (url.endsWith('/api/v1')) {
+                url = `${url}/ws`;
+            } else if (!url.endsWith('/ws')) {
+                // If it doesn't end with /ws, append it
+                url = `${url}/ws`;
+            }
+
+            return url;
+        };
+
+        const wsUrl = getWsUrl();
 
         console.log(`🔌 WS: Connecting to ${wsUrl} (Attempt ${retryCount.current + 1})`);
         setStatus(retryCount.current > 0 ? 'RECONNECTING' : 'DISCONNECTED'); // Visual state
