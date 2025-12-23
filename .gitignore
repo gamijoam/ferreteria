@@ -3,8 +3,10 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+
+# Distribution / Build
 # Environments
-.env
+# .env -> Allowed for local dev (audited)
 .venv
 env/
 venv/
@@ -22,8 +24,6 @@ deployment/dist/
 deployment/build/
 
 # IMPORTANT: Allow frontend_web/dist for client deployments
-# (Clients pull from Git and backend serves this directly)
-# DO NOT add dist/ here globally - it would ignore frontend_web/dist too
 
 
 # IDEs
