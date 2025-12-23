@@ -24,7 +24,7 @@ def run_broadcast(event: str, data: dict):
         loop.close()
 
 @router.get("/", response_model=List[schemas.ProductRead])
-def read_products(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def read_products(skip: int = 0, limit: int = 5000, db: Session = Depends(get_db)):
     try:
         products = db.query(models.Product).options(joinedload(models.Product.units)).filter(models.Product.is_active == True).offset(skip).limit(limit).all()
         print(f"✅ Loaded {len(products)} products successfully")
@@ -41,16 +41,30 @@ def create_product(product: schemas.ProductCreate, background_tasks: BackgroundT
     product_data = product.dict(exclude={"units", "combo_items"})
     db_product = models.Product(**product_data)
     db.add(db_product)
-    db.commit()
-    db.refresh(db_product)
+    try:
+        db.commit()
+        db.refresh(db_product)
+    except Exception as e:
+        db.rollback()
+        if "unique" in str(e).lower() or "duplicate" in str(e).lower():
+            raise HTTPException(status_code=400, detail="Product with this SKU or Name already exists")
+        raise HTTPException(status_code=500, detail=f"Database Error: {str(e)}")
 
     # Process Units
     if product.units:
         for unit in product.units:
             db_unit = models.ProductUnit(**unit.dict(), product_id=db_product.id)
             db.add(db_unit)
+    
+    try:
         db.commit()
         db.refresh(db_product)
+    except Exception as e:
+        db.rollback()
+        error_msg = str(e).lower()
+        if "unique" in error_msg or "duplicate" in error_msg:
+             raise HTTPException(status_code=400, detail=f"Error: SKU or Name already exists. ({str(e)})")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     
     # NEW: Process Combo Items
     if product.combo_items:

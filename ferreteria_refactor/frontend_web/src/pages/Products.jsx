@@ -276,7 +276,8 @@ const Products = () => {
                         setSelectedProduct(null);
                     } catch (error) {
                         console.error("Error saving product:", error);
-                        alert("Error al guardar producto");
+                        const errorMessage = error.response?.data?.detail || "Error al guardar producto";
+                        alert(errorMessage);
                     }
                 }}
             />
