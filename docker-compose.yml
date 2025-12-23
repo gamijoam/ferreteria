@@ -51,7 +51,7 @@ services:
       ACCESS_TOKEN_EXPIRE_MINUTES: 30
       
       # CORS (ajustar según dominio en producción)
-      ALLOWED_ORIGINS: http://localhost,http://localhost:5173,http://localhost:8000
+      ALLOWED_ORIGINS: http://localhost,http://localhost:5173,http://localhost:8001
       
       # Environment
       ENVIRONMENT: ${ENVIRONMENT:-production}
@@ -61,7 +61,7 @@ services:
     networks:
       - ferreteria-network
     ports:
-      - "8000:8000"
+      - "8001:8000"  # Puerto 8001 del host -> 8000 del contenedor (evita conflicto con Portainer)
     volumes:
       # Opcional: montar código para desarrollo
       # - ./ferreteria_refactor/backend_api:/app/backend_api
