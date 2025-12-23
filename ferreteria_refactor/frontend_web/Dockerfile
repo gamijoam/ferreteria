@@ -18,6 +18,10 @@ RUN npm ci
 # Copy source code
 COPY . .
 
+# Build argument for API URL (can be overridden at build time)
+ARG VITE_API_URL=/api/v1
+ENV VITE_API_URL=$VITE_API_URL
+
 # Build the application
 RUN npm run build
 

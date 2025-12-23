@@ -19,15 +19,17 @@ export const WebSocketProvider = ({ children }) => {
             return;
         }
 
-        // Calculate URL
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        // Use the base URL from axios config or default
-        const baseUrl = apiClient.defaults.baseURL
-            ? apiClient.defaults.baseURL.replace('http', 'ws')
-            : 'ws://127.0.0.1:8000/api/v1';
+        // Calculate WebSocket URL from environment variable
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api/v1';
 
-        // Ensure /ws endpoint
-        const wsUrl = baseUrl.endsWith('/ws') ? baseUrl : `${baseUrl}/ws`;
+        // Convert http/https to ws/wss
+        const wsBaseUrl = apiUrl
+            .replace(/^https:/, 'wss:')
+            .replace(/^http:/, 'ws:')
+            .replace('/api/v1', ''); // Remove API version path
+
+        // Construct WebSocket URL
+        const wsUrl = `${wsBaseUrl}/ws`;
 
         console.log(`🔌 WS: Connecting to ${wsUrl} (Attempt ${retryCount.current + 1})`);
         setStatus(retryCount.current > 0 ? 'RECONNECTING' : 'DISCONNECTED'); // Visual state
