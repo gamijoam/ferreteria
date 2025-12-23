@@ -128,7 +128,7 @@ const Dashboard = () => {
             {/* Header */}
             <div className="mb-8 flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-800 mb-2">Dashboarddds Financiero</h1>
+                    <h1 className="text-3xl font-bold text-gray-800 mb-2">Dashboardddsdsds Financiero</h1>
                     <p className="text-gray-600">Resumen de ventas y métricas en tiempo real</p>
                 </div>
                 <button
