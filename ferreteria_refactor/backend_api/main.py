@@ -3,6 +3,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import os
+import sys
+
+print("🔍 Verificando entorno Python...", flush=True)
+try:
+    import aiofiles
+    print("✅ aiofiles está instalado y disponible.", flush=True)
+except ImportError as e:
+    print(f"❌ ERROR CRÍTICO: aiofiles NO está instalado: {e}", flush=True)
 
 from .models import models
 from .database.db import engine
