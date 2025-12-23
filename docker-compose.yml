@@ -1,0 +1,118 @@
+# ============================================
+# Docker Compose - Ferretería System
+# ============================================
+# NOTA: Este archivo NO afecta el Launcher.pyw
+# Solo se usa para deployment en VPS
+# ============================================
+
+version: '3.8'
+
+services:
+  # ============================================
+  # PostgreSQL Database
+  # ============================================
+  db:
+    image: postgres:15-alpine
+    container_name: ferreteria_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ferreteria
+      POSTGRES_USER: ferreteria_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme_in_production}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    networks:
+      - ferreteria-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ferreteria_user -d ferreteria"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "5432:5432"  # Exponer solo si necesitas acceso externo
+
+  # ============================================
+  # Backend API (FastAPI + Uvicorn)
+  # ============================================
+  backend:
+    build:
+      context: .  # Contexto en la raíz para acceder a requirements.txt
+      dockerfile: ferreteria_refactor/backend_api/Dockerfile
+    container_name: ferreteria_backend
+    restart: unless-stopped
+    environment:
+      # Database connection
+      DATABASE_URL: postgresql://ferreteria_user:${DB_PASSWORD:-changeme_in_production}@db:5432/ferreteria
+      
+      # Application settings
+      SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-in-production}
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      
+      # CORS (ajustar según dominio en producción)
+      ALLOWED_ORIGINS: http://localhost,http://localhost:5173,http://localhost:8000
+      
+      # Environment
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - ferreteria-network
+    ports:
+      - "8000:8000"
+    volumes:
+      # Opcional: montar código para desarrollo
+      # - ./ferreteria_refactor/backend_api:/app/backend_api
+      
+      # Persistir archivos de licencia y logs
+      - backend_data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/api/v1/system/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ============================================
+  # Frontend (React + Nginx)
+  # ============================================
+  frontend:
+    build:
+      context: ./ferreteria_refactor/frontend_web
+      dockerfile: Dockerfile
+    container_name: ferreteria_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - ferreteria-network
+    ports:
+      - "5173:80"  # Puerto 5173 externo -> 80 interno (nginx)
+    environment:
+      - VITE_API_URL=http://backend:8000
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+# ============================================
+# Networks
+# ============================================
+networks:
+  ferreteria-network:
+    driver: bridge
+    name: ferreteria-network
+
+# ============================================
+# Volumes
+# ============================================
+volumes:
+  pg_data:
+    name: ferreteria_pg_data
+    driver: local
+  backend_data:
+    name: ferreteria_backend_data
+    driver: local
