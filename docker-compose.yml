@@ -1,119 +1,82 @@
-# ============================================
-# Docker Compose - Ferretería System
-# ============================================
-# NOTA: Este archivo NO afecta el Launcher.pyw
-# Solo se usa para deployment en VPS
-# ============================================
-
 version: '3.8'
 
 services:
   # ============================================
-  # PostgreSQL Database
+  # Database (PostgreSQL 15)
   # ============================================
   db:
     image: postgres:15-alpine
-    container_name: ferreteria_db
-    restart: always # Auto-restart
+    container_name: ferreteria_db_prod
+    restart: always
     environment:
-      POSTGRES_DB: ferreteria
-      POSTGRES_USER: ferreteria_user
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme_in_production}
+      POSTGRES_USER: ${POSTGRES_USER:-ferreteria_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secure_password}
+      POSTGRES_DB: ${POSTGRES_DB:-ferreteria}
       PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
-      - pg_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
     networks:
-      - ferreteria-network
+      - app_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ferreteria_user -d ferreteria"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ferreteria_user} -d ${POSTGRES_DB:-ferreteria}"]
       interval: 10s
       timeout: 5s
       retries: 5
-    ports:
-      - "5432:5432"  # Exponer solo si necesitas acceso externo
 
   # ============================================
-  # Backend API (FastAPI + Uvicorn)
+  # Backend API
   # ============================================
   backend:
     build:
-      context: .  # Contexto en la raíz para acceder a requirements.txt
+      context: .
       dockerfile: ferreteria_refactor/backend_api/Dockerfile
-    container_name: ferreteria_backend
-    restart: always # Auto-restart
-    environment:
-      # Database connection
-      DATABASE_URL: postgresql://ferreteria_user:${DB_PASSWORD:-changeme_in_production}@db:5432/ferreteria
-      
-      # Application settings
-      SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-in-production}
-      ALGORITHM: HS256
-      ACCESS_TOKEN_EXPIRE_MINUTES: 30
-      LICENSE_KEY: ${LICENSE_KEY} # Passing LICENSE_KEY env var
-      
-      # CORS (ajustar según dominio en producción)
-      ALLOWED_ORIGINS: http://localhost,http://localhost:5173,http://localhost:8001
-      
-      # Environment
-      ENVIRONMENT: ${ENVIRONMENT:-production}
+    container_name: ferreteria_backend_prod
+    restart: always
     depends_on:
       db:
         condition: service_healthy
-    networks:
-      - ferreteria-network
-    ports:
-      - "8001:8000"  # Puerto 8001 del host -> 8000 del contenedor (evita conflicto con Portainer)
-    volumes:
-      # Opcional: montar código para desarrollo
-      # - ./ferreteria_refactor/backend_api:/app/backend_api
+    environment:
+      # Database
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ferreteria_user}:${POSTGRES_PASSWORD:-secure_password}@db:5432/${POSTGRES_DB:-ferreteria}
       
-      # Persistir archivos de licencia y logs
+      # Security
+      SECRET_KEY: ${SECRET_KEY}
+      LICENSE_KEY: ${LICENSE_KEY}
+      
+      # CORS (Allow Frontend container and localhost)
+      ALLOWED_ORIGINS: "http://localhost,http://frontend"
+      
+      # Config
+      ENVIRONMENT: production
+    networks:
+      - app_network
+    volumes:
+      # Persist Application Data (Logs, Licenses, Media)
       - backend_data:/app/data
-    healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/api/v1/system/health')"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
 
   # ============================================
-  # Frontend (React + Nginx)
+  # Frontend Web
   # ============================================
   frontend:
     build:
       context: ./ferreteria_refactor/frontend_web
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: /api/v1  # Relative URL - Nginx proxy handles routing
-    container_name: ferreteria_frontend
-    restart: always # Auto-restart
+        # Pass API URL if needed during build (though runtime proxy is handled by nginx if configured)
+        VITE_API_URL: /api/v1
+    container_name: ferreteria_frontend_prod
+    restart: always
+    ports:
+      - "80:80"
+    networks:
+      - app_network
     depends_on:
       - backend
-    networks:
-      - ferreteria-network
-    ports:
-      - "80:80"  # Exposing port 80
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
 
-# ============================================
-# Networks
-# ============================================
 networks:
-  ferreteria-network:
+  app_network:
     driver: bridge
-    name: ferreteria-network
 
-# ============================================
-# Volumes
-# ============================================
 volumes:
-  pg_data:
-    name: ferreteria_pg_data
-    driver: local
+  postgres_data:
   backend_data:
-    name: ferreteria_backend_data
-    driver: local
