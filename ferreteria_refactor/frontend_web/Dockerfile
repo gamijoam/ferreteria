@@ -1,5 +1,5 @@
 # ============================================
-# Frontend Dockerfile (Multi-stage)
+# Frontend Dockerfile (Multi-stage Build)
 # ============================================
 
 # ============================================
@@ -13,7 +13,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm ci --only=production
+RUN npm ci
 
 # Copy source code
 COPY . .
@@ -29,7 +29,7 @@ FROM nginx:alpine
 # Copy built files from builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Create custom nginx configuration
+# Create custom nginx configuration for React Router (SPA)
 RUN echo 'server { \
     listen 80; \
     server_name _; \
