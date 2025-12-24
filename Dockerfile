@@ -1,5 +1,5 @@
 # Stage 1: Build Frontend
-FROM node:20-alpine as frontend-build
+FROM node:20-alpine AS frontend-build
 WORKDIR /app/frontend
 
 # Copy frontend configuration
@@ -21,7 +21,7 @@ COPY ferreteria_refactor/frontend_web/ ./
 RUN npm run build
 
 # Stage 2: Runtime Backend
-FROM python:3.11-slim
+FROM python:3.11-slim-bookworm
 WORKDIR /app
 
 # Install system dependencies (gcc, libpq-dev)

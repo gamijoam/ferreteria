@@ -38,6 +38,18 @@ const Login = () => {
                     )}
                 </div>
 
+                <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 transition-all hover:bg-blue-100">
+                    <p className="font-bold text-blue-700 text-sm mb-1">Credenciales de Acceso:</p>
+                    <div className="flex flex-col space-y-1">
+                        <p className="text-blue-700 text-sm">
+                            <span className="font-semibold">Usuario:</span> admin
+                        </p>
+                        <p className="text-blue-700 text-sm">
+                            <span className="font-semibold">Contraseña:</span> admin123
+                        </p>
+                    </div>
+                </div>
+
                 {error && (
                     <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 text-sm">
                         {error}
