@@ -13,6 +13,7 @@ router = APIRouter(
 )
 
 @router.get("/", response_model=List[schemas.CustomerRead])
+@router.get("", response_model=List[schemas.CustomerRead], include_in_schema=False)
 def read_customers(
     skip: int = 0, 
     limit: int = 100, 
@@ -29,6 +30,7 @@ def read_customers(
     return query.offset(skip).limit(limit).all()
 
 @router.post("/", response_model=schemas.CustomerRead)
+@router.post("", response_model=schemas.CustomerRead, include_in_schema=False)
 async def create_customer(customer: schemas.CustomerCreate, db: Session = Depends(get_db)):
     # Check duplicate ID
     if customer.id_number:

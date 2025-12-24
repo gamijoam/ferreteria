@@ -24,6 +24,7 @@ def run_broadcast(event: str, data: dict):
         loop.close()
 
 @router.get("/", response_model=List[schemas.ProductRead])
+@router.get("", response_model=List[schemas.ProductRead], include_in_schema=False)
 def read_products(skip: int = 0, limit: int = 5000, db: Session = Depends(get_db)):
     try:
         products = db.query(models.Product).options(joinedload(models.Product.units)).filter(models.Product.is_active == True).offset(skip).limit(limit).all()
@@ -36,6 +37,7 @@ def read_products(skip: int = 0, limit: int = 5000, db: Session = Depends(get_db
         raise HTTPException(status_code=500, detail=f"Error loading products: {str(e)}")
 
 @router.post("/", response_model=schemas.ProductRead, dependencies=[Depends(has_role([UserRole.ADMIN, UserRole.WAREHOUSE]))])
+@router.post("", response_model=schemas.ProductRead, dependencies=[Depends(has_role([UserRole.ADMIN, UserRole.WAREHOUSE]))], include_in_schema=False)
 def create_product(product: schemas.ProductCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     # 1. Operaciones DB (Síncronas en Threadpool)
     product_data = product.dict(exclude={"units", "combo_items"})

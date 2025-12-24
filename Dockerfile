@@ -1,49 +1,48 @@
-# --- ETAPA 1: Construcción del Frontend (React) ---
+# Stage 1: Build Frontend
 FROM node:20-alpine as frontend-build
-
 WORKDIR /app/frontend
 
-# Copiamos archivos de dependencias
-COPY ferreteria_refactor/frontend_web/package.json ferreteria_refactor/frontend_web/package-lock.json ./
+# Copy frontend configuration
+COPY ferreteria_refactor/frontend_web/package.json ./
+# Note: copying package-lock.json would be better for determinism, but user only mentioned package.json. 
+# Safe to include lock if it exists, or just package.json as requested.
+# I'll stick to user instructions strictly but generally good practice to copy lock. 
+# The directory listing showed package-lock.json exists. I'll include it implicitly if I copy dir, 
+# but for cache invalidation, better to copy specifically.
+# User said: "Copia el package.json del frontend". I will allow npm ci to fail back to install or warn if lock missing implies different content.
+# Actually `npm ci` REQUIRES package-lock.json. So I MUST copy it if I use `npm ci`.
+COPY ferreteria_refactor/frontend_web/package-lock.json ./
 
-# Instalamos dependencias
+# Install dependencies
 RUN npm ci
 
-# Copiamos el código fuente del frontend
+# Copy source code and build
 COPY ferreteria_refactor/frontend_web/ ./
-
-# Compilamos para producción (Esto crea la carpeta dist)
 RUN npm run build
 
-# --- ETAPA 2: Construcción del Backend (FastAPI) ---
+# Stage 2: Runtime Backend
 FROM python:3.11-slim
-
 WORKDIR /app
 
-# Instalamos dependencias de sistema necesarias para PostgreSQL y compilación
-RUN apt-get update && apt-get install -y \
+# Install system dependencies (gcc, libpq-dev)
+RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copiamos requirements e instalamos dependencias de Python
+# Install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install uvicorn psycopg2-binary aiofiles
 
-# Copiamos todo el código del proyecto
-COPY . .
+# Copy backend code
+# Only copying the necessary package structure
+COPY ferreteria_refactor /app/ferreteria_refactor
 
-# Copiamos el build del frontend desde la Etapa 1 a una carpeta 'static'
-# OJO: Ajustamos la ruta para que FastAPI la encuentre fácil
+# Copy built frontend from Stage 1 to /app/static
 COPY --from=frontend-build /app/frontend/dist /app/static
 
-# Variable de entorno para indicar que estamos en Docker
-ENV DOCKER_CONTAINER=true
-ENV DATABASE_URL=sqlite:///./ferreteria.db
+# Env vars
+ENV PYTHONPATH=/app
 
-# Exponemos el puerto
-EXPOSE 8000
-
-# Comando de inicio
+# Run uvicorn
 CMD ["uvicorn", "ferreteria_refactor.backend_api.main:app", "--host", "0.0.0.0", "--port", "8000"]

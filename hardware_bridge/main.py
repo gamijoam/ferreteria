@@ -6,6 +6,20 @@ from jinja2 import Template
 import re
 import datetime
 
+import os
+import sys
+from dotenv import load_dotenv
+
+# FIX: PyInstaller --noconsole sets stdout/stderr to None, causing Uvicorn logging to crash
+# FIX: Also force UTF-8 to prevent UnicodeEncodeError when writing emojis to devnull on Windows
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, "w", encoding="utf-8")
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, "w", encoding="utf-8")
+
+# Cargar variables de entorno desde .env (si existe)
+load_dotenv()
+
 app = FastAPI()
 
 # Configura CORS para permitir peticiones desde el frontend web
@@ -17,7 +31,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-PRINTER_MODE = "VIRTUAL"  # "VIRTUAL" (archivo) o "USB" (impresora real)
+# "VIRTUAL" (archivo/consola) o "USB" (impresora real)
+# Por defecto es USB para producción, pero se puede cambiar en .env
+PRINTER_MODE = os.getenv("PRINTER_MODE", "USB").upper()
 
 # ========================================
 # JINJA2 TEMPLATE SYSTEM
@@ -306,7 +322,8 @@ def read_root():
 
 if __name__ == "__main__":
     import uvicorn
-    print("🖨️  Iniciando Hardware Bridge v2.0 en Puerto 5001...")
-    print(f"📋 Modo: {PRINTER_MODE}")
-    print("✅ Jinja2 Template System Enabled")
+    # Removed emojis to prevent cp1252 encoding errors on some Windows systems
+    print("Iniciando Hardware Bridge v2.0 en Puerto 5001...")
+    print(f"Modo: {PRINTER_MODE}")
+    print("Jinja2 Template System Enabled")
     uvicorn.run(app, host="0.0.0.0", port=5001)

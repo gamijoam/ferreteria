@@ -11,6 +11,7 @@ router = APIRouter(
 )
 
 @router.get("/", response_model=List[schemas.CategoryResponse])
+@router.get("", response_model=List[schemas.CategoryResponse], include_in_schema=False)
 def get_categories(tree: bool = False, db: Session = Depends(get_db)):
     """
     Get all categories.
@@ -35,6 +36,7 @@ def get_category(category_id: int, db: Session = Depends(get_db)):
     return category
 
 @router.post("/", response_model=schemas.CategoryResponse)
+@router.post("", response_model=schemas.CategoryResponse, include_in_schema=False)
 def create_category(category: schemas.CategoryCreate, db: Session = Depends(get_db)):
     """Create a new category or subcategory"""
     

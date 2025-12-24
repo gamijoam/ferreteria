@@ -19,33 +19,15 @@ export const WebSocketProvider = ({ children }) => {
             return;
         }
 
-        // Calculate WebSocket URL dynamically
-        const getWsUrl = () => {
-            // Get base API URL from environment or axios config
-            let url = import.meta.env.VITE_API_URL || apiClient.defaults.baseURL || 'http://127.0.0.1:8000/api/v1';
+        // --- LÓGICA DINÁMICA DE WEBSOCKET ---
+        // Detectar si usamos https (wss) o http (ws)
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        // Detectar el host actual (ej: demo.invensoft.lat o localhost:8000)
+        const host = window.location.host;
+        // Construir la URL final
+        const wsUrl = `${protocol}//${host}/api/v1/ws`;
 
-            // Determine protocol based on current page protocol
-            if (window.location.protocol === 'https:') {
-                // HTTPS -> WSS (secure WebSocket)
-                url = url.replace(/^http:/, 'https:').replace(/^https:/, 'wss:');
-            } else {
-                // HTTP -> WS
-                url = url.replace(/^https:/, 'http:').replace(/^http:/, 'ws:');
-            }
-
-            // Ensure /ws endpoint
-            // If URL ends with /api/v1, append /ws
-            if (url.endsWith('/api/v1')) {
-                url = `${url}/ws`;
-            } else if (!url.endsWith('/ws')) {
-                // If it doesn't end with /ws, append it
-                url = `${url}/ws`;
-            }
-
-            return url;
-        };
-
-        const wsUrl = getWsUrl();
+        console.log("🔌 Conectando WS a:", wsUrl);
 
         console.log(`🔌 WS: Connecting to ${wsUrl} (Attempt ${retryCount.current + 1})`);
         setStatus(retryCount.current > 0 ? 'RECONNECTING' : 'DISCONNECTED'); // Visual state

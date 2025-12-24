@@ -259,31 +259,18 @@ def test_print_ticket(db: Session = Depends(get_db)):
     # Add alias 'products' to avoid Jinja collision with dict.items()
     context["sale"]["products"] = context["sale"]["items"]
     
-    # Send to hardware bridge
-    try:
-        # Check if template is present
-        template_content = template_config.value if (template_config and template_config.value) else "NOTE: No template saved. This is a test."
-        
-        response = requests.post(
-            "http://localhost:5001/print",
-            json={
-                "template": template_content,
-                "context": context
-            },
-            timeout=5
-        )
-        response.raise_for_status()
-        return {"status": "success", "message": "Test ticket sent to printer"}
-    except requests.exceptions.ConnectionError:
-        raise HTTPException(
-            status_code=503, 
-            detail="Hardware bridge not available. Make sure it's running on port 5001."
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Print error: {str(e)}")
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Print error: {str(e)}")
+    # Send to hardware bridge? 
+    # NO! In SaaS mode, the backend cannot reach the printer.
+    # We return the payload so the FRONTEND can send it to the local bridge.
+    
+    template_content = template_config.value if (template_config and template_config.value) else "NOTE: No template saved. This is a test."
+    
+    return {
+        "status": "ready_to_print",
+        "message": "Payload generated. Send this to local bridge.",
+        "template": template_content,
+        "context": context
+    }
 
 # ========================================
 # TEMPLATE PRESETS
@@ -325,7 +312,7 @@ def apply_template_preset(
         "preset_name": preset["name"]
     }
 
-@router.get("/", response_model=List[schemas.BusinessConfigRead])
+@router.get("", response_model=List[schemas.BusinessConfigRead])
 def get_all_configs(db: Session = Depends(get_db)):
     """Get all configuration entries"""
     return db.query(models.BusinessConfig).all()

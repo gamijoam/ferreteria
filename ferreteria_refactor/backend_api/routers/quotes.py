@@ -10,7 +10,7 @@ router = APIRouter(
     tags=["quotes"]
 )
 
-@router.post("/", response_model=schemas.QuoteRead)
+@router.post("", response_model=schemas.QuoteRead)
 def create_quote(quote_data: schemas.QuoteCreate, db: Session = Depends(get_db)):
     # Create Header
     new_quote = models.Quote(
@@ -39,7 +39,7 @@ def create_quote(quote_data: schemas.QuoteCreate, db: Session = Depends(get_db))
     # Pydantic will handle date conversion if models.date is datetime
     return new_quote
 
-@router.get("/", response_model=List[schemas.QuoteRead])
+@router.get("", response_model=List[schemas.QuoteRead])
 def read_quotes(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return db.query(models.Quote).order_by(models.Quote.date.desc()).offset(skip).limit(limit).all()
 

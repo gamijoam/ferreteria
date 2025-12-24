@@ -18,6 +18,7 @@ security = HTTPBasic()
 # Deleted local hash_password and verify_password in favor of imported ones
 
 @router.post("/", response_model=schemas.UserRead)
+@router.post("", response_model=schemas.UserRead, include_in_schema=False)
 def create_user(user_data: schemas.UserCreate, db: Session = Depends(get_db)):
     """Create a new user"""
     # Check if username already exists
@@ -38,6 +39,7 @@ def create_user(user_data: schemas.UserCreate, db: Session = Depends(get_db)):
     return user
 
 @router.get("/", response_model=List[schemas.UserRead])
+@router.get("", response_model=List[schemas.UserRead], include_in_schema=False)
 def get_all_users(db: Session = Depends(get_db)):
     """Get all users"""
     return db.query(models.User).all()

@@ -13,6 +13,7 @@ router = APIRouter(
 )
 
 @router.get("/", response_model=List[schemas.SupplierRead])
+@router.get("", response_model=List[schemas.SupplierRead], include_in_schema=False)
 def read_suppliers(
     skip: int = 0, 
     limit: int = 100, 
@@ -32,6 +33,7 @@ def read_suppliers(
     return query.order_by(models.Supplier.name).offset(skip).limit(limit).all()
 
 @router.post("/", response_model=schemas.SupplierRead)
+@router.post("", response_model=schemas.SupplierRead, include_in_schema=False)
 async def create_supplier(supplier: schemas.SupplierCreate, db: Session = Depends(get_db)):
     # Check duplicate name
     exists = db.query(models.Supplier).filter(models.Supplier.name.ilike(supplier.name)).first()

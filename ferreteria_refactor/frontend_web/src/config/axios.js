@@ -1,10 +1,18 @@
 import axios from 'axios';
 
+// --- CAMBIO PARA SOPORTE HÍBRIDO (LOCAL/SAAS) ---
+// Al usar '/api/v1', el navegador resolverá automáticamente:
+// - En local: http://localhost:8000/api/v1 (gracias al proxy de Vite)
+// - En VPS: https://demo.invensoft.lat/api/v1 (gracias a Nginx/Traefik)
+const baseURL = '/api/v1';
+
 const apiClient = axios.create({
-    baseURL: import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api/v1',
+    baseURL,
+    withCredentials: true,
     headers: {
         'Content-Type': 'application/json',
-    }
+        'Accept': 'application/json',
+    },
 });
 
 import toast from 'react-hot-toast';

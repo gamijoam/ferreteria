@@ -102,11 +102,41 @@ TOTAL:       {{ sale.total }}
     const handleTestPrint = async () => {
         setMessage(null);
         try {
-            await apiClient.post('/config/test-print');
-            setMessage({ type: 'success', text: '🖨️ Ticket de prueba enviado a impresora' });
+            // 1. Obtener datos de prueba (Template + Contexto Dummy) desde el Backend (Nube)
+            // El backend ya NO intenta imprimir, solo nos da los datos.
+            const response = await apiClient.post('/config/test-print');
+            const printPayload = response.data;
+
+            // 2. Enviar estos datos al Hardware Bridge LOCAL (Tu PC)
+            // Usamos fetch directo para saltarnos la baseURL de axios
+            try {
+                const bridgeResponse = await fetch('http://localhost:5001/print', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        template: printPayload.template,
+                        context: printPayload.context
+                    })
+                });
+
+                if (!bridgeResponse.ok) {
+                    throw new Error('Bridge error: ' + bridgeResponse.statusText);
+                }
+
+                setMessage({ type: 'success', text: '🖨️ Ticket enviado al Hardware Bridge Local' });
+            } catch (bridgeError) {
+                console.error("Local Bridge Error:", bridgeError);
+                setMessage({
+                    type: 'error',
+                    text: '❌ Error conectando con tu Impresora Local (localhost:5001). Asegúrate de que BridgeInvensoft.exe esté corriendo.'
+                });
+            }
+
         } catch (error) {
-            console.error('Error printing test:', error);
-            setMessage({ type: 'error', text: '❌ Error al imprimir prueba: ' + (error.response?.data?.detail || error.message) });
+            console.error('Error getting test data:', error);
+            setMessage({ type: 'error', text: '❌ Error obteniendo datos de prueba del servidor.' });
         }
     };
 

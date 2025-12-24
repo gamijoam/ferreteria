@@ -48,7 +48,7 @@ def get_sale_for_return(sale_id: int, db: Session = Depends(get_db)):
     
     return sale
 
-@router.post("/", response_model=schemas.ReturnRead)
+@router.post("", response_model=schemas.ReturnRead)
 def process_return(return_data: schemas.ReturnCreate, db: Session = Depends(get_db)):
     """Process a return: restore stock, create kardex entries, register cash movement"""
     
@@ -200,7 +200,7 @@ def process_return(return_data: schemas.ReturnCreate, db: Session = Depends(get_
     
     return new_return
 
-@router.get("/", response_model=List[schemas.ReturnRead])
+@router.get("", response_model=List[schemas.ReturnRead])
 def get_returns(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """Get list of returns"""
     return db.query(models.Return).options(

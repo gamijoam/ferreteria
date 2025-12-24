@@ -12,7 +12,7 @@ router = APIRouter(
     tags=["purchases"]
 )
 
-@router.post("/", response_model=schemas.PurchaseOrderResponse)
+@router.post("", response_model=schemas.PurchaseOrderResponse)
 async def create_purchase_order(order_data: schemas.PurchaseOrderCreate, db: Session = Depends(get_db)):
     """
     Create a new purchase order with automatic:
@@ -118,7 +118,7 @@ async def create_purchase_order(order_data: schemas.PurchaseOrderCreate, db: Ses
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.get("/", response_model=List[schemas.PurchaseOrderResponse])
+@router.get("", response_model=List[schemas.PurchaseOrderResponse])
 def get_all_purchase_orders(status: Optional[str] = None, db: Session = Depends(get_db)):
     """Get all purchase orders, optionally filtered by status"""
     query = db.query(models.PurchaseOrder).options(
