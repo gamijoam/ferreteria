@@ -221,9 +221,9 @@ const CustomerManager = () => {
                 </button>
             </div>
 
-            <div className="grid grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Left Panel - Customer List */}
-                <div className="col-span-1 bg-white rounded-lg shadow-md p-4">
+                <div className={`bg-white rounded-lg shadow-md p-4 ${selectedCustomer ? 'hidden md:block' : 'block'} md:col-span-1`}>
                     <div className="mb-4">
                         <div className="relative">
                             <Search className="absolute left-3 top-2.5 text-gray-400" size={20} />
@@ -285,7 +285,7 @@ const CustomerManager = () => {
                 </div>
 
                 {/* Right Panel - Customer Profile */}
-                <div className="col-span-2">
+                <div className={`md:col-span-2 ${!selectedCustomer ? 'hidden md:block' : 'block'}`}>
                     {!selectedCustomer ? (
                         <div className="bg-white rounded-lg shadow-md p-12 text-center">
                             <User className="mx-auto mb-4 text-gray-400" size={64} />
@@ -293,9 +293,17 @@ const CustomerManager = () => {
                         </div>
                     ) : (
                         <div className="space-y-6">
+                            {/* Mobile Back Button */}
+                            <button
+                                onClick={() => setSelectedCustomer(null)}
+                                className="md:hidden flex items-center text-gray-600 mb-2"
+                            >
+                                <Users className="mr-2" size={20} /> Volver a lista
+                            </button>
+
                             {/* Header */}
                             <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg shadow-lg p-6">
-                                <div className="flex justify-between items-start">
+                                <div className="flex flex-col md:flex-row justify-between items-start gap-4">
                                     <div>
                                         <h2 className="text-2xl font-bold mb-2">{selectedCustomer.name}</h2>
                                         <div className="space-y-1 text-blue-100">
@@ -304,8 +312,8 @@ const CustomerManager = () => {
                                             <p>📧 Email: {selectedCustomer.email || 'No registrado'}</p>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-3">
-                                        <label className="flex items-center gap-2 bg-white/20 px-4 py-2 rounded-lg cursor-pointer">
+                                    <div className="flex items-center gap-3 w-full md:w-auto">
+                                        <label className="flex items-center gap-2 bg-white/20 px-4 py-2 rounded-lg cursor-pointer w-full md:w-auto justify-center">
                                             <input
                                                 type="checkbox"
                                                 checked={selectedCustomer.is_blocked || false}
@@ -322,7 +330,7 @@ const CustomerManager = () => {
                             {loading ? (
                                 <div className="text-center p-8">Cargando estado financiero...</div>
                             ) : financialStatus && (
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {/* Credit Limit */}
                                     <div className="bg-white rounded-lg shadow-md p-6">
                                         <div className="flex items-center justify-between mb-2">
@@ -442,7 +450,8 @@ const CustomerManager = () => {
                             {/* Credit History */}
                             <div className="bg-white rounded-lg shadow-md p-6">
                                 <h3 className="text-xl font-bold text-gray-800 mb-4">Historial de Crédito</h3>
-                                <div className="overflow-x-auto">
+                                {/* Desktop Table */}
+                                <div className="hidden md:block overflow-x-auto">
                                     <table className="w-full">
                                         <thead className="bg-gray-50">
                                             <tr>
@@ -489,6 +498,40 @@ const CustomerManager = () => {
                                             )}
                                         </tbody>
                                     </table>
+                                </div>
+
+                                {/* Mobile Credit Cards */}
+                                <div className="md:hidden space-y-3">
+                                    {creditHistory.length === 0 ? (
+                                        <div className="text-center p-8 text-gray-500">
+                                            No hay historial de crédito
+                                        </div>
+                                    ) : (
+                                        creditHistory.map(sale => {
+                                            const status = getInvoiceStatus(sale);
+                                            return (
+                                                <div key={sale.id} className="bg-gray-50 p-4 rounded-lg border border-gray-100">
+                                                    <div className="flex justify-between items-start mb-2">
+                                                        <div className="font-bold text-gray-800">#{sale.id}</div>
+                                                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${status.bg} ${status.color}`}>
+                                                            {status.label}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex justify-between text-sm mb-1">
+                                                        <span className="text-gray-500">Fecha:</span>
+                                                        <span>{new Date(sale.date).toLocaleDateString('es-ES')}</span>
+                                                    </div>
+                                                    <div className="flex justify-between text-sm mb-2">
+                                                        <span className="text-gray-500">Vence:</span>
+                                                        <span>{sale.due_date ? new Date(sale.due_date).toLocaleDateString('es-ES') : 'N/A'}</span>
+                                                    </div>
+                                                    <div className="flex justify-end text-lg font-bold text-gray-800 pt-2 border-t border-gray-200">
+                                                        ${sale.total_amount.toFixed(2)}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })
+                                    )}
                                 </div>
                             </div>
                         </div>

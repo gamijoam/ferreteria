@@ -126,7 +126,7 @@ const Dashboard = () => {
     return (
         <div className="p-6 bg-gray-50 min-h-screen">
             {/* Header */}
-            <div className="mb-8 flex items-center justify-between">
+            <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-800 mb-2">Dashboard Financiero</h1>
                     <p className="text-gray-600">Resumen de ventas y métricas en tiempo real</p>
@@ -134,7 +134,7 @@ const Dashboard = () => {
                 <button
                     onClick={handleDownloadExcel}
                     disabled={downloading}
-                    className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold rounded-xl hover:from-green-700 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg flex items-center gap-2"
+                    className="w-full md:w-auto px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold rounded-xl hover:from-green-700 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg flex items-center justify-center gap-2"
                 >
                     <Download size={20} />
                     {downloading ? 'Generando...' : 'Exportar a Excel'}
@@ -142,10 +142,10 @@ const Dashboard = () => {
             </div>
 
             {/* Date Range Selector */}
-            <div className="mb-6 flex gap-3">
+            <div className="mb-6 flex flex-wrap gap-2 md:gap-3">
                 <button
                     onClick={() => setDateRange('today')}
-                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${dateRange === 'today'
+                    className={`flex-1 md:flex-none px-4 py-2 rounded-lg font-medium transition-colors ${dateRange === 'today'
                         ? 'bg-blue-600 text-white'
                         : 'bg-white text-gray-700 hover:bg-gray-100'
                         }`}
@@ -154,7 +154,7 @@ const Dashboard = () => {
                 </button>
                 <button
                     onClick={() => setDateRange('week')}
-                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${dateRange === 'week'
+                    className={`flex-1 md:flex-none px-4 py-2 rounded-lg font-medium transition-colors ${dateRange === 'week'
                         ? 'bg-blue-600 text-white'
                         : 'bg-white text-gray-700 hover:bg-gray-100'
                         }`}
@@ -163,7 +163,7 @@ const Dashboard = () => {
                 </button>
                 <button
                     onClick={() => setDateRange('month')}
-                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${dateRange === 'month'
+                    className={`flex-1 md:flex-none px-4 py-2 rounded-lg font-medium transition-colors ${dateRange === 'month'
                         ? 'bg-blue-600 text-white'
                         : 'bg-white text-gray-700 hover:bg-gray-100'
                         }`}

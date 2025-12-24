@@ -249,8 +249,8 @@ const SalesHistory = () => {
             </div>
 
             {/* Filters */}
-            <div className="bg-white rounded-lg shadow p-6 mb-6">
-                <div className="grid grid-cols-4 gap-4">
+            <div className="bg-white rounded-lg shadow p-4 md:p-6 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                             Fecha Desde
@@ -305,7 +305,8 @@ const SalesHistory = () => {
             </div>
 
             {/* Sales Table */}
-            <div className="bg-white rounded-lg shadow overflow-hidden">
+            {/* Desktop Sales Table */}
+            <div className="hidden md:block bg-white rounded-lg shadow overflow-hidden">
                 <table className="w-full">
                     <thead className="bg-gray-50">
                         <tr>
@@ -390,6 +391,69 @@ const SalesHistory = () => {
                         )}
                     </tbody>
                 </table>
+            </div>
+
+            {/* Mobile Sales Cards */}
+            <div className="md:hidden space-y-4">
+                {loading ? (
+                    <div className="text-center p-8 text-gray-500">Cargando...</div>
+                ) : filteredSales.length === 0 ? (
+                    <div className="text-center p-8 text-gray-500">No se encontraron ventas</div>
+                ) : (
+                    filteredSales.map(sale => (
+                        <div
+                            key={sale.id}
+                            className={`bg-white p-4 rounded-lg shadow-sm border border-gray-100 ${sale.status === 'VOIDED' ? 'bg-red-50 opacity-75' : ''}`}
+                            onClick={() => handleViewDetails(sale)}
+                        >
+                            <div className="flex justify-between items-start mb-3">
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-bold text-lg text-gray-800">#{sale.id}</span>
+                                        {getStatusBadge(sale.status)}
+                                    </div>
+                                    <div className="text-xs text-gray-500 mt-1">
+                                        {new Date(sale.date).toLocaleString('es-ES')}
+                                    </div>
+                                    <div className="text-sm font-medium text-gray-700 mt-1">
+                                        {sale.customer?.name || 'Cliente General'}
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <div className={`text-lg font-bold text-blue-600 ${sale.status === 'VOIDED' ? 'line-through text-gray-500' : ''}`}>
+                                        ${Number(sale.total_amount).toFixed(2)}
+                                    </div>
+                                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">
+                                        {sale.payment_method || 'Mixto'}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end gap-3 pt-3 border-t border-gray-100" onClick={(e) => e.stopPropagation()}>
+                                <button
+                                    onClick={() => handlePrintPDF(sale)}
+                                    className="flex items-center gap-1 text-sm text-indigo-600 font-medium px-2 py-1 bg-indigo-50 rounded"
+                                >
+                                    <FileText size={16} /> PDF
+                                </button>
+                                {sale.status !== 'VOIDED' && (
+                                    <button
+                                        onClick={() => handleVoidClick(sale)}
+                                        className="flex items-center gap-1 text-sm text-red-600 font-medium px-2 py-1 bg-red-50 rounded"
+                                    >
+                                        <Trash2 size={16} /> Anular
+                                    </button>
+                                )}
+                                <button
+                                    onClick={() => handleViewDetails(sale)}
+                                    className="flex items-center gap-1 text-sm text-blue-600 font-medium px-2 py-1 bg-blue-50 rounded"
+                                >
+                                    <Eye size={16} /> Ver
+                                </button>
+                            </div>
+                        </div>
+                    ))
+                )}
             </div>
 
             {/* Sale Detail Modal */}

@@ -163,8 +163,8 @@ const Products = () => {
                 </div>
             </div>
 
-            {/* Table */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+            {/* Desktop Table View */}
+            <div className="hidden md:block bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
                 <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                         <tr>
@@ -191,11 +191,6 @@ const Products = () => {
                                 const matchesCategory = !filterCategory || product.category_id === parseInt(filterCategory);
 
                                 // 3. Exchange Rate Filter
-                                // We check if the product ITSELF uses this rate OR if it inherits it (null) but we can't easily check inheritance here without more logic.
-                                // For now, we filter by explicit assignment. 
-                                // TO IMPROVE: If exchange_rate_id is null, it usually means "Default". 
-                                // But implementing "matches default" requires knowing the default logic.
-                                // We will filter by EXACT match of ID, or if we want to find "Default", maybe filterExchangeRate === 'null'.
                                 const matchesRate = !filterExchangeRate || product.exchange_rate_id === parseInt(filterExchangeRate);
 
                                 return matchesSearch && matchesCategory && matchesRate;
@@ -251,6 +246,73 @@ const Products = () => {
                             ))}
                     </tbody>
                 </table>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="md:hidden grid grid-cols-1 gap-4 pb-20">
+                {products
+                    .filter(product => {
+                        const matchesSearch = !searchTerm || (() => {
+                            const search = searchTerm.toLowerCase();
+                            return (
+                                product.name.toLowerCase().includes(search) ||
+                                (product.sku && product.sku.toLowerCase().includes(search))
+                            );
+                        })();
+                        const matchesCategory = !filterCategory || product.category_id === parseInt(filterCategory);
+                        const matchesRate = !filterExchangeRate || product.exchange_rate_id === parseInt(filterExchangeRate);
+                        return matchesSearch && matchesCategory && matchesRate;
+                    })
+                    .map(product => (
+                        <div key={product.id} className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 flex flex-col gap-3">
+                            <div className="flex justify-between items-start">
+                                <div className="flex items-center gap-3">
+                                    <div className="h-10 w-10 flex-shrink-0 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold">
+                                        {product.name.charAt(0)}
+                                    </div>
+                                    <div>
+                                        <div className="font-bold text-gray-800">{product.name}</div>
+                                        <div className="text-xs text-gray-500 flex gap-2">
+                                            <span>{product.sku || 'Sin SKU'}</span>
+                                            <span>•</span>
+                                            <span>{product.unit}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <span className={`px-2 py-1 text-xs font-semibold rounded-full ${product.stock > 10 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                    Example: {formatStock(product.stock)}
+                                </span>
+                            </div>
+
+                            <div className="flex justify-between items-end border-t pt-3 mt-1">
+                                <div>
+                                    <div className="text-lg font-bold text-blue-600">${Number(product.price).toFixed(2)}</div>
+                                    <div className="text-xs text-gray-500 flex flex-col">
+                                        {getActiveCurrencies().map(currency => (
+                                            <span key={currency.id}>
+                                                {convertProductPrice(product, currency.currency_code).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currency.symbol}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        setSelectedProduct(product);
+                                        setIsModalOpen(true);
+                                    }}
+                                    className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                                >
+                                    Editar
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                {/* Empty State Helper for Mobile */}
+                {products.length === 0 && (
+                    <div className="text-center py-10 text-gray-500">
+                        No se encontraron productos.
+                    </div>
+                )}
             </div>
 
             <ProductForm

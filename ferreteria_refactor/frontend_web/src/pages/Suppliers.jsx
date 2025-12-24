@@ -67,22 +67,22 @@ const Suppliers = () => {
 
     return (
         <div className="p-6">
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-800">Proveedores</h1>
                     <p className="text-gray-600">Gestión de proveedores y términos de crédito</p>
                 </div>
                 <button
                     onClick={() => setShowModal(true)}
-                    className="flex items-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow transition-colors"
+                    className="w-full md:w-auto flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow transition-colors"
                 >
                     <Plus size={20} className="mr-2" />
                     Nuevo Proveedor
                 </button>
             </div>
 
-            {/* Suppliers Table */}
-            <div className="bg-white rounded-lg shadow">
+            {/* Suppliers Table (Desktop) */}
+            <div className="hidden md:block bg-white rounded-lg shadow">
                 <table className="w-full">
                     <thead className="bg-gray-50 border-b">
                         <tr>
@@ -162,6 +162,70 @@ const Suppliers = () => {
                         )}
                     </tbody>
                 </table>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="md:hidden space-y-4">
+                {loading ? (
+                    <div className="text-center p-8 text-gray-500">Cargando...</div>
+                ) : suppliers.length === 0 ? (
+                    <div className="text-center p-8 text-gray-500">No hay proveedores registrados</div>
+                ) : (
+                    suppliers.map(supplier => (
+                        <div key={supplier.id} className="bg-white p-4 rounded-lg shadow border border-gray-100 flex flex-col gap-3">
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <h3 className="font-bold text-gray-800 text-lg">{supplier.name}</h3>
+                                    {supplier.contact_person && (
+                                        <div className="text-sm text-gray-600 flex items-center mt-1">
+                                            <Building2 size={14} className="mr-1" /> {supplier.contact_person}
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="text-right">
+                                    <div className={`font-bold text-lg ${supplier.current_balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                        ${Number(supplier.current_balance || 0).toFixed(2)}
+                                    </div>
+                                    <div className="text-xs text-gray-500">Deuda Actual</div>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 text-sm border-t border-b border-gray-100 py-2">
+                                <div>
+                                    <div className="text-gray-500 text-xs">Teléfono</div>
+                                    <div className="font-medium">{supplier.phone || '-'}</div>
+                                </div>
+                                <div>
+                                    <div className="text-gray-500 text-xs">Email</div>
+                                    <div className="font-medium truncate">{supplier.email || '-'}</div>
+                                </div>
+                                <div>
+                                    <div className="text-gray-500 text-xs">Crédito</div>
+                                    <div className="font-medium">{supplier.credit_limit ? `$${Number(supplier.credit_limit).toFixed(2)}` : '-'}</div>
+                                </div>
+                                <div>
+                                    <div className="text-gray-500 text-xs">Plazo</div>
+                                    <div className="font-medium">{supplier.payment_terms || 0} días</div>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end gap-3 pt-2">
+                                <button
+                                    onClick={() => handleEdit(supplier)}
+                                    className="flex items-center text-blue-600 bg-blue-50 px-3 py-2 rounded-lg font-medium text-sm"
+                                >
+                                    <Edit2 size={16} className="mr-1" /> Editar
+                                </button>
+                                <button
+                                    onClick={() => handleDelete(supplier.id, supplier.name)}
+                                    className="flex items-center text-red-600 bg-red-50 px-3 py-2 rounded-lg font-medium text-sm"
+                                >
+                                    <Trash2 size={16} className="mr-1" /> Eliminar
+                                </button>
+                            </div>
+                        </div>
+                    ))
+                )}
             </div>
 
             {/* Modal */}

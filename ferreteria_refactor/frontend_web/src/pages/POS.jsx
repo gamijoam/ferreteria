@@ -463,17 +463,25 @@ const POS = () => {
         clearCart();
     };
 
+    // Mobile View State
+    const [mobileTab, setMobileTab] = useState('catalog'); // 'catalog' | 'ticket'
+
     return (
-        <div className="flex h-[calc(100vh-64px)] overflow-hidden bg-gray-100">
-            {/* LEFT COLUMN: Catalog (70%) */}
-            <div className="w-[70%] flex flex-col p-4 border-r border-gray-300">
+        <div className="flex flex-col md:flex-row h-[calc(100vh-64px)] overflow-hidden bg-gray-100 relative">
+
+            {/* LEFT COLUMN: Catalog (Mobile: Show only if tab is catalog. Desktop: Always 70%) */}
+            <div className={`
+                flex-col p-4 border-r border-gray-300 transition-all
+                ${mobileTab === 'catalog' ? 'flex w-full' : 'hidden md:flex w-full md:w-[70%]'}
+                h-full
+            `}>
                 {/* Search */}
                 <div className="mb-4 relative">
                     <Search className="absolute left-4 top-3.5 text-gray-400" size={24} />
                     <input
                         ref={searchInputRef}
                         type="text"
-                        className="w-full text-xl pl-12 pr-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-0 outline-none shadow-sm"
+                        className="w-full text-lg md:text-xl pl-12 pr-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-0 outline-none shadow-sm"
                         placeholder="Buscar producto (F3)..."
                         value={searchTerm}
                         onChange={(e) => {
@@ -482,18 +490,17 @@ const POS = () => {
                         }}
                         autoFocus
                     />
-                    {/* Keyboard hint */}
-                    <div className="absolute right-3 top-3 flex gap-1">
+                    {/* Keyboard hint - Hide on mobile */}
+                    <div className="hidden md:flex absolute right-3 top-3 gap-1">
                         <kbd className="px-2 py-1 text-xs font-semibold text-gray-600 bg-gray-100 border border-gray-300 rounded shadow-sm">F3</kbd>
                         <kbd className="px-2 py-1 text-xs font-semibold text-gray-600 bg-gray-100 border border-gray-300 rounded shadow-sm">↑↓</kbd>
-                        <kbd className="px-2 py-1 text-xs font-semibold text-gray-600 bg-gray-100 border border-gray-300 rounded shadow-sm">Enter</kbd>
                     </div>
                 </div>
 
                 {/* Category Filters */}
                 <div className="mb-4">
                     {/* Parent Categories */}
-                    <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-300">
+                    <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-300 touch-pan-x">
                         <button
                             onClick={() => setSelectedCategory(null)}
                             className={`px-4 py-2 rounded-full font-medium whitespace-nowrap transition-all ${!selectedCategory
@@ -519,7 +526,7 @@ const POS = () => {
 
                     {/* Subcategories (if parent selected) */}
                     {selectedCategory && getSubcategories(selectedCategory).length > 0 && (
-                        <div className="flex items-center gap-2 overflow-x-auto mt-2 pb-2 scrollbar-thin scrollbar-thumb-gray-300">
+                        <div className="flex items-center gap-2 overflow-x-auto mt-2 pb-2 scrollbar-thin scrollbar-thumb-gray-300 touch-pan-x">
                             <span className="text-xs text-gray-500 font-medium whitespace-nowrap">Subcategorías:</span>
                             {getSubcategories(selectedCategory).map(subcategory => (
                                 <button
@@ -538,29 +545,30 @@ const POS = () => {
                 </div>
 
                 {/* Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 overflow-y-auto pr-2 pb-20">
+                {/* Mobile: grid-cols-2, Desktop: grid-cols-3/4. Added pb-24 for mobile fab space */}
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4 overflow-y-auto pr-2 pb-24 md:pb-20">
                     {filteredCatalog.map((product, index) => (
                         <div
                             key={product.id}
                             onClick={() => handleProductClick(product)}
-                            className={`bg-white p-4 rounded-xl shadow-sm hover:shadow-md cursor-pointer border transition-all flex flex-col justify-between h-40 ${index === selectedProductIndex
+                            className={`bg-white p-3 md:p-4 rounded-xl shadow-sm hover:shadow-md cursor-pointer border transition-all flex flex-col justify-between h-40 ${index === selectedProductIndex
                                 ? 'border-blue-500 ring-2 ring-blue-300 bg-blue-50'
                                 : 'border-transparent hover:border-blue-400'
                                 }`}
                         >
-                            <div>
-                                <h3 className="font-bold text-gray-800 leading-tight mb-1">{product.name}</h3>
-                                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                            <div className="overflow-hidden">
+                                <h3 className="font-bold text-gray-800 leading-tight mb-1 text-sm md:text-base line-clamp-2">{product.name}</h3>
+                                <span className="text-[10px] md:text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded inline-block">
                                     Stock: {formatStock(product.stock || 0)}
                                 </span>
                             </div>
-                            <div className="mt-2 self-end">
-                                <span className="block text-right text-lg font-bold text-blue-600">
+                            <div className="mt-2 self-end w-full">
+                                <span className="block text-right text-base md:text-lg font-bold text-blue-600">
                                     ${Number(product.price).toFixed(2)}
                                 </span>
                                 {product.units?.length > 0 && (
-                                    <span className="block text-right text-xs text-orange-500 font-medium">
-                                        + {product.units.length} Presentaciones
+                                    <span className="block text-right text-[10px] md:text-xs text-orange-500 font-medium truncate">
+                                        + {product.units.length} Pres.
                                     </span>
                                 )}
                             </div>
@@ -569,116 +577,158 @@ const POS = () => {
                 </div>
             </div>
 
-            {/* RIGHT COLUMN: Ticket (30%) */}
-            <div className="w-[30%] bg-white flex flex-col shadow-2xl h-full border-l">
-                <div className="bg-slate-800 text-white p-4 shadow-md">
-                    <div className="flex justify-between items-center mb-2">
+            {/* RIGHT COLUMN: Ticket (Mobile: Show only if tab is ticket. Desktop: Always 30% and flex) */}
+            <div className={`
+                bg-white flex-col shadow-2xl h-full border-l
+                ${mobileTab === 'ticket' ? 'flex w-full absolute inset-0 z-10' : 'hidden md:flex w-[30%]'}
+            `}>
+                <div className="bg-slate-800 text-white p-4 shadow-md flex justify-between items-center">
+                    <div className="flex items-center">
+                        {/* Mobile Back Button */}
+                        <button
+                            onClick={() => setMobileTab('catalog')}
+                            className="mr-3 md:hidden p-1 hover:bg-slate-700 rounded"
+                        >
+                            <Search size={20} />
+                        </button>
                         <h2 className="text-xl font-bold flex items-center">
-                            <ShoppingCart className="mr-2" /> Ticket
+                            <ShoppingCart className="mr-2" size={20} /> <span className="hidden sm:inline">Ticket</span>
                         </h2>
+                    </div>
+
+                    <div className="flex items-center gap-2">
                         <button
                             onClick={clearCart}
-                            className="text-xs bg-red-500 hover:bg-red-600 px-2 py-1 rounded transition flex items-center gap-1"
+                            className="text-xs bg-red-500 hover:bg-red-600 px-3 py-1.5 rounded transition flex items-center gap-1 font-bold"
                             title="Nueva Venta (F2)"
                         >
-                            Limpiar
-                            <kbd className="ml-1 px-1 py-0.5 text-[10px] bg-red-600 rounded">F2</kbd>
+                            <Trash2 size={14} />
+                            <span className="hidden lg:inline">Limpiar</span>
                         </button>
-                    </div>
-                    <div className="flex space-x-2">
-                        <button
-                            onClick={() => setIsMovementOpen(true)}
-                            className="flex-1 text-xs bg-slate-700 hover:bg-slate-600 py-1 rounded text-center border border-slate-600"
-                        >
-                            Gasto/Retiro
-                        </button>
-                        <Link
-                            to="/cash-close"
-                            className="flex-1 text-xs bg-slate-700 hover:bg-slate-600 py-1 rounded text-center border border-slate-600 block"
-                        >
-                            Cerrar Caja
-                        </Link>
                     </div>
                 </div>
 
-                {/* List */}
-                <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                {/* Operations Toolbar */}
+                <div className="bg-slate-100 p-2 flex space-x-2 border-b">
+                    <button
+                        onClick={() => setIsMovementOpen(true)}
+                        className="flex-1 text-xs bg-white hover:bg-gray-50 text-slate-700 py-2 rounded text-center border shadow-sm font-medium"
+                    >
+                        Gasto/Retiro
+                    </button>
+                    <Link
+                        to="/cash-close"
+                        className="flex-1 text-xs bg-white hover:bg-gray-50 text-slate-700 py-2 rounded text-center border shadow-sm font-medium block"
+                    >
+                        Cerrar Caja
+                    </Link>
+                </div>
+
+                {/* Cart List */}
+                <div className="flex-1 overflow-y-auto p-2 space-y-2 pb-32 md:pb-0">
                     {cart.length === 0 && (
                         <div className="flex flex-col items-center justify-center h-full text-gray-400 opacity-50">
                             <ShoppingCart size={48} className="mb-2" />
                             <p>Carrito Vacío</p>
+                            <button
+                                onClick={() => setMobileTab('catalog')}
+                                className="mt-4 text-blue-500 underline md:hidden"
+                            >
+                                Ir al Catálogo
+                            </button>
                         </div>
                     )}
-                    {cart.map(item => (
+                    {cart.map((item, idx) => (
                         <div
-                            key={item.id + (item.unit_id || '')}
+                            key={`${item.id}-${item.unit_id}-${idx}`}
                             onClick={() => setSelectedItemForEdit(item)}
-                            className="flex justify-between items-center p-3 hover:bg-blue-50 cursor-pointer rounded-lg border-b border-gray-100 last:border-0 transition-colors group"
+                            className="flex justify-between items-center p-3 hover:bg-blue-50 cursor-pointer rounded-lg border-b border-gray-100 last:border-0 transition-colors group relative"
                         >
-                            <div className="flex-1">
-                                <div className="font-medium text-gray-800 leading-snug">{item.name}</div>
-                                <div className="text-xs text-gray-500 flex gap-2 items-center flex-wrap">
-                                    <span className="bg-blue-100 text-blue-700 px-1.5 rounded">
+                            <div className="flex-1 pr-2">
+                                <div className="font-medium text-gray-800 leading-snug text-sm md:text-base">{item.name}</div>
+                                <div className="text-xs text-gray-500 flex gap-2 items-center flex-wrap mt-1">
+                                    <span className="bg-blue-100 text-blue-700 px-1.5 rounded whitespace-nowrap">
                                         {item.unit_name} {item.unit_id ? <span>(x{item.conversion_factor})</span> : null}
                                     </span>
-                                    <span>${Number(item.unit_price_usd || 0).toFixed(2)}</span>
-
-                                    {/* NEW: Special Rate Indicator */}
                                     {item.is_special_rate && (
-                                        <span className="bg-purple-100 text-purple-700 px-1.5 rounded font-semibold flex items-center gap-1" title={`Usando tasa: ${item.exchange_rate_name}`}>
-                                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                                <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z" />
-                                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clipRule="evenodd" />
-                                            </svg>
-                                            {item.exchange_rate_name}
+                                        <span className="bg-purple-100 text-purple-700 px-1.5 rounded font-semibold flex items-center gap-1" title={item.exchange_rate_name}>
+                                            <RotateCcw size={10} />
+                                            Rs
                                         </span>
                                     )}
                                 </div>
                             </div>
-                            <div className="flex flex-col items-end">
+                            <div className="flex flex-col items-end min-w-[80px]">
                                 <span className="text-lg font-bold text-gray-800">x{item.quantity}</span>
-                                <span className="font-bold text-blue-600">${Number(item.subtotal_usd || 0).toFixed(2)}</span>
+                                <span className="font-bold text-blue-600 text-sm">${Number(item.subtotal_usd || 0).toFixed(2)}</span>
                             </div>
                         </div>
                     ))}
                 </div>
 
-                {/* Footer Totals */}
-                <div className="bg-gray-50 p-4 border-t-2 border-slate-200">
+                {/* Footer Totals (Fixed at bottom on desktop, integrated in flow) */}
+                <div className="bg-gray-50 p-4 border-t-2 border-slate-200 mt-auto shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-20">
                     <div className="space-y-2 mb-4">
                         {/* Base Currency (Anchor) */}
                         <div className="flex justify-between items-end border-b pb-2">
                             <span className="text-gray-500 text-sm font-medium">Total ({anchorCurrency.symbol})</span>
                             <span className="text-3xl font-bold text-gray-800">{anchorCurrency.symbol}{Number(totalUSD).toFixed(2)}</span>
                         </div>
-                        {/* Other Currencies */}
-                        {getActiveCurrencies().map(curr => {
-                            // Get total for this currency from cart calculations
-                            const currencyTotal = totalsByCurrency?.[curr.currency_code] || 0;
-
-                            return (
-                                <div key={curr.id} className="flex justify-between items-end">
-                                    <span className="text-gray-500 text-xs font-medium">Total {curr.name}</span>
-                                    <span className="text-lg font-bold text-blue-600 font-mono">
-                                        {curr.symbol} {currencyTotal.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                    </span>
-                                </div>
-                            );
-                        })}
+                        {/* Other Currencies Compact View */}
+                        <div className="flex flex-wrap gap-4 justify-end">
+                            {getActiveCurrencies().map(curr => {
+                                const currencyTotal = totalsByCurrency?.[curr.currency_code] || 0;
+                                return (
+                                    <div key={curr.id} className="text-right">
+                                        <span className="text-[10px] text-gray-500 block">{curr.name}</span>
+                                        <span className="text-sm font-bold text-blue-600 font-mono">
+                                            {curr.symbol} {currencyTotal.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </span>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
 
                     <button
                         onClick={() => setIsPaymentOpen(true)}
                         disabled={cart.length === 0}
-                        className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl shadow-lg transform active:scale-95 transition-all text-xl flex items-center justify-center gap-2"
+                        className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-3 md:py-4 rounded-xl shadow-lg transform active:scale-95 transition-all text-lg md:text-xl flex items-center justify-center gap-2"
                     >
                         COBRAR ${Number(totalUSD).toFixed(2)}
-                        <kbd className="px-2 py-1 text-sm font-semibold bg-blue-700 rounded shadow-sm">F5</kbd>
+                        <kbd className="hidden md:inline px-2 py-1 text-sm font-semibold bg-blue-700 rounded shadow-sm">F5</kbd>
+                    </button>
+                    {/* Botón para volver al catálogo en móvil (solo visible si estamos en modo ticket) */}
+                    <button
+                        onClick={() => setMobileTab('catalog')}
+                        className="md:hidden w-full mt-2 text-gray-500 py-2 text-sm"
+                    >
+                        Seguir Comprando
                     </button>
                 </div>
             </div>
 
-            {/* Modals */}
+            {/* MOBILE FLOATING ACTION BUTTON (Summary) - Only visible when in Catalog mode and cart has items */}
+            {mobileTab === 'catalog' && cart.length > 0 && (
+                <div className="md:hidden fixed bottom-6 left-4 right-4 z-30">
+                    <button
+                        onClick={() => setMobileTab('ticket')}
+                        className="w-full bg-slate-800 text-white p-4 rounded-xl shadow-2xl flex justify-between items-center animate-bounce-slight"
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="bg-blue-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm">
+                                {cart.length}
+                            </div>
+                            <span className="font-medium">Ver / Pagar</span>
+                        </div>
+                        <span className="text-xl font-bold">
+                            ${Number(totalUSD).toFixed(2)}
+                        </span>
+                    </button>
+                </div>
+            )}
+
+            {/* Modals Logic Remains Same */}
             <UnitSelectionModal
                 isOpen={!!selectedProductForUnits}
                 product={selectedProductForUnits}
