@@ -471,7 +471,7 @@ const POS = () => {
 
             {/* LEFT COLUMN: Catalog (Mobile: Show only if tab is catalog. Desktop: Always 70%) */}
             <div className={`
-                flex-col p-4 border-r border-gray-300 transition-all
+                flex-col p-4 border-r border-gray-300 transition-all min-w-0
                 ${mobileTab === 'catalog' ? 'flex w-full' : 'hidden md:flex w-full md:w-[70%]'}
                 h-full
             `}>
@@ -579,7 +579,7 @@ const POS = () => {
 
             {/* RIGHT COLUMN: Ticket (Mobile: Show only if tab is ticket. Desktop: Always 30% and flex) */}
             <div className={`
-                bg-white flex-col shadow-2xl h-full border-l
+                bg-white flex-col shadow-2xl h-full border-l min-w-0
                 ${mobileTab === 'ticket' ? 'flex w-full absolute inset-0 z-10' : 'hidden md:flex w-[30%]'}
             `}>
                 <div className="bg-slate-800 text-white p-4 shadow-md flex justify-between items-center">
@@ -644,8 +644,8 @@ const POS = () => {
                             onClick={() => setSelectedItemForEdit(item)}
                             className="flex justify-between items-center p-3 hover:bg-blue-50 cursor-pointer rounded-lg border-b border-gray-100 last:border-0 transition-colors group relative"
                         >
-                            <div className="flex-1 pr-2">
-                                <div className="font-medium text-gray-800 leading-snug text-sm md:text-base">{item.name}</div>
+                            <div className="flex-1 pr-2 min-w-0">
+                                <div className="font-medium text-gray-800 leading-snug text-sm md:text-base truncate">{item.name}</div>
                                 <div className="text-xs text-gray-500 flex gap-2 items-center flex-wrap mt-1">
                                     <span className="bg-blue-100 text-blue-700 px-1.5 rounded whitespace-nowrap">
                                         {item.unit_name} {item.unit_id ? <span>(x{item.conversion_factor})</span> : null}
