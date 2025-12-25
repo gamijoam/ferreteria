@@ -1,43 +1,34 @@
 import apiClient from '../config/axios';
 
+// Hardware Bridge Client ID (should match .env in Hardware Bridge)
+const HARDWARE_CLIENT_ID = 'escritorio-caja-1';
+
 const printerService = {
     /**
-     * Trigger re-print of a ticket via backend
+     * Trigger print via WebSocket to Hardware Bridge
      * @param {number} saleId - The ID of the sale to print
      */
     printTicket: async (saleId) => {
         try {
-            // 1. Get Payload from Backend (SaaS)
-            const response = await apiClient.post(`/products/sales/${saleId}/print`);
-            const payload = response.data;
-
-            if (!payload.template || !payload.context) {
-                console.warn("Backend returned incomplete payload:", payload);
-                if (payload.message) return payload; // Maybe it's just a message
-            }
-
-            // 2. Send to Local Hardware Bridge (Localhost)
-            // Use fetch directly to avoid apiClient interceptors/base URLs
-            const bridgeResponse = await fetch("http://localhost:5001/print", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify(payload)
+            // Send print command to backend, which forwards to Hardware Bridge via WebSocket
+            const response = await apiClient.post(`/products/print/remote`, {
+                client_id: HARDWARE_CLIENT_ID,
+                sale_id: saleId
             });
 
-            if (!bridgeResponse.ok) {
-                const errText = await bridgeResponse.text();
-                throw new Error(`Bridge Error: ${bridgeResponse.statusText} - ${errText}`);
-            }
-
-            return await bridgeResponse.json();
+            return response.data;
         } catch (error) {
             console.error("Print Error:", error);
-            // Enhance error message
-            if (error.message.includes("Failed to fetch")) {
-                throw new Error("No se puede conectar con el Puente de Impresión (Hardware Bridge). Verifique que 'BridgeInvensoft.exe' esté ejecutándose en el puerto 5001.");
+
+            // Enhanced error messages
+            if (error.response?.status === 503) {
+                throw new Error("Hardware Bridge no está conectado. Verifique que 'BridgeInvensoft.exe' esté ejecutándose.");
+            } else if (error.response?.status === 500) {
+                throw new Error(error.response?.data?.detail || "Error al enviar comando de impresión");
+            } else if (error.message.includes("Network Error")) {
+                throw new Error("No se puede conectar con el servidor. Verifique su conexión a internet.");
             }
+
             throw error;
         }
     }

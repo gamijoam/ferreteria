@@ -668,3 +668,12 @@ class AuditLogRead(AuditLogBase):
 
     class Config:
         from_attributes = True
+
+# ========================
+# Remote Print Schemas
+# ========================
+
+class RemotePrintRequest(BaseModel):
+    """Request body for remote printing via WebSocket"""
+    client_id: str = Field(..., description="Hardware Bridge client ID", example="escritorio-caja-1")
+    sale_id: int = Field(..., description="Sale ID to print", example=123)

@@ -20,6 +20,7 @@ from .routers import (
     inventory, returns, reports, purchases, users, 
     config, auth, categories, websocket, audit, system
 )
+from .routers.hardware_bridge import router as hardware_bridge_router  # WebSocket router
 from .middleware.license_guard import LicenseGuardMiddleware
 
 app = FastAPI(
@@ -70,6 +71,7 @@ app.include_router(categories, prefix="/api/v1", tags=["Categorías"])
 app.include_router(websocket, prefix="/api/v1", tags=["WebSocket Events"])
 app.include_router(audit, prefix="/api/v1", tags=["Auditoría"])
 app.include_router(system, prefix="/api/v1", tags=["Sistema y Licencias"])
+app.include_router(hardware_bridge_router, prefix="/api/v1", tags=["Hardware Bridge"])
 
 # --- LÓGICA DE INICIALIZACIÓN ---
 def run_migrations():

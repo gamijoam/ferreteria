@@ -344,6 +344,57 @@ def print_sale_endpoint(sale_id: int, db: Session = Depends(get_db)):
     # Now returns JSON { template, context, status }
     return SalesService.get_sale_print_payload(db, sale_id)
 
+@router.post("/print/remote")
+async def print_remote(
+    request: schemas.RemotePrintRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Send print command to Hardware Bridge via WebSocket
+    
+    Args:
+        request: RemotePrintRequest with client_id and sale_id
+    
+    Returns:
+        Success/failure status
+    """
+    from ..services.sales_service import SalesService
+    from ..services.websocket_manager import manager
+    
+    # Check if Hardware Bridge is connected
+    if not manager.is_client_connected(request.client_id):
+        raise HTTPException(
+            status_code=503,
+            detail=f"Hardware Bridge '{request.client_id}' no está conectado. Verifique que BridgeInvensoft.exe esté ejecutándose."
+        )
+    
+    # Get print payload
+    try:
+        payload = SalesService.get_sale_print_payload(db, request.sale_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generando ticket: {str(e)}")
+    
+    # Send to Hardware Bridge via WebSocket
+    message = {
+        "type": "print",
+        "sale_id": request.sale_id,
+        "payload": payload
+    }
+    
+    success = await manager.send_to_client(request.client_id, message)
+    
+    if not success:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error enviando comando de impresión a '{request.client_id}'"
+        )
+    
+    return {
+        "status": "success",
+        "message": f"Comando de impresión enviado a {request.client_id}",
+        "sale_id": request.sale_id
+    }
+
 @router.post("/sales/payments")
 def register_sale_payment(
     payment_data: schemas.SalePaymentCreate,

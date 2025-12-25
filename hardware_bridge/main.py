@@ -1,119 +1,238 @@
-from fastapi import FastAPI, HTTPException, Request, Response
-from starlette.middleware.base import BaseHTTPMiddleware
-from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
-from jinja2 import Template
-import re
-import datetime
-
+"""
+Hardware Bridge - WebSocket Client
+Connects to VPS and listens for print commands
+No HTTP server - pure WebSocket client
+"""
+import asyncio
+import websockets
+import json
 import os
 import sys
-from dotenv import load_dotenv
+import configparser
+from pathlib import Path
 
-# FIX: PyInstaller --noconsole sets stdout/stderr to None, causing Uvicorn logging to crash
-# FIX: Also force UTF-8 to prevent UnicodeEncodeError when writing emojis to devnull on Windows
-# FIX: PyInstaller --noconsole sets stdout/stderr to None.
-# Redirect to FILE for debugging instead of devnull.
+# FIX: PyInstaller --noconsole sets stdout/stderr to None
 if sys.stdout is None:
     sys.stdout = open("bridge_debug.log", "w", encoding="utf-8")
 if sys.stderr is None:
     sys.stderr = open("bridge_debug.log", "w", encoding="utf-8")
 
-# Cargar variables de entorno desde .env (si existe)
-load_dotenv()
+# ========================================
+# CONFIGURATION MANAGEMENT
+# ========================================
+
+def get_config_path():
+    """Get path to config.ini in the same directory as the executable"""
+    if getattr(sys, 'frozen', False):
+        # Running as compiled executable
+        app_dir = Path(sys.executable).parent
+    else:
+        # Running as script
+        app_dir = Path(__file__).parent
+    
+    return app_dir / "config.ini"
+
+
+def create_default_config(config_path):
+    """Create default config.ini file"""
+    config = configparser.ConfigParser()
+    
+    config['SERVIDOR'] = {
+        'url_servidor': 'wss://demo.invensoft.lat',
+        'nombre_caja': 'caja-1'
+    }
+    
+    config['IMPRESORA'] = {
+        'modo': 'VIRTUAL',
+        'nombre': 'POS-58'
+    }
+    
+    with open(config_path, 'w', encoding='utf-8') as f:
+        config.write(f)
+    
+    print("="*60)
+    print("⚠️  CONFIGURACIÓN INICIAL CREADA")
+    print("="*60)
+    print(f"Se ha creado el archivo: {config_path}")
+    print()
+    print("Por favor, edite el archivo config.ini con los datos correctos:")
+    print("  - url_servidor: URL de su servidor (ej: wss://cliente1.invensoft.lat)")
+    print("  - nombre_caja: Identificador único de esta caja (ej: caja-1)")
+    print()
+    print("Luego, reinicie el programa.")
+    print("="*60)
+    input("\nPresione ENTER para salir...")
+    sys.exit(0)
+
+
+def load_config():
+    """Load configuration from config.ini"""
+    config_path = get_config_path()
+    
+    # Create default config if doesn't exist
+    if not config_path.exists():
+        create_default_config(config_path)
+    
+    # Read config
+    config = configparser.ConfigParser()
+    try:
+        config.read(config_path, encoding='utf-8')
+        
+        # Validate required sections
+        if 'SERVIDOR' not in config or 'IMPRESORA' not in config:
+            print(f"❌ Error: config.ini está incompleto o corrupto")
+            print(f"Eliminando archivo corrupto...")
+            config_path.unlink()
+            create_default_config(config_path)
+        
+        # Extract values
+        vps_url = config['SERVIDOR'].get('url_servidor', 'wss://demo.invensoft.lat')
+        client_id = config['SERVIDOR'].get('nombre_caja', 'caja-1')
+        printer_mode = config['IMPRESORA'].get('modo', 'VIRTUAL').upper()
+        printer_name = config['IMPRESORA'].get('nombre', 'POS-58')
+        
+        return {
+            'vps_url': vps_url,
+            'client_id': client_id,
+            'printer_mode': printer_mode,
+            'printer_name': printer_name
+        }
+    
+    except Exception as e:
+        print(f"❌ Error leyendo config.ini: {e}")
+        print(f"Recreando archivo de configuración...")
+        config_path.unlink(missing_ok=True)
+        create_default_config(config_path)
+
+
+# Load configuration
+CONFIG = load_config()
+VPS_URL = CONFIG['vps_url']
+CLIENT_ID = CONFIG['client_id']
+PRINTER_MODE = CONFIG['printer_mode']
+PRINTER_NAME = CONFIG['printer_name']
+
+print("="*60)
+print("Hardware Bridge v3.0 - WebSocket Client")
+print("="*60)
+print(f"Servidor: {VPS_URL}")
+print(f"Caja: {CLIENT_ID}")
+print(f"Modo Impresora: {PRINTER_MODE}")
+print(f"Nombre Impresora: {PRINTER_NAME}")
+print("="*60)
 
 # ========================================
-# NUCLEAR OPTION: BaseHTTPMiddleware for PNA
+# PRINTING FUNCTIONS (from old main.py)
 # ========================================
-class PNACORSMiddleware(BaseHTTPMiddleware):
-    """
-    Low-level CORS + Private Network Access middleware
-    Handles Chrome's strict PNA requirements at Starlette level
-    """
-    async def dispatch(self, request: Request, call_next):
-        # Get origin
-        origin = request.headers.get("Origin", "*")
-        
-        print(f"🔍 [{request.method}] {request.url.path} from {origin}")
-        
-        # ===== PREFLIGHT (OPTIONS) HANDLING =====
-        if request.method == "OPTIONS":
-            print("   🔒 PREFLIGHT - Returning immediate response")
-            
-            # Create empty response with 204 No Content
-            response = Response(
-                content="",
-                status_code=204,
-                media_type="text/plain"
-            )
-            
-            # CRITICAL HEADERS (order matters for Chrome)
-            response.headers["Access-Control-Allow-Origin"] = origin
-            response.headers["Access-Control-Allow-Methods"] = "POST, GET, OPTIONS"
-            response.headers["Access-Control-Allow-Headers"] = "*"
-            response.headers["Access-Control-Allow-Private-Network"] = "true"
-            response.headers["Access-Control-Max-Age"] = "3600"
-            
-            print(f"   ✅ Headers: {dict(response.headers)}")
-            return response
-        
-        # ===== NORMAL REQUEST PROCESSING =====
-        response = await call_next(request)
-        
-        # Inject CORS + PNA headers to actual response
-        response.headers["Access-Control-Allow-Origin"] = origin
-        response.headers["Access-Control-Allow-Private-Network"] = "true"
-        
-        print(f"   ✅ Response sent with PNA")
-        return response
 
-# Initialize FastAPI app
-app = FastAPI()
-
-# Add PNA middleware (FIRST, before any other middleware)
-app.add_middleware(PNACORSMiddleware)
-
-# "VIRTUAL" (archivo/consola), "USB" (impresora real via Zadig), o "WINDOWS" (driver instalado)
-PRINTER_MODE = os.getenv("PRINTER_MODE", "WINDOWS").upper()
-PRINTER_NAME = os.getenv("PRINTER_NAME", "POS-58") # Nombre exacto en "Dispositivos e Impresoras"
-
-# ========================================
-# HELPER: LIST WINDOWS PRINTERS
-# ========================================
 def get_windows_printers():
+    """List available Windows printers"""
     printers = []
     try:
         import win32print
-        # Enum PRINTER_ENUM_LOCAL | PRINTER_ENUM_CONNECTIONS
         for p in win32print.EnumPrinters(2 | 4):
-            printers.append(p[2]) # p[2] is printer name
+            printers.append(p[2])
     except Exception as e:
         print(f"Error listing printers: {e}")
     return printers
 
 
-# ========================================
-# JINJA2 TEMPLATE SYSTEM
-# ========================================
+def print_to_windows(commands):
+    """Print using Windows Print Spooler"""
+    try:
+        import win32print
+        import win32ui
+        from PIL import Image, ImageDraw, ImageFont
+        
+        # Open printer
+        hPrinter = win32print.OpenPrinter(PRINTER_NAME)
+        
+        try:
+            # Start print job
+            hJob = win32print.StartDocPrinter(hPrinter, 1, ("Ticket", None, "RAW"))
+            win32print.StartPagePrinter(hPrinter)
+            
+            # Convert commands to ESC/POS
+            esc_pos_data = b""
+            
+            for cmd in commands:
+                if cmd['type'] == 'text':
+                    text = cmd['content']
+                    
+                    # Alignment
+                    if cmd['align'] == 'center':
+                        esc_pos_data += b'\\x1b\\x61\\x01'  # Center
+                    elif cmd['align'] == 'right':
+                        esc_pos_data += b'\\x1b\\x61\\x02'  # Right
+                    else:
+                        esc_pos_data += b'\\x1b\\x61\\x00'  # Left
+                    
+                    # Bold
+                    if cmd['bold']:
+                        esc_pos_data += b'\\x1b\\x45\\x01'  # Bold ON
+                    
+                    # Text
+                    esc_pos_data += text.encode('cp437', errors='replace') + b'\\n'
+                    
+                    # Reset bold
+                    if cmd['bold']:
+                        esc_pos_data += b'\\x1b\\x45\\x00'  # Bold OFF
+                
+                elif cmd['type'] == 'cut':
+                    esc_pos_data += b'\\x1d\\x56\\x00'  # Cut
+            
+            # Send to printer
+            win32print.WritePrinter(hPrinter, esc_pos_data)
+            win32print.EndPagePrinter(hPrinter)
+            win32print.EndDocPrinter(hPrinter)
+            
+            print(f"✅ Printed to {PRINTER_NAME}")
+            return True
+            
+        finally:
+            win32print.ClosePrinter(hPrinter)
+            
+    except Exception as e:
+        print(f"❌ Print error: {e}")
+        return False
+
+
+def print_virtual(commands):
+    """Print to console/file (for testing)"""
+    width = 48
+    output = []
+    
+    for cmd in commands:
+        if cmd['type'] == 'cut':
+            output.append('\\n' + '=' * width + ' [CORTE] ' + '=' * width + '\\n')
+        elif cmd['type'] == 'text':
+            content = cmd['content']
+            
+            if cmd['bold']:
+                content = content.upper()
+            
+            if cmd['align'] == 'center':
+                output.append(f"{content:^{width}}")
+            elif cmd['align'] == 'right':
+                output.append(f"{content:>{width}}")
+            else:
+                output.append(content)
+    
+    result = '\\n'.join(output)
+    print(result)
+    
+    # Save to file
+    with open("ticket_output.txt", "w", encoding="utf-8") as f:
+        f.write(result)
+    
+    return True
+
 
 def parse_format_tags(line, printer_output):
-    """
-    Parse custom formatting tags and apply ESC/POS commands
-    
-    Supported tags:
-    - <center>, <left>, <right>: Alignment
-    - <bold>: Bold text
-    - <cut>: Paper cut
-    
-    Args:
-        line: Line of text with potential tags
-        printer_output: List to append formatted output
-    """
-    # Track formatting state
+    """Parse formatting tags from template"""
     align = 'left'
     bold = False
     
-    # Extract alignment
     if '<center>' in line:
         align = 'center'
         line = line.replace('<center>', '').replace('</center>', '')
@@ -124,21 +243,17 @@ def parse_format_tags(line, printer_output):
         align = 'left'
         line = line.replace('<left>', '').replace('</left>', '')
     
-    # Extract bold
     if '<bold>' in line:
         bold = True
         line = line.replace('<bold>', '').replace('</bold>', '')
     
-    # Check for cut command
     if '<cut>' in line:
         printer_output.append({'type': 'cut'})
         return
     
-    # Skip empty lines
     if not line.strip():
         return
     
-    # Apply formatting and add to output
     printer_output.append({
         'type': 'text',
         'content': line,
@@ -146,298 +261,123 @@ def parse_format_tags(line, printer_output):
         'bold': bold
     })
 
+
 def print_from_template(template_str, context_data):
-    """
-    Render Jinja2 template and parse for ESC/POS formatting
+    """Render Jinja2 template and parse for printing"""
+    from jinja2 import Template
     
-    Args:
-        template_str: Jinja2 template string
-        context_data: Dictionary with template variables
-        
-    Returns:
-        List of formatted print commands
-    """
-    # Step 1: Render Jinja2 template
     template = Template(template_str)
     rendered = template.render(context_data)
     
-    # Step 2: Process line by line for formatting tags
     printer_output = []
-    lines = rendered.split('\n')
+    lines = rendered.split('\\n')
     
     for line in lines:
         parse_format_tags(line, printer_output)
     
     return printer_output
 
-def format_virtual_ticket(commands):
-    """
-    Format print commands as virtual ticket text
-    
-    Args:
-        commands: List of print commands from print_from_template
-        
-    Returns:
-        Formatted text string
-    """
-    width = 48
-    lines = []
-    
-    for cmd in commands:
-        if cmd['type'] == 'cut':
-            lines.append('\n' + '=' * width + ' [CORTE] ' + '=' * width + '\n')
-        elif cmd['type'] == 'text':
-            content = cmd['content']
-            align = cmd['align']
-            bold = cmd['bold']
-            
-            # Apply bold (uppercase for virtual)
-            if bold:
-                content = content.upper()
-            
-            # Apply alignment
-            if align == 'center':
-                formatted = f"{content:^{width}}"
-            elif align == 'right':
-                formatted = f"{content:>{width}}"
-            else:  # left
-                formatted = f"{content:<{width}}"
-            
-            lines.append(formatted)
-    
-    return '\n'.join(lines)
 
-# ========================================
-# API ENDPOINTS
-# ========================================
-
-@app.post("/print")
-async def print_ticket(request: Request):
-    """
-    Print ticket from Jinja2 template
-    
-    Payload:
-    {
-        "template": "Jinja2 template string",
-        "context": {
-            "business": {...},
-            "sale": {...}
-        }
-    }
-    """
+def execute_print(payload):
+    """Execute print command from payload"""
     try:
-        data = await request.json()
-        template_str = data.get('template')
-        context = data.get('context', {})
+        template = payload.get('template')
+        context = payload.get('context')
         
-        print(f"🔍 DEBUG: Received template length: {len(template_str) if template_str else 0}")
-        print(f"🔍 DEBUG: Context keys: {list(context.keys())}")
+        if not template or not context:
+            print("❌ Invalid payload: missing template or context")
+            return False
         
-        # DEBUG: Print template line 18
-        template_lines = template_str.split('\n')
-        if len(template_lines) >= 18:
-            print(f"🔍 DEBUG: Template line 18: {template_lines[17]}")
+        # Render template
+        commands = print_from_template(template, context)
         
-        # DEBUG: Print sale.items structure
-        if 'sale' in context and 'items' in context['sale']:
-            print(f"🔍 DEBUG: sale.items type: {type(context['sale']['items'])}")
-            print(f"🔍 DEBUG: sale.items is list: {isinstance(context['sale']['items'], list)}")
-        
-        if not template_str:
-            raise HTTPException(status_code=400, detail="Template is required")
-        
-        # Render template and parse tags
-        print("🔍 DEBUG: Starting template rendering...")
-        commands = print_from_template(template_str, context)
-        print(f"🔍 DEBUG: Generated {len(commands)} commands")
-        
-        if PRINTER_MODE == "VIRTUAL":
-            content = format_virtual_ticket(commands)
+        # Print based on mode
+        if PRINTER_MODE == "WINDOWS":
+            return print_to_windows(commands)
+        else:
+            return print_virtual(commands)
             
-            # 1. Print to console
-            print("=== NUEVA IMPRESION (TEMPLATE) ===")
-            print(content)
-            print("===================================")
-            
-            # 2. Save to file
-            with open("ticket_output.txt", "w", encoding="utf-8") as f:
-                f.write(content)
-                
-            return {
-                "status": "success", 
-                "mode": "virtual", 
-                "message": "Ticket generado en ticket_output.txt",
-                "commands_count": len(commands)
-            }
-        
-        elif PRINTER_MODE == "WINDOWS":
-            try:
-                print(f"🖨️ WINDOWS MODE: Sending to printer '{PRINTER_NAME}'")
-                from escpos.printer import Win32Raw
-                
-                # Check if printer exists
-                available_printers = get_windows_printers()
-                print(f"📋 Available Printers: {available_printers}")
-                
-                if PRINTER_NAME not in available_printers:
-                    print(f"❌ ERROR: Printer '{PRINTER_NAME}' not found!")
-                    raise HTTPException(status_code=500, detail=f"Printer '{PRINTER_NAME}' not found. Available: {available_printers}")
-                
-                print("🔌 Initializing Win32Raw...")
-                p = Win32Raw(printer_name=PRINTER_NAME)
-                
-                print("📝 Sending commands...")
-                for cmd in commands:
-                    if cmd['type'] == 'cut':
-                        p.cut()
-                    elif cmd['type'] == 'text':
-                        # Set alignment
-                        align_map = {'left': 'left', 'center': 'center', 'right': 'right'}
-                        p.set(align=align_map[cmd['align']], bold=cmd['bold'])
-                        
-                        # FORCE ENCODING: Win32Raw often needs encoded bytes, not strings
-                        # We try to send raw bytes encoded in CP850 (standard for thermal printers)
-                        text_to_print = cmd['content'] + '\n'
-                        try:
-                            # Try printing as string first (python-escpos handles magic)
-                            p.text(text_to_print)
-                        except Exception as encoding_err:
-                            print(f"⚠️ Text encoding error: {encoding_err}. Retrying as raw bytes...")
-                            # Fallback: Send raw bytes directly if library fails
-                            p._raw(text_to_print.encode('cp850', errors='replace'))
-
-                # End job
-                print("✅ Printing complete. Closing job.")
-                p.close()
-                return {"status": "success", "mode": "windows", "printer": PRINTER_NAME}
-                
-            except ImportError:
-                 print("❌ ERROR: pywin32 not installed")
-                 raise HTTPException(status_code=500, detail="pywin32 not installed")
-            except Exception as e:
-                import traceback
-                error_trace = traceback.format_exc()
-                print(f"❌ WINDOWS PRINT ERROR: {e}")
-                print(error_trace)
-                raise HTTPException(status_code=500, detail=f"Windows print error: {str(e)}")
-
-        elif PRINTER_MODE == "USB":
-            # TODO: Implement using python-escpos
-            try:
-                from escpos.printer import Usb
-                
-                # Find printer (adjust vendor_id and product_id)
-                p = Usb(0x04b8, 0x0e15)  # Example: Epson TM-T20
-                
-                for cmd in commands:
-                    if cmd['type'] == 'cut':
-                        p.cut()
-                    elif cmd['type'] == 'text':
-                        # Set alignment
-                        align_map = {'left': 'left', 'center': 'center', 'right': 'right'}
-                        p.set(align=align_map[cmd['align']], bold=cmd['bold'])
-                        p.text(cmd['content'] + '\n')
-                
-                return {"status": "success", "mode": "usb", "message": "Ticket printed"}
-            except ImportError:
-                raise HTTPException(
-                    status_code=500, 
-                    detail="python-escpos not installed. Run: pip install python-escpos"
-                )
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=f"USB print error: {str(e)}")
-            
-    except HTTPException:
-        raise
     except Exception as e:
+        print(f"❌ Print execution error: {e}")
         import traceback
-        error_detail = traceback.format_exc()
-        print(f"❌ ERROR: {error_detail}")
-        raise HTTPException(status_code=500, detail=str(e))
+        traceback.print_exc()
+        return False
 
-# Legacy endpoint (keep for backward compatibility)
-class TicketItem(BaseModel):
-    name: str
-    quantity: float
-    price: float
-    total: float
-    unit: str
 
-class TicketData(BaseModel):
-    header: Optional[List[str]] = []
-    items: List[TicketItem]
-    totals: dict
-    footer: Optional[List[str]] = []
+# ========================================
+# WEBSOCKET CLIENT
+# ========================================
 
-@app.post("/print-ticket")
-async def print_ticket_legacy(data: TicketData):
-    """Legacy endpoint - kept for backward compatibility"""
-    try:
-        # Convert to template format
-        template_str = """<center><bold>{{ header[0] }}</bold></center>
-{% for line in header[1:] %}
-<center>{{ line }}</center>
-{% endfor %}
-================================
-{% for item in items %}
-{{ item.name }}
-  {{ item.quantity }} {{ item.unit }} x ${{ item.price }} = ${{ item.total }}
-{% endfor %}
-================================
-{% for key, value in totals.items() %}
-<right>{{ key }}: ${{ value }}</right>
-{% endfor %}
-================================
-{% for line in footer %}
-<center>{{ line }}</center>
-{% endfor %}
-<cut>"""
+async def connect_to_vps():
+    """Connect to VPS WebSocket and listen for print commands"""
+    uri = f"{VPS_URL}/api/v1/ws/hardware/{CLIENT_ID}"
+    
+    print(f"\\n🔌 Connecting to {uri}...")
+    
+    while True:
+        try:
+            async with websockets.connect(uri) as websocket:
+                print(f"✅ Connected to VPS as {CLIENT_ID}")
+                
+                # Listen for messages
+                async for message in websocket:
+                    try:
+                        data = json.loads(message)
+                        print(f"\\n📥 Received message: {data.get('type', 'unknown')}")
+                        
+                        if data.get('type') == 'print':
+                            print(f"🖨️ Processing print command for sale #{data.get('sale_id')}")
+                            payload = data.get('payload', {})
+                            
+                            success = execute_print(payload)
+                            
+                            if success:
+                                print("✅ Print completed successfully")
+                            else:
+                                print("❌ Print failed")
+                        
+                        else:
+                            print(f"⚠️ Unknown message type: {data.get('type')}")
+                    
+                    except json.JSONDecodeError as e:
+                        print(f"❌ Invalid JSON: {e}")
+                    except Exception as e:
+                        print(f"❌ Error processing message: {e}")
+                        import traceback
+                        traceback.print_exc()
         
-        context = {
-            'header': data.header,
-            'items': [item.dict() for item in data.items],
-            'totals': data.totals,
-            'footer': data.footer
-        }
+        except websockets.exceptions.WebSocketException as e:
+            print(f"❌ WebSocket error: {e}")
+            print("🔄 Reconnecting in 5 seconds...")
+            await asyncio.sleep(5)
         
-        commands = print_from_template(template_str, context)
-        content = format_virtual_ticket(commands)
-        
-        print("=== NUEVA IMPRESION (LEGACY) ===")
-        print(content)
-        print("=================================")
-        
-        with open("ticket_output.txt", "w", encoding="utf-8") as f:
-            f.write(content)
-            
-        return {
-            "status": "success", 
-            "mode": "virtual", 
-            "message": "Ticket generado en ticket_output.txt"
-        }
-            
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        except Exception as e:
+            print(f"❌ Unexpected error: {e}")
+            import traceback
+            traceback.print_exc()
+            print("🔄 Reconnecting in 5 seconds...")
+            await asyncio.sleep(5)
 
-@app.get("/")
-def read_root():
-    return {
-        "service": "Hardware Bridge",
-        "version": "2.1",
-        "mode": PRINTER_MODE,
-        "target_printer": PRINTER_NAME if PRINTER_MODE == "WINDOWS" else None,
-        "features": ["jinja2_templates", "custom_tags", "windows_spooler"],
-        "available_printers": get_windows_printers()
-    }
 
-@app.get("/printers")
-def list_printers():
-    return {"printers": get_windows_printers()}
+# ========================================
+# MAIN
+# ========================================
 
 if __name__ == "__main__":
-    import uvicorn
-    # Removed emojis to prevent cp1252 encoding errors on some Windows systems
-    print("Iniciando Hardware Bridge v2.0 en Puerto 5001...")
-    print(f"Modo: {PRINTER_MODE}")
-    print("Jinja2 Template System Enabled")
-    uvicorn.run(app, host="0.0.0.0", port=5001)
+    try:
+        # List available printers
+        if PRINTER_MODE == "WINDOWS":
+            printers = get_windows_printers()
+            print(f"\\n📋 Available printers: {printers}")
+            if PRINTER_NAME not in printers:
+                print(f"⚠️ WARNING: Printer '{PRINTER_NAME}' not found!")
+        
+        # Start WebSocket client
+        asyncio.run(connect_to_vps())
+    
+    except KeyboardInterrupt:
+        print("\\n\\n👋 Hardware Bridge stopped by user")
+    except Exception as e:
+        print(f"\\n\\n❌ Fatal error: {e}")
+        import traceback
+        traceback.print_exc()
