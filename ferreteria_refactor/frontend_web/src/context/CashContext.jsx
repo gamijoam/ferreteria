@@ -1,6 +1,7 @@
 import { createContext, useState, useContext, useEffect } from 'react';
 import apiClient from '../config/axios';
 import { useWebSocket } from './WebSocketContext';
+import toast from 'react-hot-toast';
 
 const CashContext = createContext();
 
@@ -13,6 +14,7 @@ export const CashProvider = ({ children }) => {
     const checkStatus = async (retryCount = 0) => {
         try {
             const response = await apiClient.get('/cash/sessions/current');
+            console.log('✅ Cash session check successful:', response.data);
             setIsSessionOpen(true);
             setSession(response.data);
             setLoading(false);
@@ -32,14 +34,23 @@ export const CashProvider = ({ children }) => {
                 return;
             }
 
-            // If it's a network error and we haven't retried too many times, retry
-            if (error.code === 'ERR_NETWORK' && retryCount < 3) {
-                console.log(`⏳ Cash session check failed, retrying in ${(retryCount + 1) * 500}ms...`);
-                setTimeout(() => checkStatus(retryCount + 1), (retryCount + 1) * 500);
+            // Retry on network errors OR if backend not ready (increase retry limit)
+            if ((error.code === 'ERR_NETWORK' || !error.response) && retryCount < 5) {
+                const delay = retryCount === 0 ? 1000 : (retryCount + 1) * 500; // First retry after 1s
+                console.warn(`⏳ Cash session check failed (attempt ${retryCount + 1}/5), retrying in ${delay}ms...`);
+                setTimeout(() => checkStatus(retryCount + 1), delay);
                 return;
             }
 
             // No active session or max retries reached
+            console.warn('⚠️ No active cash session found or error checking status:', error);
+            if (error.response?.status !== 404) {
+                // Only alert if it's NOT a 404 (404 is normal for "Closed")
+                console.error('🔥 Error Checking Cash Session:', error);
+                // Show toast to user for diagnostics
+                toast.error(`Error verificando caja: ${error.response?.status || 'Network Error'} - ${error.message}`);
+            }
+
             setIsSessionOpen(false);
             setSession(null);
             setLoading(false);

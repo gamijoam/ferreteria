@@ -38,6 +38,6 @@ websockets
 # Hardware Bridge (Thermal Printer)
 python-escpos
 pyusb
-pywin32
+# pywin32  # Windows-only, not needed in Docker/Linux
 jinja2==3.1.2
 aiofiles
