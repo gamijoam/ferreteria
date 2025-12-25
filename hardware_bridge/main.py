@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, Request, Response
+from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 from jinja2 import Template
@@ -21,48 +22,56 @@ if sys.stderr is None:
 # Cargar variables de entorno desde .env (si existe)
 load_dotenv()
 
-app = FastAPI()
-# Standard CORSMiddleware can sometimes clash or miss PNA headers on Preflight
-@app.middleware("http")
-async def cors_pna_middleware(request: Request, call_next):
-    # Gets the origin of the request (e.g., https://demo.invensoft.lat)
-    origin = request.headers.get("Origin")
-    
-    # 1. Handle Preflight (OPTIONS) requests directly
-    if request.method == "OPTIONS":
-        response = Response(status_code=204) # No Content
+# ========================================
+# NUCLEAR OPTION: BaseHTTPMiddleware for PNA
+# ========================================
+class PNACORSMiddleware(BaseHTTPMiddleware):
+    """
+    Low-level CORS + Private Network Access middleware
+    Handles Chrome's strict PNA requirements at Starlette level
+    """
+    async def dispatch(self, request: Request, call_next):
+        # Get origin
+        origin = request.headers.get("Origin", "*")
         
-        # Reflect Origin (Required for Credentials)
-        if origin:
-            response.headers["Access-Control-Allow-Origin"] = origin
-        else:
-            response.headers["Access-Control-Allow-Origin"] = "*"
+        print(f"🔍 [{request.method}] {request.url.path} from {origin}")
+        
+        # ===== PREFLIGHT (OPTIONS) HANDLING =====
+        if request.method == "OPTIONS":
+            print("   🔒 PREFLIGHT - Returning immediate response")
             
-        response.headers["Access-Control-Allow-Credentials"] = "true"
-        response.headers["Access-Control-Allow-Methods"] = "*"
-        response.headers["Access-Control-Allow-Headers"] = "*"
+            # Create empty response with 204 No Content
+            response = Response(
+                content="",
+                status_code=204,
+                media_type="text/plain"
+            )
+            
+            # CRITICAL HEADERS (order matters for Chrome)
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Methods"] = "POST, GET, OPTIONS"
+            response.headers["Access-Control-Allow-Headers"] = "*"
+            response.headers["Access-Control-Allow-Private-Network"] = "true"
+            response.headers["Access-Control-Max-Age"] = "3600"
+            
+            print(f"   ✅ Headers: {dict(response.headers)}")
+            return response
         
-        # CRITICAL: Address Private Network Access (PNA)
+        # ===== NORMAL REQUEST PROCESSING =====
+        response = await call_next(request)
+        
+        # Inject CORS + PNA headers to actual response
+        response.headers["Access-Control-Allow-Origin"] = origin
         response.headers["Access-Control-Allow-Private-Network"] = "true"
+        
+        print(f"   ✅ Response sent with PNA")
         return response
 
-    # 2. Handle Normal Requests
-    response = await call_next(request)
-    
-    # Attach CORS headers to response
-    if origin:
-        response.headers["Access-Control-Allow-Origin"] = origin
-    else:
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        
-    response.headers["Access-Control-Allow-Credentials"] = "true"
-    # CRITICAL: Address Private Network Access (PNA)
-    response.headers["Access-Control-Allow-Private-Network"] = "true"
-    
-    return response
+# Initialize FastAPI app
+app = FastAPI()
 
-# REMOVED: Standard CORSMiddleware used previously
-# app.add_middleware(CORSMiddleware...) - Replaced by manual middleware above
+# Add PNA middleware (FIRST, before any other middleware)
+app.add_middleware(PNACORSMiddleware)
 
 # "VIRTUAL" (archivo/consola), "USB" (impresora real via Zadig), o "WINDOWS" (driver instalado)
 PRINTER_MODE = os.getenv("PRINTER_MODE", "WINDOWS").upper()
