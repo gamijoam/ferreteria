@@ -39,11 +39,28 @@ const SaleSuccessModal = ({ isOpen, onClose, saleData }) => {
                 <div className="bg-gray-50 p-4 rounded-lg mb-8 border border-gray-200">
                     <div className="flex justify-between mb-2">
                         <span className="text-gray-600">Total Pagado:</span>
-                        <span className="font-bold text-gray-800">${saleData.totalUSD.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                        <span className="text-gray-600">Cambio:</span>
-                        <span className="font-bold text-green-600">${Math.max(0, (Number(saleData.paymentData.totalPaidUSD || 0) - Number(saleData.totalUSD || 0))).toFixed(2)}</span>
+                        {/* Dynamic Currency Display */}
+                        {(() => {
+                            const payments = saleData.paymentData?.payments || [];
+                            const isMixed = payments.length > 1;
+                            // Check if single payment in alternate currency (e.g. Bs aka VES)
+                            const singlePayment = !isMixed && payments[0];
+                            const currencySymbol = singlePayment ? (singlePayment.currency === "USD" ? "$" : singlePayment.currency) : "$";
+
+                            // If single payment in Bs, show that amount. Else show Total USD.
+                            let displayAmount = saleData.totalUSD;
+                            if (singlePayment && singlePayment.currency !== "USD" && singlePayment.currency !== "$") {
+                                // Assuming singlePayment.amount is the amount in that currency
+                                displayAmount = singlePayment.amount;
+                            }
+
+                            return (
+                                <span className="font-bold text-gray-800">
+                                    {isMixed ? "Mixto (Ver Detalle)" : `${currencySymbol}${Number(displayAmount).toFixed(2)}`}
+                                    {isMixed && <span className="block text-xs text-right text-gray-500">${saleData.totalUSD.toFixed(2)}</span>}
+                                </span>
+                            );
+                        })()}
                     </div>
                 </div>
 

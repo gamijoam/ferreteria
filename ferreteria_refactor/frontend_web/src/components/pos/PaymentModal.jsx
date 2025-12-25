@@ -105,14 +105,23 @@ const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onCon
         setProcessing(true);
 
         try {
+            // Determine dominant currency
+            // If single payment, use that currency. If multiple, default to USD (Base).
+            let saleCurrency = "USD";
+            if (!isCreditSale && payments.length === 1) {
+                // Map symbol to code if necessary, or just use symbol if that's what backend expects
+                // Backend seems to use "USD" or "Bs" / "VES"
+                saleCurrency = payments[0].currency === "$" ? "USD" : payments[0].currency;
+            }
+
             const saleData = {
                 total_amount: totalUSD,
-                currency: "USD",
+                currency: saleCurrency, // Dynamic Currency
                 exchange_rate: getExchangeRate('Bs') || 1,
                 payment_method: isCreditSale ? "Credito" : (payments[0]?.method || "Efectivo"),
                 payments: isCreditSale ? [] : payments.map(p => ({
                     amount: parseFloat(p.amount) || 0,
-                    currency: p.currency,
+                    currency: p.currency === "$" ? "USD" : p.currency, // Ensure consistency
                     payment_method: p.method,
                     exchange_rate: getExchangeRate(p.currency) || 1
                 })),
@@ -125,7 +134,7 @@ const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onCon
                     discount_type: "NONE"
                 })),
                 is_credit: isCreditSale,
-                customer_id: selectedCustomer ? selectedCustomer.id : null, // Send customer for ALL sales if selected
+                customer_id: selectedCustomer ? selectedCustomer.id : null,
                 notes: ""
             };
 

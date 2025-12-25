@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from datetime import datetime, timedelta
 from fastapi import HTTPException, BackgroundTasks
@@ -261,47 +261,57 @@ class SalesService:
             })
             
             # AUTO-PRINT TICKET
-            background_tasks.add_task(print_sale_ticket, new_sale.id)
+            # REMOVED: Server-side printing is incompatible with SaaS architecture.
+            # Client (Frontend) is now responsible for initiating print via local bridge.
+            # background_tasks.add_task(print_sale_ticket, new_sale.id)
             
         return {"status": "success", "sale_id": new_sale.id}
 
-def print_sale_ticket(sale_id: int):
-    """
-    Print ticket for a completed sale
-    Sends sale data to hardware bridge for printing
-    """
-    from ..database.db import SessionLocal
-    import json # For debug dumping
-    
-    print(f"🖨️ START PRINT JOB: Sale #{sale_id}")
-    
-    # Create new database session for background task
-    db = SessionLocal()
-    
-    try:
+    @staticmethod
+    def get_sale_print_payload(db: Session, sale_id: int):
+        """
+        Generate payload (template + context) for client-side printing.
+        Includes currency symbol logic.
+        """
         # Get sale with all relationships
-        sale = db.query(models.Sale).filter(models.Sale.id == sale_id).first()
+        sale = db.query(models.Sale).options(
+            joinedload(models.Sale.details).joinedload(models.SaleDetail.product),
+            joinedload(models.Sale.customer)
+        ).filter(models.Sale.id == sale_id).first()
+        
         if not sale:
-            print(f"❌ Sale {sale_id} not found for printing")
-            return
+            raise HTTPException(status_code=404, detail="Sale not found")
         
         # Get business info
         business_config = {}
         configs = db.query(models.BusinessConfig).all()
         for config in configs:
-            # print(f"DEBUG DB: {config.key} = {config.value}") 
             business_config[config.key] = config.value
             
-        print(f"   Loaded {len(business_config)} config keys. Business Name: '{business_config.get('business_name')}'")
-        
         # Get ticket template
         template = business_config.get('ticket_template')
         if not template:
-            print("⚠️  No ticket template configured, skipping print")
-            return
+            # Fallback to a basic message if no template
+            template = "Error: No ticket template configured."
             
-        print(f"   Template found (len={len(template)})")
+        # Determine Currency and Values
+        currency_symbol = "$"
+        is_foreign_currency = False
+        rate = sale.exchange_rate_used or 1
         
+        # Check if Sale is in Bs/VES
+        if sale.currency in ["VES", "Bs", "Bs."]:
+            currency_symbol = "Bs."
+            is_foreign_currency = True
+        elif sale.currency == "USD":
+            currency_symbol = "$"
+            
+        # Helper to convert if needed
+        def get_value(usd_value):
+            if is_foreign_currency:
+                return float(usd_value) * float(rate)
+            return float(usd_value)
+
         # Build context for template
         context = {
             "business": {
@@ -314,9 +324,14 @@ def print_sale_ticket(sale_id: int):
             "sale": {
                 "id": sale.id,
                 "date": sale.date.strftime("%d/%m/%Y %H:%M") if sale.date else "",
-                "total": float(sale.total_amount),
+                "total": get_value(sale.total_amount), # CONVERTED TOTAL
+                "currency": sale.currency,
+                "currency_symbol": currency_symbol,
+                "exchange_rate": float(rate),
                 "is_credit": sale.is_credit,
-                "balance": float(sale.balance_pending) if sale.balance_pending else 0.0,
+                # Calculate total discount from details
+                "discount": get_value(sum(d.discount for d in sale.details if d.discount)),
+                "balance": get_value(sale.balance_pending) if sale.balance_pending else 0.0,
                 "customer": {
                     "name": sale.customer.name if sale.customer else None,
                     "id_number": sale.customer.id_number if sale.customer else None
@@ -325,45 +340,22 @@ def print_sale_ticket(sale_id: int):
                     {
                         "product": {"name": item.product.name if item.product else "Producto"},
                         "quantity": float(item.quantity),
-                        "unit_price": float(item.unit_price),
-                        "subtotal": float(item.subtotal)
+                        "unit_price": get_value(item.unit_price), # CONVERTED PRICE
+                        "subtotal": get_value(item.subtotal),     # CONVERTED SUBTOTAL
+                        "currency_symbol": currency_symbol
                     }
                     for item in sale.details
                 ]
-            }
+            },
+            "currency_symbol": currency_symbol
         }
         # Add alias 'products' to avoid Jinja collision with dict.items()
         context["sale"]["products"] = context["sale"]["items"]
         
-        print("   Context built successfully")
-        
-        # Send to hardware bridge
-        print(f"   Sending to http://localhost:5001/print...")
-        
-        # DEBUG: Print payload preview
-        # print(json.dumps(context, indent=2, default=str)) 
-        
-        response = requests.post(
-            "http://localhost:5001/print",
-            json={
-                "template": template,
-                "context": context
-            },
-            timeout=5
-        )
-        
-        print(f"   Bridge Response: {response.status_code} - {response.text}")
-        
-        if response.status_code == 200:
-            print(f"✅ Ticket printed for sale #{sale_id}")
-        else:
-            print(f"⚠️  Print failed for sale #{sale_id}: {response.text}")
-            
-    except requests.exceptions.ConnectionError:
-        print("❌ BRIDGE ERROR: Hardware bridge not available (port 5001)")
-    except Exception as e:
-        print(f"❌ PRINT EXCEPTION: {str(e)}")
-        import traceback
-        traceback.print_exc()
-    finally:
-        db.close()
+        return {
+            "status": "ready",
+            "template": template,
+            "context": context
+        }
+
+# REMOVED: print_sale_ticket (Old Server-Side Logic)

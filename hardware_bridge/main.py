@@ -1,7 +1,6 @@
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Response
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
-from fastapi.middleware.cors import CORSMiddleware
 from jinja2 import Template
 import re
 import datetime
@@ -12,28 +11,77 @@ from dotenv import load_dotenv
 
 # FIX: PyInstaller --noconsole sets stdout/stderr to None, causing Uvicorn logging to crash
 # FIX: Also force UTF-8 to prevent UnicodeEncodeError when writing emojis to devnull on Windows
+# FIX: PyInstaller --noconsole sets stdout/stderr to None.
+# Redirect to FILE for debugging instead of devnull.
 if sys.stdout is None:
-    sys.stdout = open(os.devnull, "w", encoding="utf-8")
+    sys.stdout = open("bridge_debug.log", "w", encoding="utf-8")
 if sys.stderr is None:
-    sys.stderr = open(os.devnull, "w", encoding="utf-8")
+    sys.stderr = open("bridge_debug.log", "w", encoding="utf-8")
 
 # Cargar variables de entorno desde .env (si existe)
 load_dotenv()
 
 app = FastAPI()
+# Standard CORSMiddleware can sometimes clash or miss PNA headers on Preflight
+@app.middleware("http")
+async def cors_pna_middleware(request: Request, call_next):
+    # Gets the origin of the request (e.g., https://demo.invensoft.lat)
+    origin = request.headers.get("Origin")
+    
+    # 1. Handle Preflight (OPTIONS) requests directly
+    if request.method == "OPTIONS":
+        response = Response(status_code=204) # No Content
+        
+        # Reflect Origin (Required for Credentials)
+        if origin:
+            response.headers["Access-Control-Allow-Origin"] = origin
+        else:
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Methods"] = "*"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+        
+        # CRITICAL: Address Private Network Access (PNA)
+        response.headers["Access-Control-Allow-Private-Network"] = "true"
+        return response
 
-# Configura CORS para permitir peticiones desde el frontend web
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # En produccion, limita esto al dominio de tu app
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+    # 2. Handle Normal Requests
+    response = await call_next(request)
+    
+    # Attach CORS headers to response
+    if origin:
+        response.headers["Access-Control-Allow-Origin"] = origin
+    else:
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    # CRITICAL: Address Private Network Access (PNA)
+    response.headers["Access-Control-Allow-Private-Network"] = "true"
+    
+    return response
 
-# "VIRTUAL" (archivo/consola) o "USB" (impresora real)
-# Por defecto es USB para producción, pero se puede cambiar en .env
-PRINTER_MODE = os.getenv("PRINTER_MODE", "USB").upper()
+# REMOVED: Standard CORSMiddleware used previously
+# app.add_middleware(CORSMiddleware...) - Replaced by manual middleware above
+
+# "VIRTUAL" (archivo/consola), "USB" (impresora real via Zadig), o "WINDOWS" (driver instalado)
+PRINTER_MODE = os.getenv("PRINTER_MODE", "WINDOWS").upper()
+PRINTER_NAME = os.getenv("PRINTER_NAME", "POS-58") # Nombre exacto en "Dispositivos e Impresoras"
+
+# ========================================
+# HELPER: LIST WINDOWS PRINTERS
+# ========================================
+def get_windows_printers():
+    printers = []
+    try:
+        import win32print
+        # Enum PRINTER_ENUM_LOCAL | PRINTER_ENUM_CONNECTIONS
+        for p in win32print.EnumPrinters(2 | 4):
+            printers.append(p[2]) # p[2] is printer name
+    except Exception as e:
+        print(f"Error listing printers: {e}")
+    return printers
+
 
 # ========================================
 # JINJA2 TEMPLATE SYSTEM
@@ -212,7 +260,58 @@ async def print_ticket(request: Request):
                 "message": "Ticket generado en ticket_output.txt",
                 "commands_count": len(commands)
             }
-            
+        
+        elif PRINTER_MODE == "WINDOWS":
+            try:
+                print(f"🖨️ WINDOWS MODE: Sending to printer '{PRINTER_NAME}'")
+                from escpos.printer import Win32Raw
+                
+                # Check if printer exists
+                available_printers = get_windows_printers()
+                print(f"📋 Available Printers: {available_printers}")
+                
+                if PRINTER_NAME not in available_printers:
+                    print(f"❌ ERROR: Printer '{PRINTER_NAME}' not found!")
+                    raise HTTPException(status_code=500, detail=f"Printer '{PRINTER_NAME}' not found. Available: {available_printers}")
+                
+                print("🔌 Initializing Win32Raw...")
+                p = Win32Raw(printer_name=PRINTER_NAME)
+                
+                print("📝 Sending commands...")
+                for cmd in commands:
+                    if cmd['type'] == 'cut':
+                        p.cut()
+                    elif cmd['type'] == 'text':
+                        # Set alignment
+                        align_map = {'left': 'left', 'center': 'center', 'right': 'right'}
+                        p.set(align=align_map[cmd['align']], bold=cmd['bold'])
+                        
+                        # FORCE ENCODING: Win32Raw often needs encoded bytes, not strings
+                        # We try to send raw bytes encoded in CP850 (standard for thermal printers)
+                        text_to_print = cmd['content'] + '\n'
+                        try:
+                            # Try printing as string first (python-escpos handles magic)
+                            p.text(text_to_print)
+                        except Exception as encoding_err:
+                            print(f"⚠️ Text encoding error: {encoding_err}. Retrying as raw bytes...")
+                            # Fallback: Send raw bytes directly if library fails
+                            p._raw(text_to_print.encode('cp850', errors='replace'))
+
+                # End job
+                print("✅ Printing complete. Closing job.")
+                p.close()
+                return {"status": "success", "mode": "windows", "printer": PRINTER_NAME}
+                
+            except ImportError:
+                 print("❌ ERROR: pywin32 not installed")
+                 raise HTTPException(status_code=500, detail="pywin32 not installed")
+            except Exception as e:
+                import traceback
+                error_trace = traceback.format_exc()
+                print(f"❌ WINDOWS PRINT ERROR: {e}")
+                print(error_trace)
+                raise HTTPException(status_code=500, detail=f"Windows print error: {str(e)}")
+
         elif PRINTER_MODE == "USB":
             # TODO: Implement using python-escpos
             try:
@@ -315,10 +414,16 @@ async def print_ticket_legacy(data: TicketData):
 def read_root():
     return {
         "service": "Hardware Bridge",
-        "version": "2.0",
+        "version": "2.1",
         "mode": PRINTER_MODE,
-        "features": ["jinja2_templates", "custom_tags", "virtual_printer"]
+        "target_printer": PRINTER_NAME if PRINTER_MODE == "WINDOWS" else None,
+        "features": ["jinja2_templates", "custom_tags", "windows_spooler"],
+        "available_printers": get_windows_printers()
     }
+
+@app.get("/printers")
+def list_printers():
+    return {"printers": get_windows_printers()}
 
 if __name__ == "__main__":
     import uvicorn

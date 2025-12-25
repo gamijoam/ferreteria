@@ -334,20 +334,15 @@ def get_sale_detail(sale_id: int, db: Session = Depends(get_db)):
     return sale
 
 @router.post("/sales/{sale_id}/print")
-def print_sale_endpoint(sale_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    """Manually trigger ticket printing for a sale"""
-    # Verify sale exists first
-    sale = db.query(models.Sale).filter(models.Sale.id == sale_id).first()
-    if not sale:
-        raise HTTPException(status_code=404, detail="Sale not found")
-        
-    # Import service to avoid circular dependency at module level
-    from ..services.sales_service import print_sale_ticket
+def print_sale_endpoint(sale_id: int, db: Session = Depends(get_db)):
+    """
+    Get print payload for client-side printing.
+    Returns template and context for the Hardware Bridge.
+    """
+    from ..services.sales_service import SalesService
     
-    # Add to background tasks
-    background_tasks.add_task(print_sale_ticket, sale_id)
-    
-    return {"status": "success", "message": "Ticket printing queued"}
+    # Now returns JSON { template, context, status }
+    return SalesService.get_sale_print_payload(db, sale_id)
 
 @router.post("/sales/payments")
 def register_sale_payment(

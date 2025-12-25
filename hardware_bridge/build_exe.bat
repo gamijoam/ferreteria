@@ -19,6 +19,11 @@ pyinstaller --noconsole --onefile --clean ^
     --hidden-import=usb ^
     --hidden-import=usb.core ^
     --hidden-import=usb.backend.libusb1 ^
+    --hidden-import=win32timezone ^
+    --hidden-import=win32print ^
+    --hidden-import=win32api ^
+    --hidden-import=pythoncom ^
+    --hidden-import=pywintypes ^
     --hidden-import=uvicorn.logging ^
     --hidden-import=uvicorn.loops ^
     --hidden-import=uvicorn.loops.auto ^
@@ -27,6 +32,7 @@ pyinstaller --noconsole --onefile --clean ^
     --hidden-import=uvicorn.protocols.http.auto ^
     --hidden-import=uvicorn.lifespan ^
     --hidden-import=uvicorn.lifespan.on ^
+    --collect-all escpos ^
     main.py
 
 echo.

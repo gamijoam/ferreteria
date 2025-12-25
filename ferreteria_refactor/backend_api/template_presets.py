@@ -18,15 +18,19 @@ Vence: {{ sale.due_date }}
 CANT   PRODUCTO         TOTAL
 --------------------------------
 {% for item in sale.products %}
-{{ "%.1f"|format(item.quantity) }} x {{ item.product.name }}
-       {{ "$%.2f"|format(item.unit_price) }} = {{ "$%.2f"|format(item.subtotal) }}
+{{ "%.0f"|format(item.quantity) }} x {{ item.product.name }}
+{% if item.quantity == 1.0 %}
+       {{ currency_symbol }}{{ "%.2f"|format(item.subtotal) }}
+{% else %}
+       {{ currency_symbol }}{{ "%.2f"|format(item.unit_price) }} c/u  =  {{ currency_symbol }}{{ "%.2f"|format(item.subtotal) }}
+{% endif %}
 {% endfor %}
 ================================
-SUBTOTAL:       {{ "$%.2f"|format(sale.total) }}
+SUBTOTAL:       {{ currency_symbol }}{{ "%.2f"|format(sale.total) }}
 {% if sale.discount > 0 %}
-DESCUENTO:     -{{ "$%.2f"|format(sale.discount) }}
+DESCUENTO:     -{{ currency_symbol }}{{ "%.2f"|format(sale.discount) }}
 {% endif %}
-TOTAL A PAGAR:  {{ "$%.2f"|format(sale.total) }}
+TOTAL A PAGAR:  {{ currency_symbol }}{{ "%.2f"|format(sale.total) }}
 ================================
       Gracias por su compra
 """
@@ -47,14 +51,19 @@ ITEMS
 ----------------------------------
 {% for item in sale.products %}
 * {{ item.product.name }}
-  {{ item.quantity }} x {{ "$%.2f"|format(item.unit_price) }} ...... {{ "$%.2f"|format(item.subtotal) }}
+{% if item.quantity == 1.0 %}
+   TOTAL: {{ currency_symbol }}{{ "%.2f"|format(item.subtotal) }}
+{% else %}
+   {{ "%.0f"|format(item.quantity) }} x {{ currency_symbol }}{{ "%.2f"|format(item.unit_price) }}
+   TOTAL: {{ currency_symbol }}{{ "%.2f"|format(item.subtotal) }}
+{% endif %}
 {% endfor %}
 ----------------------------------
-TOTAL ......... {{ "$%.2f"|format(sale.total) }}
+TOTAL ......... {{ currency_symbol }}{{ "%.2f"|format(sale.total) }}
 ----------------------------------
 {% if sale.is_credit %}
 *** CUENTA POR COBRAR ***
-Saldo Pendiente: {{ "$%.2f"|format(sale.balance) }}
+Saldo Pendiente: {{ currency_symbol }}{{ "%.2f"|format(sale.balance) }}
 {% else %}
 *** PAGADO ***
 {% endif %}
@@ -72,12 +81,16 @@ Fecha: {{ sale.date }}
 --------------------------------
 {% for item in sale.products %}
 [{{ item.product.sku }}] {{ item.product.name }}
-Cant: {{ item.quantity }}   Precio: {{ "$%.2f"|format(item.unit_price) }}
-Subtotal: {{ "$%.2f"|format(item.subtotal) }}
+{% if item.quantity == 1.0 %}
+   Precio: {{ currency_symbol }}{{ "%.2f"|format(item.subtotal) }}
+{% else %}
+   Cant: {{ "%.0f"|format(item.quantity) }} x {{ currency_symbol }}{{ "%.2f"|format(item.unit_price) }}
+   Subtotal: {{ currency_symbol }}{{ "%.2f"|format(item.subtotal) }}
+{% endif %}
 - - - - - - - - - - - - - - - -
 {% endfor %}
 ================================
-TOTAL: {{ "$%.2f"|format(sale.total) }}
+TOTAL: {{ currency_symbol }}{{ "%.2f"|format(sale.total) }}
 ================================
 """
 
@@ -87,10 +100,10 @@ Ticket #{{ sale.id }}
 {{ sale.date }}
 --------------------------------
 {% for item in sale.products %}
-{{ item.quantity }} {{ item.product.name[:20] }} {{ "$%.2f"|format(item.subtotal) }}
+{{ "%.0f"|format(item.quantity) }} {{ item.product.name[:15] }} {{ currency_symbol }}{{ "%.2f"|format(item.subtotal) }}
 {% endfor %}
 --------------------------------
-TOTAL: {{ "$%.2f"|format(sale.total) }}
+TOTAL: {{ currency_symbol }}{{ "%.2f"|format(sale.total) }}
 """
 
 def get_all_presets() -> List[Dict[str, str]]:

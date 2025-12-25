@@ -38,5 +38,6 @@ websockets
 # Hardware Bridge (Thermal Printer)
 python-escpos
 pyusb
+pywin32
 jinja2==3.1.2
 aiofiles

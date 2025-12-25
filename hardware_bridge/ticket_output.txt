@@ -1,20 +1,30 @@
 === TICKET DE VENTA ===                         
-CROACIA                                         
-SIN DIRECCION                                   
-RIF: 414141                                     
-Tel: 12121                                      
+MI NEGOCIO                                      
+RIF:                                            
+Tel:                                            
 ================================                
-Fecha: 20/12/2025 17:17                         
-Factura: #22                                    
-Cliente: Consumidor Final                       
+Fecha: 25/12/2025 10:28                         
+Factura: #39                                    
+Cliente: GABRIEL                                
 ================================                
 CANT   PRODUCTO         TOTAL                   
 --------------------------------                
-1.0 x Taladro Percutor 600W                     
-       65.0 = 65.0                              
-1.0 x Martillo Carpintero 16oz                  
-       12.5 = 12.5                              
+1 x Producto Prueba 138 - 59151                 
+       $101.33                                  
+1 x Producto Prueba 11 - 53424                  
+       $264.76                                  
+2 x Producto Prueba 9 - 83544                   
+       $57.62 c/u  =  $115.24                   
+1 x Producto Prueba 100 - 31791                 
+       $390.61                                  
+1 x Producto Prueba 19 - 93293                  
+       $199.31                                  
+3 x Producto Prueba 81 - 22872                  
+       $400.78 c/u  =  $1202.34                 
+1 x Producto Prueba 150 - 32493                 
+       $431.61                                  
 ================================                
-TOTAL:       77.5                               
+SUBTOTAL:       $2705.20                        
+TOTAL A PAGAR:  $2705.20                        
 ================================                
       Gracias por su compra                     
