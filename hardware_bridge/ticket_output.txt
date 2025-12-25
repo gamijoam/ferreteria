@@ -1,30 +1,11 @@
-=== TICKET DE VENTA ===                         
 MI NEGOCIO                                      
-RIF:                                            
-Tel:                                            
-================================                
-Fecha: 25/12/2025 10:28                         
-Factura: #39                                    
-Cliente: GABRIEL                                
-================================                
-CANT   PRODUCTO         TOTAL                   
+Ticket #42                                      
+25/12/2025 10:32                                
 --------------------------------                
-1 x Producto Prueba 138 - 59151                 
-       $101.33                                  
-1 x Producto Prueba 11 - 53424                  
-       $264.76                                  
-2 x Producto Prueba 9 - 83544                   
-       $57.62 c/u  =  $115.24                   
-1 x Producto Prueba 100 - 31791                 
-       $390.61                                  
-1 x Producto Prueba 19 - 93293                  
-       $199.31                                  
-3 x Producto Prueba 81 - 22872                  
-       $400.78 c/u  =  $1202.34                 
-1 x Producto Prueba 150 - 32493                 
-       $431.61                                  
-================================                
-SUBTOTAL:       $2705.20                        
-TOTAL A PAGAR:  $2705.20                        
-================================                
-      Gracias por su compra                     
+1 Producto Prueba Bs.22668.36                   
+1 Producto Prueba Bs.24463.92                   
+1 Producto Prueba Bs.17315.48                   
+1 Producto Prueba Bs.20311.72                   
+3 Producto Prueba Bs.31092.36                   
+--------------------------------                
+TOTAL: Bs.115851.84                             
