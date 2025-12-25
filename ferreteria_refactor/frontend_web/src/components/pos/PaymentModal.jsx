@@ -128,10 +128,12 @@ const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onCon
                 items: cart.map(item => ({
                     product_id: item.product_id,
                     quantity: item.quantity,
-                    unit_price_usd: item.unit_price_usd || item.price_unit_usd,
+                    // Fix: Send original price if discount active, otherwise normal price
+                    // Backend calculates subtotal using unit_price * quantity * (1 - discount/100)
+                    unit_price_usd: item.is_discount_active ? item.original_price_usd : (item.unit_price_usd || item.price_unit_usd || item.price_usd),
                     conversion_factor: item.conversion_factor || 1,
-                    discount: 0,
-                    discount_type: "NONE"
+                    discount: item.is_discount_active ? item.discount_percentage : 0,
+                    discount_type: item.is_discount_active ? "PERCENT" : "NONE"
                 })),
                 is_credit: isCreditSale,
                 customer_id: selectedCustomer ? selectedCustomer.id : null,
@@ -174,19 +176,23 @@ const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onCon
 
                     <div className="space-y-4 mb-8 flex-1 overflow-y-auto">
                         <div className="space-y-4 mb-8 flex-1 overflow-y-auto">
+                            <h4 className="text-xs text-gray-500 font-bold uppercase border-b border-gray-700 pb-1 mb-2">Restante por Pagar</h4>
                             {currencies.map(curr => {
-                                // If it's the anchor currency (USD), show totalUSD directly
-                                const amount = curr.is_anchor
-                                    ? totalUSD
-                                    : (totalsByCurrency?.[curr.currency_code] || 0);
+                                // Calculate REMAINING amount in this currency
+                                const amount = Math.max(0, remainingUSD) * (curr.rate || 1);
 
                                 return (
-                                    <div key={curr.symbol} className="flex justify-between items-center border-b border-gray-700 pb-2">
+                                    <div key={curr.symbol} className="flex justify-between items-center border-b border-gray-700 pb-2 last:border-0">
                                         <span className="text-gray-400 text-sm">{curr.name}</span>
                                         <span className="font-mono text-blue-300 flex flex-col items-end">
-                                            <span>{amount.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {curr.symbol}</span>
+                                            <span className={`text-lg font-bold ${amount > 0 ? 'text-white' : 'text-green-500'}`}>
+                                                {amount > 0
+                                                    ? `${amount.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${curr.symbol}`
+                                                    : '¡COMPLETO!'
+                                                }
+                                            </span>
                                             {curr.symbol !== 'USD' && (
-                                                <span className="text-xs text-gray-500">Tasa Ref: {curr.rate.toLocaleString('es-VE')}</span>
+                                                <span className="text-xs text-gray-500">Tasa: {curr.rate.toLocaleString('es-VE')}</span>
                                             )}
                                         </span>
                                     </div>

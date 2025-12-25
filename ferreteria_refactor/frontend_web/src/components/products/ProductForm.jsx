@@ -68,7 +68,10 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
                         type: type,
                         barcode: u.barcode || '',
                         price_usd: u.price_usd || 0,
-                        exchange_rate_id: u.exchange_rate_id || null  // NEW
+                        exchange_rate_id: u.exchange_rate_id || null,
+                        // Fix: Map Discount Fields
+                        discount_percentage: u.discount_percentage || 0,
+                        is_discount_active: u.is_discount_active || false
                     };
                 });
 
@@ -87,6 +90,10 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
                         : 0,
                     exchange_rate_id: initialData.exchange_rate_id || null,
                     is_combo: initialData.is_combo || false,  // NEW
+                    // Pricing System Fields - Fix Uncontrolled Input
+                    profit_margin: initialData.profit_margin || null,
+                    discount_percentage: initialData.discount_percentage || 0,
+                    is_discount_active: initialData.is_discount_active || false,
                     units: mappedUnits,
                     combo_items: initialData.combo_items || []  // NEW
                 });

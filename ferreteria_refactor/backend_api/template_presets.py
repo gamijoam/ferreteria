@@ -19,7 +19,9 @@ CANT   PRODUCTO         TOTAL
 --------------------------------
 {% for item in sale.products %}
 {{ "%.0f"|format(item.quantity) }} x {{ item.product.name }}
-{% if item.quantity == 1.0 %}
+{% if item.discount_percentage > 0 %}
+       {{ currency_symbol }}{{ "%.2f"|format(item.unit_price) }} -{{ "%.0f"|format(item.discount_percentage) }}% = {{ currency_symbol }}{{ "%.2f"|format(item.subtotal) }}
+{% elif item.quantity == 1.0 %}
        {{ currency_symbol }}{{ "%.2f"|format(item.subtotal) }}
 {% else %}
        {{ currency_symbol }}{{ "%.2f"|format(item.unit_price) }} c/u  =  {{ currency_symbol }}{{ "%.2f"|format(item.subtotal) }}
@@ -51,7 +53,10 @@ ITEMS
 ----------------------------------
 {% for item in sale.products %}
 * {{ item.product.name }}
-{% if item.quantity == 1.0 %}
+{% if item.discount_percentage > 0 %}
+   {{ "%.0f"|format(item.quantity) }} x {{ currency_symbol }}{{ "%.2f"|format(item.unit_price) }} (-{{ "%.0f"|format(item.discount_percentage) }}%)
+   TOTAL: {{ currency_symbol }}{{ "%.2f"|format(item.subtotal) }}
+{% elif item.quantity == 1.0 %}
    TOTAL: {{ currency_symbol }}{{ "%.2f"|format(item.subtotal) }}
 {% else %}
    {{ "%.0f"|format(item.quantity) }} x {{ currency_symbol }}{{ "%.2f"|format(item.unit_price) }}

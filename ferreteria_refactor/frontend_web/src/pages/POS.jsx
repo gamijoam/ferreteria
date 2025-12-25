@@ -344,9 +344,26 @@ const POS = () => {
             }
         }
 
+        // Calculate Discount
+        const basePrice = parseFloat(product.price);
+        let finalPrice = basePrice;
+        let discountPercentage = 0;
+        let isDiscountActive = false;
+
+        if (product.is_discount_active && product.discount_percentage > 0) {
+            discountPercentage = parseFloat(product.discount_percentage);
+            const discountAmount = basePrice * (discountPercentage / 100);
+            finalPrice = basePrice - discountAmount;
+            isDiscountActive = true;
+        }
+
         const baseUnit = {
             name: product.unit_type || 'Unidad',
-            price_usd: product.price,
+            price_usd: finalPrice, // Discounted price for cart totals
+            original_price_usd: basePrice, // Original price for backend
+            discount_percentage: discountPercentage,
+            is_discount_active: isDiscountActive,
+
             factor: 1,
             is_base: true,
             exchange_rate_id: selectedExchangeRateId,
@@ -354,15 +371,9 @@ const POS = () => {
             is_special_rate: isSpecialRate
         };
 
-        console.log('🔍 DEBUG addBaseProductToCart:');
-        console.log('   Product:', product.name);
-        console.log('   Product exchange_rate_id:', product.exchange_rate_id);
-        console.log('   baseUnit:', baseUnit);
-
+        console.log('🔍 DEBUG addBaseProductToCart:', baseUnit);
         addToCart(product, baseUnit);
     };
-
-
 
     const handleUnitSelect = (unitOption) => {
         if (!selectedProductForUnits) return;
@@ -371,20 +382,31 @@ const POS = () => {
         // ========================================
         // ALGORITMO DE PRECIO (USD) - CASCADA ESTRICTA
         // ========================================
-        let finalPriceUSD;
+        let calculatedPriceUSD;
 
         // PASO 1: ¿La ProductUnit tiene precio específico?
         if (unitOption.price_usd && unitOption.price_usd > 0) {
-            finalPriceUSD = unitOption.price_usd;
-            console.log(`💰 Precio Unit Específico: $${finalPriceUSD}`);
+            calculatedPriceUSD = parseFloat(unitOption.price_usd);
         }
         // PASO 2: Calcular desde precio base del producto
         else {
-            const basePriceUSD = product.price || 0;
-            const conversionFactor = unitOption.conversion_factor || unitOption.factor || 1;
-            finalPriceUSD = basePriceUSD * conversionFactor;
-            console.log(`💰 Precio Calculado: $${basePriceUSD} × ${conversionFactor} = $${finalPriceUSD}`);
+            const basePriceUSD = parseFloat(product.price || 0);
+            const conversionFactor = parseFloat(unitOption.conversion_factor || unitOption.factor || 1);
+            calculatedPriceUSD = basePriceUSD * conversionFactor;
         }
+
+        // Apply Discount Logic for Units
+        let finalPriceUSD = calculatedPriceUSD;
+        let discountPercentage = 0;
+        let isDiscountActive = false;
+
+        if (unitOption.is_discount_active && unitOption.discount_percentage > 0) {
+            discountPercentage = parseFloat(unitOption.discount_percentage);
+            const discountAmount = calculatedPriceUSD * (discountPercentage / 100);
+            finalPriceUSD = calculatedPriceUSD - discountAmount;
+            isDiscountActive = true;
+        }
+
 
         // ========================================
         // ALGORITMO DE TASA DE CAMBIO - CASCADA ESTRICTA
@@ -425,7 +447,11 @@ const POS = () => {
         // ========================================
         const unit = {
             name: unitOption.unit_name || unitOption.name,
-            price_usd: finalPriceUSD,  // Precio ya resuelto
+            price_usd: finalPriceUSD,  // Precio YA DESCONTADO
+            original_price_usd: calculatedPriceUSD, // Precio BASE
+            discount_percentage: discountPercentage,
+            is_discount_active: isDiscountActive,
+
             factor: unitOption.conversion_factor || unitOption.factor || 1,
             is_base: unitOption.is_base || false,
             unit_id: unitOption.id || null,

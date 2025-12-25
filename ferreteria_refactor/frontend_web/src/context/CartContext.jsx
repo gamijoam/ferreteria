@@ -156,7 +156,11 @@ export const CartProvider = ({ children }) => {
                     exchange_rate_source: rateInfo.source,
                     is_special_rate: rateInfo.isSpecial,
                     subtotal_usd: subtotalUsd,
-                    subtotal_bs: subtotalUsd * rateInfo.rate
+                    subtotal_bs: subtotalUsd * rateInfo.rate,
+                    // Fix: Preserve discount fields
+                    original_price_usd: unit.original_price_usd,
+                    discount_percentage: unit.discount_percentage || 0,
+                    is_discount_active: unit.is_discount_active || false
                 };
 
                 console.log('   newItem created:', newItem);

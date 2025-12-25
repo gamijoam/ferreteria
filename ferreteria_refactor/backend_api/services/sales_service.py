@@ -342,6 +342,7 @@ class SalesService:
                         "quantity": float(item.quantity),
                         "unit_price": get_value(item.unit_price), # CONVERTED PRICE
                         "subtotal": get_value(item.subtotal),     # CONVERTED SUBTOTAL
+                        "discount_percentage": float(item.discount) if item.discount else 0,
                         "currency_symbol": currency_symbol
                     }
                     for item in sale.details
@@ -352,6 +353,11 @@ class SalesService:
         # Add alias 'products' to avoid Jinja collision with dict.items()
         context["sale"]["products"] = context["sale"]["items"]
         
+        # DEBUG: Print context items to verify discount
+        print("🔍 TICKET CONTEXT ITEMS:")
+        for i in context["sale"]["items"]:
+            print(f"   - {i['product']['name']}: Price={i['unit_price']}, Discount%={i.get('discount_percentage')}, Subtotal={i['subtotal']}")
+
         return {
             "status": "ready",
             "template": template,

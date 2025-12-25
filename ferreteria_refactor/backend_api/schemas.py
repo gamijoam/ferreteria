@@ -127,6 +127,11 @@ class ProductUpdate(BaseModel):
     exchange_rate_id: Optional[int] = None  # NEW: Allow updating exchange rate
     is_combo: Optional[bool] = None  # NEW: Allow updating combo status
     is_active: Optional[bool] = None
+    # Pricing System Fields - Added for updates
+    profit_margin: Optional[Decimal] = None
+    discount_percentage: Optional[Decimal] = None
+    is_discount_active: Optional[bool] = None
+    
     units: Optional[List[ProductUnitCreate]] = None
     combo_items: Optional[List[ComboItemCreate]] = None  # NEW: Allow updating combo items
 
