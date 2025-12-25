@@ -276,7 +276,8 @@ class SalesService:
         # Get sale with all relationships
         sale = db.query(models.Sale).options(
             joinedload(models.Sale.details).joinedload(models.SaleDetail.product),
-            joinedload(models.Sale.customer)
+            joinedload(models.Sale.customer),
+            joinedload(models.Sale.payments)
         ).filter(models.Sale.id == sale_id).first()
         
         if not sale:
@@ -346,6 +347,15 @@ class SalesService:
                         "currency_symbol": currency_symbol
                     }
                     for item in sale.details
+                ],
+                "payments": [
+                    {
+                        "amount": float(p.amount),
+                        "currency": p.currency,
+                        "method": p.payment_method,
+                        "exchange_rate": float(p.exchange_rate)
+                    }
+                    for p in sale.payments
                 ]
             },
             "currency_symbol": currency_symbol

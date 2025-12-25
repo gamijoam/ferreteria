@@ -8,9 +8,8 @@ def update_template():
         # Fetch the current config
         config = db.query(models.BusinessConfig).filter(models.BusinessConfig.key == "ticket_template").first()
         
-        # Get the new clean 'Classic' template (since that matches the user's current layout)
-        # We could also switch them to 'Modern' if we wanted, but let's stick to fixing what they have.
-        new_template = template_presets.get_classic_template()
+        # Get the new clean 'Modern' template (since that matches the user's current layout)
+        new_template = template_presets.get_modern_template()
         
         if config:
             print("Found existing template config. Updating...")

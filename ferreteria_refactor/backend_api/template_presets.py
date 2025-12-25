@@ -10,6 +10,7 @@ Tel: {{ business.phone }}
 Fecha: {{ sale.date }}
 Factura: #{{ sale.id }}
 Cliente: {{ sale.customer.name if sale.customer else "Consumidor Final" }}
+DOC: {{ sale.customer.id_number if sale.customer else "" }}
 {% if sale.is_credit %}
 CONDICION: A CREDITO
 Vence: {{ sale.due_date }}
@@ -33,6 +34,11 @@ SUBTOTAL:       {{ currency_symbol }}{{ "%.2f"|format(sale.total) }}
 DESCUENTO:     -{{ currency_symbol }}{{ "%.2f"|format(sale.discount) }}
 {% endif %}
 TOTAL A PAGAR:  {{ currency_symbol }}{{ "%.2f"|format(sale.total) }}
+================================
+PAGOS:
+{% for p in sale.payments %}
+- {{ p.method }}: {{ p.currency }}{{ "%.2f"|format(p.amount) }}
+{% endfor %}
 ================================
       Gracias por su compra
 """
@@ -66,6 +72,10 @@ ITEMS
 ----------------------------------
 TOTAL ......... {{ currency_symbol }}{{ "%.2f"|format(sale.total) }}
 ----------------------------------
+{% for p in sale.payments %}
+PAGO: {{ p.method }} {{ p.currency }}{{ "%.2f"|format(p.amount) }}
+{% endfor %}
+----------------------------------
 {% if sale.is_credit %}
 *** CUENTA POR COBRAR ***
 Saldo Pendiente: {{ currency_symbol }}{{ "%.2f"|format(sale.balance) }}
@@ -83,6 +93,8 @@ def get_detailed_template() -> str:
 --------------------------------
 Venta: #{{ sale.id }}
 Fecha: {{ sale.date }}
+Cliente: {{ sale.customer.name if sale.customer else "Consumidor Final" }}
+Doc: {{ sale.customer.id_number if sale.customer else "" }}
 --------------------------------
 {% for item in sale.products %}
 [{{ item.product.sku }}] {{ item.product.name }}
@@ -95,7 +107,13 @@ Fecha: {{ sale.date }}
 - - - - - - - - - - - - - - - -
 {% endfor %}
 ================================
+================================
 TOTAL: {{ currency_symbol }}{{ "%.2f"|format(sale.total) }}
+================================
+PAGOS DETALLADOS:
+{% for p in sale.payments %}
+* {{ p.method }}: {{ p.currency }} {{ "%.2f"|format(p.amount) }}
+{% endfor %}
 ================================
 """
 
@@ -103,12 +121,18 @@ def get_minimal_template() -> str:
     return """{{ business.name }}
 Ticket #{{ sale.id }}
 {{ sale.date }}
+Cli: {{ sale.customer.name if sale.customer else "Consumidor Final" }}
+{{ sale.customer.id_number if sale.customer else "" }}
 --------------------------------
 {% for item in sale.products %}
 {{ "%.0f"|format(item.quantity) }} {{ item.product.name[:15] }} {{ currency_symbol }}{{ "%.2f"|format(item.subtotal) }}
 {% endfor %}
 --------------------------------
 TOTAL: {{ currency_symbol }}{{ "%.2f"|format(sale.total) }}
+--------------------------------
+{% for p in sale.payments %}
+{{ p.method }}: {{ p.currency }}{{ "%.2f"|format(p.amount) }}
+{% endfor %}
 """
 
 def get_all_presets() -> List[Dict[str, str]]:
