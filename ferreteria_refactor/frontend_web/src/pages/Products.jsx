@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Search, Package, Filter, X } from 'lucide-react';
 import ProductForm from '../components/products/ProductForm';
+import BulkProductActions from '../components/Products/BulkProductActions';
 import { useConfig } from '../context/ConfigContext';
 import { useWebSocket } from '../context/WebSocketContext';
 
@@ -93,6 +94,9 @@ const Products = () => {
                     Nuevo Producto
                 </button>
             </div>
+
+            {/* Bulk Import/Export Actions */}
+            <BulkProductActions onImportComplete={fetchProducts} />
 
             {/* Filters Bar */}
             <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 mb-6 flex flex-col md:flex-row gap-4 items-center">

@@ -48,7 +48,12 @@ else:
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:5173",  # Vite dev server
+        "http://127.0.0.1:5173",  # Alternative localhost
+        "https://demo.invensoft.lat",  # Production domain
+        "https://invensoft.lat",  # Production domain (www)
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

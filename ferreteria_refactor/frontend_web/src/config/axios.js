@@ -1,10 +1,11 @@
 import axios from 'axios';
 
 // --- CAMBIO PARA SOPORTE HÍBRIDO (LOCAL/SAAS) ---
-// Al usar '/api/v1', el navegador resolverá automáticamente:
-// - En local: http://localhost:8000/api/v1 (gracias al proxy de Vite)
-// - En VPS: https://demo.invensoft.lat/api/v1 (gracias a Nginx/Traefik)
-const baseURL = '/api/v1';
+// Detectar modo desarrollo y usar URL directa si el proxy falla
+const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const baseURL = isDevelopment ? 'http://localhost:8000/api/v1' : '/api/v1';
+
+console.log('🔧 Axios config:', { isDevelopment, baseURL, hostname: window.location.hostname });
 
 const apiClient = axios.create({
     baseURL,

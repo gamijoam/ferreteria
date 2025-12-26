@@ -1,8 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, UploadFile, File
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, joinedload
 from typing import List
 import json
 import asyncio
+from datetime import date
 from ..database.db import get_db
 from ..models import models
 from ..models.models import UserRole
@@ -11,6 +13,8 @@ from ..dependencies import has_role
 from ..websocket.manager import manager
 from ..websocket.events import WebSocketEvents
 from ..audit_utils import log_action
+from ..services.product_import_service import ProductImportService
+from ..services.product_export_service import ProductExportService
 
 router = APIRouter(prefix="/products", tags=["products"])
 
@@ -205,6 +209,132 @@ def update_product(product_id: int, product_update: schemas.ProductUpdate, backg
     background_tasks.add_task(run_broadcast, WebSocketEvents.PRODUCT_UPDATED, payload)
     
     return db_product
+
+# ========================================
+# BULK IMPORT/EXPORT ENDPOINTS
+# (Must be BEFORE /{product_id} to avoid route conflicts)
+# ========================================
+
+@router.get("/template")
+def download_template():
+    """
+    Download Excel template for bulk product import
+    """
+    buffer = ProductExportService.generate_template()
+    
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=plantilla_productos.xlsx"}
+    )
+
+@router.post("/import", dependencies=[Depends(has_role([UserRole.ADMIN, UserRole.WAREHOUSE]))])
+async def import_products(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Import products from Excel file
+    
+    Returns:
+        {
+            "success": true,
+            "created": 45,
+            "errors": []
+        }
+    """
+    # Validate file type
+    if not file.filename.endswith('.xlsx'):
+        raise HTTPException(
+            status_code=400,
+            detail="Solo se permiten archivos .xlsx"
+        )
+    
+    # Read file
+    try:
+        contents = await file.read()
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Error leyendo archivo: {str(e)}"
+        )
+    
+    # Parse and validate
+    products_to_create, errors = ProductImportService.parse_excel_to_products(contents, db)
+    
+    # If there are validation errors, return them
+    if errors:
+        return {
+            "success": False,
+            "created": 0,
+            "errors": errors
+        }
+    
+    # Create products
+    try:
+        created_count = ProductImportService.bulk_create_products(products_to_create, db)
+        
+        return {
+            "success": True,
+            "created": created_count,
+            "errors": []
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error creando productos: {str(e)}"
+        )
+
+@router.get("/export/excel")
+def export_excel(db: Session = Depends(get_db)):
+    """
+    Export all active products to Excel
+    """
+    products = db.query(models.Product).filter(
+        models.Product.is_active == True
+    ).options(
+        joinedload(models.Product.category),
+        joinedload(models.Product.supplier)
+    ).all()
+    
+    buffer = ProductExportService.export_to_excel(products)
+    
+    filename = f"inventario_{date.today().strftime('%Y-%m-%d')}.xlsx"
+    
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+@router.get("/export/pdf")
+def export_pdf(db: Session = Depends(get_db)):
+    """
+    Export all active products to PDF
+    """
+    # Get business name from config if available
+    business_name = "Inventario"
+    
+    products = db.query(models.Product).filter(
+        models.Product.is_active == True
+    ).options(
+        joinedload(models.Product.category),
+        joinedload(models.Product.supplier)
+    ).all()
+    
+    buffer = ProductExportService.export_to_pdf(products, business_name)
+    
+    filename = f"inventario_{date.today().strftime('%Y-%m-%d')}.pdf"
+    
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+# ========================================
+# PRODUCT CRUD ENDPOINTS (with dynamic routes)
+# ========================================
 
 @router.get("/{product_id}", response_model=schemas.ProductRead)
 def read_product(product_id: int, db: Session = Depends(get_db)):
