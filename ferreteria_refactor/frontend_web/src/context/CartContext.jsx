@@ -126,22 +126,38 @@ export const CartProvider = ({ children }) => {
                 // Update quantity if exists
                 return updateItemQuantityInList(prevCart, itemId, existingItem.quantity + 1);
             } else {
-                // Get effective exchange rate using hierarchy (as fallback if not provided by caller)
-                const rateInfo = unit.exchange_rate_id
-                    ? {
-                        rate: exchangeRates.find(r => r.id === unit.exchange_rate_id)?.rate || 1,
-                        rateName: unit.exchange_rate_name || 'Personalizada',
-                        source: 'pre-resolved',
-                        isSpecial: unit.is_special_rate ?? true
+                // Get effective exchange rate using hierarchy
+                let rateInfo;
+
+                // If unit has exchange_rate_id, try to resolve it
+                if (unit.exchange_rate_id) {
+                    const foundRate = exchangeRates.find(r => r.id === unit.exchange_rate_id);
+
+                    if (foundRate && foundRate.is_active) {
+                        // Successfully found the rate
+                        rateInfo = {
+                            rate: foundRate.rate,
+                            rateName: unit.exchange_rate_name || foundRate.name,
+                            rateId: foundRate.id,
+                            source: 'pre-resolved',
+                            isSpecial: unit.is_special_rate ?? !foundRate.is_default
+                        };
+                    } else {
+                        // Rate ID provided but not found or inactive - fallback to hierarchy
+                        console.warn(`⚠️ Exchange rate ID ${unit.exchange_rate_id} not found or inactive, using fallback`);
+                        rateInfo = getEffectiveExchangeRate(product, unit);
                     }
-                    : getEffectiveExchangeRate(product, unit);
+                } else {
+                    // No rate ID provided, use hierarchy
+                    rateInfo = getEffectiveExchangeRate(product, unit);
+                }
 
                 const subtotalUsd = unit.price_usd * 1;
 
                 console.log('🛒 DEBUG CartContext addToCart:');
                 console.log('   Product:', product.name);
                 console.log('   Unit received:', unit);
-                console.log('   rateInfo:', rateInfo);
+                console.log('   rateInfo resolved:', rateInfo);
 
                 const newItem = {
                     id: itemId,
@@ -154,6 +170,7 @@ export const CartProvider = ({ children }) => {
                     exchange_rate: rateInfo.rate,
                     exchange_rate_name: rateInfo.rateName,
                     exchange_rate_source: rateInfo.source,
+                    exchange_rate_id: rateInfo.rateId, // Store rate ID for updates
                     is_special_rate: rateInfo.isSpecial,
                     subtotal_usd: subtotalUsd,
                     subtotal_bs: subtotalUsd * rateInfo.rate,

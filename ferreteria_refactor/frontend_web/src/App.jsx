@@ -23,6 +23,7 @@ import AccountsReceivable from './pages/Credit/AccountsReceivable';
 import UsersManager from './pages/Users/UsersManager';
 import CashHistory from './pages/CashHistory';
 import AuditLogs from './pages/AuditLogs';
+import Help from './pages/Help';
 import { CartProvider } from './context/CartContext';
 import { CashProvider } from './context/CashContext';
 import { ConfigProvider } from './context/ConfigContext';
@@ -119,6 +120,9 @@ function App() {
                           <AuditLogs />
                         </ProtectedRoute>
                       } />
+
+                      {/* Help - Available to all authenticated users */}
+                      <Route path="/help" element={<Help />} />
                     </Route>
                   </Route>
                 </Routes>

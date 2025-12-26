@@ -24,7 +24,8 @@ import {
     FileText,
     ClipboardList,
     Menu,
-    X
+    X,
+    HelpCircle
 } from 'lucide-react';
 
 const DashboardLayout = () => {
@@ -228,6 +229,12 @@ const DashboardLayout = () => {
                         <span>Configuración</span>
                     </Link>
                 </RoleGuard>
+
+                {/* Help - Available to all users */}
+                <Link to="/help" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center space-x-3 p-3 rounded transition-colors ${isActive('/help') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
+                    <HelpCircle size={20} />
+                    <span>Ayuda</span>
+                </Link>
             </nav>
 
             <div className="p-4 border-t border-slate-700">
