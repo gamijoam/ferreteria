@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Search, Package, Filter, X } from 'lucide-react';
 import ProductForm from '../components/products/ProductForm';
-import BulkProductActions from '../components/Products/BulkProductActions';
+import BulkProductActions from '../components/products/BulkProductActions';
 import { useConfig } from '../context/ConfigContext';
 import { useWebSocket } from '../context/WebSocketContext';
 
@@ -86,17 +86,20 @@ const Products = () => {
                     </h1>
                     <p className="text-gray-500">Gestiona tu catálogo y existencias</p>
                 </div>
-                <button
-                    onClick={() => setIsModalOpen(true)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded flex items-center shadow-sm transition-all"
-                >
-                    <Plus size={20} className="mr-2" />
-                    Nuevo Producto
-                </button>
-            </div>
+                <div className="flex items-center gap-3">
+                    {/* Bulk Import/Export Actions */}
+                    <BulkProductActions onImportComplete={fetchProducts} />
 
-            {/* Bulk Import/Export Actions */}
-            <BulkProductActions onImportComplete={fetchProducts} />
+                    {/* Nuevo Producto Button */}
+                    <button
+                        onClick={() => setIsModalOpen(true)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded flex items-center shadow-sm transition-all"
+                    >
+                        <Plus size={20} className="mr-2" />
+                        Nuevo Producto
+                    </button>
+                </div>
+            </div>
 
             {/* Filters Bar */}
             <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 mb-6 flex flex-col md:flex-row gap-4 items-center">

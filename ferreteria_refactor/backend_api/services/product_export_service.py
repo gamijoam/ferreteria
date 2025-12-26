@@ -57,9 +57,8 @@ class ProductExportService:
             
             # Format header
             for cell in worksheet[1]:
-                cell.font = cell.font.copy(bold=True)
+                cell.font = cell.font.copy(bold=True, color="000000")
                 cell.fill = cell.fill.copy(fgColor="4472C4")
-                cell.font = cell.font.copy(color="FFFFFF")
             
             # Auto-adjust column widths
             for column in worksheet.columns:
@@ -238,9 +237,8 @@ Categoría: Ferretería
             # Format Products sheet
             worksheet = writer.sheets['Productos']
             for cell in worksheet[1]:
-                cell.font = cell.font.copy(bold=True)
+                cell.font = cell.font.copy(bold=True, color="000000")
                 cell.fill = cell.fill.copy(fgColor="4472C4")
-                cell.font = cell.font.copy(color="FFFFFF")
             
             # Auto-adjust column widths
             for column in worksheet.columns:

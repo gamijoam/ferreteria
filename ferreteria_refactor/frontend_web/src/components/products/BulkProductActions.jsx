@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import apiClient from '../../config/axios';
-import { Download, Upload, FileSpreadsheet, FileText, AlertCircle, CheckCircle } from 'lucide-react';
+import { Download, Upload, FileSpreadsheet, FileText, AlertCircle, CheckCircle, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const BulkProductActions = ({ onImportComplete }) => {
     const [uploading, setUploading] = useState(false);
+    const [showImportModal, setShowImportModal] = useState(false);
     const [importResult, setImportResult] = useState(null);
 
     const downloadTemplate = async () => {
@@ -56,6 +57,7 @@ const BulkProductActions = ({ onImportComplete }) => {
                 if (onImportComplete) {
                     onImportComplete();
                 }
+                setTimeout(() => setShowImportModal(false), 2000);
             } else {
                 toast.error(`❌ Error: ${response.data.errors.length} errores encontrados`);
             }
@@ -69,7 +71,6 @@ const BulkProductActions = ({ onImportComplete }) => {
             });
         } finally {
             setUploading(false);
-            // Reset file input
             event.target.value = '';
         }
     };
@@ -129,139 +130,142 @@ const BulkProductActions = ({ onImportComplete }) => {
     };
 
     return (
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-                📦 Gestión Masiva de Productos
-            </h2>
+        <>
+            {/* Compact Header Buttons */}
+            <div className="flex items-center gap-2">
+                {/* Download Template */}
+                <button
+                    onClick={downloadTemplate}
+                    className="flex items-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded text-sm transition-colors"
+                    title="Descargar plantilla Excel"
+                >
+                    <Download size={16} />
+                    <span className="hidden md:inline">Plantilla</span>
+                </button>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Import Section */}
-                <div className="border border-gray-200 rounded-lg p-4">
-                    <h3 className="font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                        <Upload size={20} className="text-blue-600" />
-                        Importar Productos
-                    </h3>
+                {/* Import */}
+                <button
+                    onClick={() => setShowImportModal(true)}
+                    className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm transition-colors"
+                    title="Importar productos desde Excel"
+                >
+                    <Upload size={16} />
+                    <span className="hidden md:inline">Importar</span>
+                </button>
 
-                    <div className="space-y-3">
-                        <div className="bg-blue-50 border-l-4 border-blue-400 p-3 text-sm">
-                            <p className="font-semibold text-blue-800 mb-1">Pasos:</p>
-                            <ol className="list-decimal list-inside text-blue-700 space-y-1">
-                                <li>Descargar plantilla Excel</li>
-                                <li>Completar con sus datos</li>
-                                <li>Subir archivo completado</li>
-                            </ol>
+                {/* Export Excel */}
+                <button
+                    onClick={exportToExcel}
+                    className="flex items-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-sm transition-colors"
+                    title="Exportar a Excel"
+                >
+                    <FileSpreadsheet size={16} />
+                    <span className="hidden md:inline">Excel</span>
+                </button>
+
+                {/* Export PDF */}
+                <button
+                    onClick={exportToPDF}
+                    className="flex items-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-sm transition-colors"
+                    title="Exportar a PDF"
+                >
+                    <FileText size={16} />
+                    <span className="hidden md:inline">PDF</span>
+                </button>
+            </div>
+
+            {/* Import Modal */}
+            {showImportModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+                        <div className="flex items-center justify-between p-4 border-b">
+                            <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                                <Upload size={20} className="text-blue-600" />
+                                Importar Productos
+                            </h3>
+                            <button
+                                onClick={() => {
+                                    setShowImportModal(false);
+                                    setImportResult(null);
+                                }}
+                                className="text-gray-400 hover:text-gray-600"
+                            >
+                                <X size={20} />
+                            </button>
                         </div>
 
-                        <button
-                            onClick={downloadTemplate}
-                            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                        >
-                            <Download size={18} />
-                            Descargar Plantilla
-                        </button>
+                        <div className="p-4 space-y-4">
+                            <div className="bg-blue-50 border-l-4 border-blue-400 p-3 text-sm">
+                                <p className="font-semibold text-blue-800 mb-1">Pasos:</p>
+                                <ol className="list-decimal list-inside text-blue-700 space-y-1">
+                                    <li>Descargar plantilla Excel</li>
+                                    <li>Completar con sus datos</li>
+                                    <li>Subir archivo completado</li>
+                                </ol>
+                            </div>
 
-                        <div className="relative">
                             <input
                                 type="file"
                                 accept=".xlsx"
                                 onChange={handleFileUpload}
                                 disabled={uploading}
                                 className="hidden"
-                                id="file-upload"
+                                id="file-upload-modal"
                             />
                             <label
-                                htmlFor="file-upload"
-                                className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors cursor-pointer ${uploading
+                                htmlFor="file-upload-modal"
+                                className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg transition-colors cursor-pointer ${uploading
                                         ? 'bg-gray-400 cursor-not-allowed'
                                         : 'bg-blue-600 hover:bg-blue-700 text-white'
                                     }`}
                             >
                                 <Upload size={18} />
-                                {uploading ? 'Subiendo...' : 'Subir Excel'}
+                                {uploading ? 'Subiendo...' : 'Seleccionar Archivo Excel'}
                             </label>
-                        </div>
-                    </div>
 
-                    {/* Import Result */}
-                    {importResult && (
-                        <div className={`mt-4 p-3 rounded-lg ${importResult.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
-                            }`}>
-                            <div className="flex items-start gap-2">
-                                {importResult.success ? (
-                                    <CheckCircle size={20} className="text-green-600 flex-shrink-0 mt-0.5" />
-                                ) : (
-                                    <AlertCircle size={20} className="text-red-600 flex-shrink-0 mt-0.5" />
-                                )}
-                                <div className="flex-1">
-                                    <p className={`font-semibold ${importResult.success ? 'text-green-800' : 'text-red-800'}`}>
-                                        {importResult.success
-                                            ? `✅ ${importResult.created} productos creados`
-                                            : `❌ ${importResult.errors.length} errores encontrados`
-                                        }
-                                    </p>
-                                    {!importResult.success && importResult.errors.length > 0 && (
-                                        <div className="mt-2 max-h-40 overflow-y-auto">
-                                            <ul className="text-sm text-red-700 space-y-1">
-                                                {importResult.errors.slice(0, 10).map((error, idx) => (
-                                                    <li key={idx} className="flex items-start gap-1">
-                                                        <span className="text-red-500">•</span>
-                                                        <span>{error}</span>
-                                                    </li>
-                                                ))}
-                                                {importResult.errors.length > 10 && (
-                                                    <li className="text-red-600 font-semibold">
-                                                        ... y {importResult.errors.length - 10} errores más
-                                                    </li>
-                                                )}
-                                            </ul>
+                            {/* Import Result */}
+                            {importResult && (
+                                <div className={`p-3 rounded-lg ${importResult.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
+                                    }`}>
+                                    <div className="flex items-start gap-2">
+                                        {importResult.success ? (
+                                            <CheckCircle size={20} className="text-green-600 flex-shrink-0 mt-0.5" />
+                                        ) : (
+                                            <AlertCircle size={20} className="text-red-600 flex-shrink-0 mt-0.5" />
+                                        )}
+                                        <div className="flex-1">
+                                            <p className={`font-semibold ${importResult.success ? 'text-green-800' : 'text-red-800'}`}>
+                                                {importResult.success
+                                                    ? `✅ ${importResult.created} productos creados`
+                                                    : `❌ ${importResult.errors.length} errores encontrados`
+                                                }
+                                            </p>
+                                            {!importResult.success && importResult.errors.length > 0 && (
+                                                <div className="mt-2 max-h-40 overflow-y-auto">
+                                                    <ul className="text-sm text-red-700 space-y-1">
+                                                        {importResult.errors.slice(0, 5).map((error, idx) => (
+                                                            <li key={idx} className="flex items-start gap-1">
+                                                                <span className="text-red-500">•</span>
+                                                                <span>{error}</span>
+                                                            </li>
+                                                        ))}
+                                                        {importResult.errors.length > 5 && (
+                                                            <li className="text-red-600 font-semibold">
+                                                                ... y {importResult.errors.length - 5} errores más
+                                                            </li>
+                                                        )}
+                                                    </ul>
+                                                </div>
+                                            )}
                                         </div>
-                                    )}
+                                    </div>
                                 </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* Export Section */}
-                <div className="border border-gray-200 rounded-lg p-4">
-                    <h3 className="font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                        <Download size={20} className="text-green-600" />
-                        Exportar Inventario
-                    </h3>
-
-                    <div className="space-y-3">
-                        <p className="text-sm text-gray-600 mb-4">
-                            Descargue el inventario completo en formato Excel o PDF
-                        </p>
-
-                        <button
-                            onClick={exportToExcel}
-                            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                        >
-                            <FileSpreadsheet size={18} />
-                            Exportar a Excel
-                        </button>
-
-                        <button
-                            onClick={exportToPDF}
-                            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                        >
-                            <FileText size={18} />
-                            Exportar a PDF
-                        </button>
-
-                        <div className="bg-gray-50 border border-gray-200 rounded p-3 text-sm text-gray-600">
-                            <p className="font-semibold mb-1">Incluye:</p>
-                            <ul className="list-disc list-inside space-y-1">
-                                <li>Todos los productos activos</li>
-                                <li>Información completa</li>
-                                <li>Formato profesional</li>
-                            </ul>
+                            )}
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
+            )}
+        </>
     );
 };
 
