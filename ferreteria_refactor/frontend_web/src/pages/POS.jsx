@@ -677,9 +677,9 @@ const POS = () => {
                                         {item.unit_name} {item.unit_id ? <span>(x{item.conversion_factor})</span> : null}
                                     </span>
                                     {item.is_special_rate && (
-                                        <span className="bg-purple-100 text-purple-700 px-1.5 rounded font-semibold flex items-center gap-1" title={item.exchange_rate_name}>
-                                            <RotateCcw size={10} />
-                                            Rs
+                                        <span className="bg-purple-100 text-purple-700 px-1.5 rounded font-semibold flex items-center gap-1 max-w-[80px]" title={item.exchange_rate_name}>
+                                            <RotateCcw size={10} className="flex-shrink-0" />
+                                            <span className="truncate text-[10px] uppercase">{item.exchange_rate_name || 'Tasa'}</span>
                                         </span>
                                     )}
                                 </div>
