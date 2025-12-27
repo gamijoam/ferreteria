@@ -228,12 +228,12 @@ const Settings = () => {
                 >
                     <Coins className="mr-2" size={20} /> Monedas y Tasas
                 </button>
-                <button
+                {/* <button
                     onClick={() => setActiveTab('taxes')}
                     className={`px-6 py-3 font-medium flex items-center whitespace-nowrap transition-all ${activeTab === 'taxes' ? 'border-b-2 border-blue-600 text-blue-600 bg-blue-50/50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}
                 >
                     <Receipt className="mr-2" size={20} /> Impuestos
-                </button>
+                </button> */}
                 <button
                     onClick={() => setActiveTab('tickets')}
                     className={`px-6 py-3 font-medium flex items-center whitespace-nowrap transition-all ${activeTab === 'tickets' ? 'border-b-2 border-blue-600 text-blue-600 bg-blue-50/50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}
@@ -619,8 +619,8 @@ const Settings = () => {
                 </div>
             )}
 
-            {/* Taxes Tab */}
-            {activeTab === 'taxes' && (
+            {/* Taxes Tab - HIDDEN */}
+            {/* {activeTab === 'taxes' && (
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 max-w-2xl mx-auto">
                     <div className="text-center mb-8">
                         <div className="bg-orange-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -666,7 +666,7 @@ const Settings = () => {
                         </p>
                     </div>
                 </div>
-            )}
+            )} */}
 
             {/* Tickets Tab - NEW */}
             {activeTab === 'tickets' && (
