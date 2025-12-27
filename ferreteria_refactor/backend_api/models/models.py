@@ -484,6 +484,17 @@ class BusinessConfig(Base):
     def __repr__(self):
         return f"<BusinessConfig(key='{self.key}', value='{self.value}')>"
 
+class PaymentMethod(Base):
+    __tablename__ = "payment_methods"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, nullable=False)
+    is_active = Column(Boolean, default=True)
+    is_system = Column(Boolean, default=False) # Prevent deletion of core methods
+
+    def __repr__(self):
+        return f"<PaymentMethod(name='{self.name}')>"
+
 class Currency(Base):
     __tablename__ = "business_currencies"
 

@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Building2, Coins, Receipt, Save, RefreshCw, Trash2, Plus, Edit, Check, X, Star, AlertCircle, Loader2, Globe, Printer } from 'lucide-react';
+import { Building2, Coins, Receipt, Save, RefreshCw, Trash2, Plus, Edit, Check, X, Star, AlertCircle, Loader2, Globe, Printer, CreditCard } from 'lucide-react';
 import { useConfig } from '../context/ConfigContext';
 import configService from '../services/configService';
 import apiClient from '../config/axios';
 import TicketConfig from './Settings/TicketConfig';  // NEW
+import PaymentMethodsConfig from './Settings/PaymentMethodsConfig'; // NEW
 
 const PREDEFINED_CURRENCIES = [
     { code: 'USD', symbol: '$', name: 'Dólar Americano' },
@@ -239,6 +240,12 @@ const Settings = () => {
                     className={`px-6 py-3 font-medium flex items-center whitespace-nowrap transition-all ${activeTab === 'tickets' ? 'border-b-2 border-blue-600 text-blue-600 bg-blue-50/50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}
                 >
                     <Printer className="mr-2" size={20} /> Tickets
+                </button>
+                <button
+                    onClick={() => setActiveTab('payments')}
+                    className={`px-6 py-3 font-medium flex items-center whitespace-nowrap transition-all ${activeTab === 'payments' ? 'border-b-2 border-blue-600 text-blue-600 bg-blue-50/50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}
+                >
+                    <CreditCard className="mr-2" size={20} /> Métodos de Pago
                 </button>
             </div>
 
@@ -671,6 +678,11 @@ const Settings = () => {
             {/* Tickets Tab - NEW */}
             {activeTab === 'tickets' && (
                 <TicketConfig />
+            )}
+
+            {/* Payment Methods Tab - NEW */}
+            {activeTab === 'payments' && (
+                <PaymentMethodsConfig />
             )}
         </div>
     );

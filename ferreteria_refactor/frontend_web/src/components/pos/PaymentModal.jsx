@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 import QuickCustomerModal from './QuickCustomerModal';
 
 const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onConfirm }) => {
-    const { getActiveCurrencies, convertPrice, getExchangeRate } = useConfig();
+    const { getActiveCurrencies, convertPrice, getExchangeRate, paymentMethods } = useConfig();
     const { subscribe } = useWebSocket();
     const currencies = [{ id: 'base', symbol: 'USD', name: 'Dólar', rate: 1, is_anchor: true }, ...getActiveCurrencies()];
 
@@ -332,11 +332,9 @@ const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onCon
                                             value={payment.method}
                                             onChange={(e) => updatePayment(index, 'method', e.target.value)}
                                         >
-                                            <option value="Efectivo">Efectivo</option>
-                                            <option value="Pago Movil">Pago Móvil</option>
-                                            <option value="Punto de Venta">Punto Venta</option>
-                                            <option value="Zelle">Zelle</option>
-                                            <option value="Transferencia">Transferencia</option>
+                                            {paymentMethods.filter(m => m.is_active).map(method => (
+                                                <option key={method.id} value={method.name}>{method.name}</option>
+                                            ))}
                                         </select>
 
                                         <select

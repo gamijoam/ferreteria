@@ -18,7 +18,7 @@ from .database.db import engine
 from .routers import (
     products, customers, quotes, cash, suppliers, 
     inventory, returns, reports, purchases, users, 
-    config, auth, categories, websocket, audit, system
+    config, auth, categories, websocket, audit, system, payment_methods
 )
 from .routers.hardware_bridge import router as hardware_bridge_router  # WebSocket router
 from .middleware.license_guard import LicenseGuardMiddleware
@@ -76,6 +76,7 @@ app.include_router(categories, prefix="/api/v1", tags=["Categorías"])
 app.include_router(websocket, prefix="/api/v1", tags=["WebSocket Events"])
 app.include_router(audit, prefix="/api/v1", tags=["Auditoría"])
 app.include_router(system, prefix="/api/v1", tags=["Sistema y Licencias"])
+app.include_router(payment_methods.router, prefix="/api/v1", tags=["Métodos de Pago"])
 app.include_router(hardware_bridge_router, prefix="/api/v1", tags=["Hardware Bridge"])
 
 # --- LÓGICA DE INICIALIZACIÓN ---
@@ -107,9 +108,21 @@ def startup_event():
     from .routers.auth import init_admin_user
     from .routers.config import init_exchange_rates
     db = SessionLocal()
+    from .routers.auth import init_admin_user
+    from .routers.config import init_exchange_rates
+    db = SessionLocal()
     try:
         init_admin_user(db)
         init_exchange_rates(db)
+
+        # Initialize Payment Methods
+        if db.query(models.PaymentMethod).count() == 0:
+            print("💳 Inicializando métodos de pago por defecto...")
+            defaults = ["Efectivo", "Pago Movil", "Punto de Venta", "Zelle", "Transferencia", "Credito"]
+            for name in defaults:
+                db.add(models.PaymentMethod(name=name, is_active=True, is_system=True))
+            db.commit()
+            print("✅ Métodos de pago creados.")
     except Exception as e:
         print(f"⚠️ Nota de Inicialización: {e}")
     finally:

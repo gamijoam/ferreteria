@@ -56,8 +56,27 @@ export const ConfigProvider = ({ children }) => {
         };
     }, [subscribe]);
 
+    const [paymentMethods, setPaymentMethods] = useState([]);
+
+    const fetchPaymentMethods = async () => {
+        try {
+            const response = await apiClient.get('/payment-methods');
+            setPaymentMethods(response.data);
+        } catch (error) {
+            console.error('Error fetching payment methods:', error);
+            // Fallback for offline/initial load if API fails
+            setPaymentMethods([
+                { id: 1, name: 'Efectivo', is_active: true },
+                { id: 2, name: 'Pago Movil', is_active: true }
+            ]);
+        }
+    };
+
     const fetchConfig = async () => {
         try {
+            // Load Payment Methods
+            fetchPaymentMethods();
+
             // Mock data loading if backend routes aren't ready yet or fail
             // In prod, you'd rely on the API success
             try {
@@ -67,6 +86,7 @@ export const ConfigProvider = ({ children }) => {
                 // NEW: Use exchange-rates endpoint instead of currencies
                 let currData = [];
                 try {
+                    // ... (rest of existing fetchConfig logic)
                     const ratesRes = await apiClient.get('/config/exchange-rates', {
                         params: { is_active: true }
                     });
@@ -222,7 +242,8 @@ export const ConfigProvider = ({ children }) => {
             getActiveCurrencies,
             convertPrice,
             getProductExchangeRate,
-            convertProductPrice
+            convertProductPrice,
+            paymentMethods
         }}>
             {children}
         </ConfigContext.Provider>
