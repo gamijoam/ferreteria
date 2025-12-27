@@ -687,6 +687,9 @@ const POS = () => {
                             <div className="flex flex-col items-end min-w-[80px]">
                                 <span className="text-lg font-bold text-gray-800">x{item.quantity}</span>
                                 <span className="font-bold text-blue-600 text-sm">${Number(item.subtotal_usd || 0).toFixed(2)}</span>
+                                <span className="block text-xs text-gray-500 font-medium text-right mt-0.5">
+                                    Bs. {Number(item.subtotal_bs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </span>
                             </div>
                         </div>
                     ))}
