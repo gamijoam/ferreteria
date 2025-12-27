@@ -177,7 +177,10 @@ export const CartProvider = ({ children }) => {
                     // Fix: Preserve discount fields
                     original_price_usd: unit.original_price_usd,
                     discount_percentage: unit.discount_percentage || 0,
-                    is_discount_active: unit.is_discount_active || false
+                    is_discount_active: unit.is_discount_active || false,
+                    // Redesign Data
+                    sku: product.sku || '',
+                    stock: product.stock || 0
                 };
 
                 console.log('   newItem created:', newItem);

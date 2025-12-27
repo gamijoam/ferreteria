@@ -251,7 +251,7 @@ export const ConfigProvider = ({ children }) => {
             convertPrice,
             getProductExchangeRate,
             convertProductPrice,
-            convertProductPrice,
+
             paymentMethods,
             formatCurrency
         }}>

@@ -27,7 +27,7 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
         is_combo: false,
         // Pricing System Fields
         profit_margin: null,
-        profit_margin: null,
+
         discount_percentage: 0,
         is_discount_active: false,
         tax_rate: 0, // NEW: Tax Rate
@@ -97,7 +97,7 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
                     is_combo: initialData.is_combo || false,  // NEW
                     // Pricing System Fields - Fix Uncontrolled Input
                     profit_margin: initialData.profit_margin || null,
-                    profit_margin: initialData.profit_margin || null,
+
                     discount_percentage: initialData.discount_percentage || 0,
                     is_discount_active: initialData.is_discount_active || false,
                     tax_rate: initialData.tax_rate !== undefined ? initialData.tax_rate : 0, // Load tax rate
@@ -286,7 +286,7 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
             is_combo: formData.is_combo,
             // Pricing System Fields
             profit_margin: formData.profit_margin ? parseFloat(formData.profit_margin) : null,
-            profit_margin: formData.profit_margin ? parseFloat(formData.profit_margin) : null,
+
             discount_percentage: parseFloat(formData.discount_percentage) || 0,
             is_discount_active: formData.is_discount_active,
             tax_rate: parseFloat(formData.tax_rate) || 0, // Send Tax Rate

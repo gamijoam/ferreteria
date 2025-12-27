@@ -668,28 +668,68 @@ const POS = () => {
                         <div
                             key={`${item.id}-${item.unit_id}-${idx}`}
                             onClick={() => setSelectedItemForEdit(item)}
-                            className="flex justify-between items-center p-3 hover:bg-blue-50 cursor-pointer rounded-lg border-b border-gray-100 last:border-0 transition-colors group relative"
+                            className="bg-white p-3 rounded-xl border border-gray-100 shadow-sm hover:shadow-md hover:border-blue-200 cursor-pointer transition-all group relative"
                         >
-                            <div className="flex-1 pr-2 min-w-0">
-                                <div className="font-medium text-gray-800 leading-snug text-sm md:text-base truncate">{item.name}</div>
-                                <div className="text-xs text-gray-500 flex gap-2 items-center flex-wrap mt-1">
-                                    <span className="bg-blue-100 text-blue-700 px-1.5 rounded whitespace-nowrap">
-                                        {item.unit_name} {item.unit_id ? <span>(x{item.conversion_factor})</span> : null}
+                            {/* Header: Name & SKU */}
+                            <div className="flex justify-between items-start mb-2">
+                                <div className="min-w-0 pr-2">
+                                    <div className="font-bold text-gray-800 text-sm md:text-base leading-tight line-clamp-2">
+                                        {item.name}
+                                    </div>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        {item.sku && (
+                                            <span className="text-[10px] font-mono bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded border border-gray-200">
+                                                {item.sku}
+                                            </span>
+                                        )}
+                                        {/* Stock Warning Badge */}
+                                        {Number(item.stock) <= Number(item.quantity) * Number(item.conversion_factor || 1) && (
+                                            <span className="text-[10px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded border border-red-100 font-medium">
+                                                Poco Stock
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                                {/* Quantity Large Display */}
+                                <div className="flex flex-col items-end">
+                                    <span className="text-xl md:text-2xl font-bold text-blue-600 leading-none">
+                                        x{item.quantity}
                                     </span>
-                                    {item.is_special_rate && (
-                                        <span className="bg-purple-100 text-purple-700 px-1.5 rounded font-semibold flex items-center gap-1 max-w-[80px]" title={item.exchange_rate_name}>
-                                            <RotateCcw size={10} className="flex-shrink-0" />
-                                            <span className="truncate text-[10px] uppercase">{item.exchange_rate_name || 'Tasa'}</span>
-                                        </span>
-                                    )}
                                 </div>
                             </div>
-                            <div className="flex flex-col items-end min-w-[80px]">
-                                <span className="text-lg font-bold text-gray-800">x{item.quantity}</span>
-                                <span className="font-bold text-blue-600 text-sm">${Number(item.subtotal_usd || 0).toFixed(2)}</span>
-                                <span className="block text-xs text-gray-500 font-medium text-right mt-0.5">
-                                    Bs. {Number(item.subtotal_bs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+
+                            {/* Divider with Unit Info */}
+                            <div className="flex items-center gap-2 mb-2">
+                                <span className="bg-blue-50 text-blue-700 text-xs px-2 py-1 rounded-md font-medium border border-blue-100">
+                                    {item.unit_name} {item.unit_id ? <span className="text-blue-500 opacity-75 text-[10px]">(x{item.conversion_factor})</span> : null}
                                 </span>
+                                {item.is_special_rate && (
+                                    <span className="bg-purple-50 text-purple-700 text-xs px-2 py-1 rounded-md font-medium flex items-center gap-1 border border-purple-100" title={item.exchange_rate_name}>
+                                        <RotateCcw size={10} />
+                                        <span className="truncate max-w-[60px] uppercase text-[10px]">{item.exchange_rate_name || 'Tasa'}</span>
+                                    </span>
+                                )}
+                            </div>
+
+                            {/* Footer: Prices */}
+                            <div className="flex justify-between items-end border-t border-dashed pt-2">
+                                {/* Unit Price Detail */}
+                                <div className="text-xs text-gray-400">
+                                    <div>Unit: ${Number(item.unit_price_usd).toFixed(2)}</div>
+                                    <div className="text-gray-500 font-medium">
+                                        Bs. {(Number(item.unit_price_usd) * Number(item.exchange_rate)).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </div>
+                                </div>
+
+                                {/* Totals */}
+                                <div className="text-right">
+                                    <div className="font-bold text-gray-900 text-sm md:text-base">
+                                        ${Number(item.subtotal_usd || 0).toFixed(2)}
+                                    </div>
+                                    <div className="text-xs text-gray-500 font-medium">
+                                        Bs. {Number(item.subtotal_bs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     ))}
