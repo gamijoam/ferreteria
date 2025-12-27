@@ -159,24 +159,24 @@ const ProductUnitManager = ({ units, onUnitsChange, baseUnitType, basePrice, bas
 
     const renderWizard = () => (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-fade-in-up">
-                <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6 text-white sticky top-0 z-10">
-                    <h3 className="text-xl font-bold flex items-center">
-                        <Layers className="mr-2" /> Agregar Nueva Presentación
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-fade-in-up flex flex-col">
+                <div className="bg-white border-b p-6 sticky top-0 z-10">
+                    <h3 className="text-xl font-bold flex items-center text-gray-800">
+                        <Layers className="mr-2 text-blue-600" /> Agregar Nueva Presentación
                     </h3>
-                    <p className="text-blue-100 text-sm mt-1">Paso {wizardStep} de 2: {wizardStep === 1 ? 'Tipo de Unidad' : 'Detalles y Precios'}</p>
+                    <p className="text-gray-500 text-sm mt-1">Paso {wizardStep} de 2: {wizardStep === 1 ? 'Tipo de Unidad' : 'Detalles y Precios'}</p>
                 </div>
 
-                <div className="p-8">
+                <div className="p-8 flex-1 overflow-y-auto">
                     {wizardStep === 1 ? (
                         <div className="space-y-4">
                             <p className="text-gray-600 mb-4 font-medium">¿Qué tipo de unidad deseas agregar?</p>
 
                             <button
                                 onClick={() => { setNewUnit({ ...newUnit, type: 'packing' }); setWizardStep(2); }}
-                                className="w-full p-4 border-2 border-gray-200 hover:border-blue-500 hover:bg-blue-50 rounded-xl transition-all flex items-center group text-left"
+                                className="w-full p-4 border border-gray-200 hover:border-blue-500 hover:bg-blue-50/50 rounded-xl transition-all flex items-center group text-left shadow-sm hover:shadow-md"
                             >
-                                <div className="bg-blue-100 text-blue-600 p-3 rounded-lg mr-4 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                                <div className="bg-blue-50 text-blue-600 p-3 rounded-lg mr-4 group-hover:bg-blue-600 group-hover:text-white transition-colors">
                                     <Package size={24} />
                                 </div>
                                 <div>
@@ -187,9 +187,9 @@ const ProductUnitManager = ({ units, onUnitsChange, baseUnitType, basePrice, bas
 
                             <button
                                 onClick={() => { setNewUnit({ ...newUnit, type: 'fraction' }); setWizardStep(2); }}
-                                className="w-full p-4 border-2 border-gray-200 hover:border-indigo-500 hover:bg-indigo-50 rounded-xl transition-all flex items-center group text-left"
+                                className="w-full p-4 border border-gray-200 hover:border-indigo-500 hover:bg-indigo-50/50 rounded-xl transition-all flex items-center group text-left shadow-sm hover:shadow-md"
                             >
-                                <div className="bg-indigo-100 text-indigo-600 p-3 rounded-lg mr-4 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                                <div className="bg-indigo-50 text-indigo-600 p-3 rounded-lg mr-4 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
                                     <Divide size={24} />
                                 </div>
                                 <div>
@@ -199,92 +199,89 @@ const ProductUnitManager = ({ units, onUnitsChange, baseUnitType, basePrice, bas
                             </button>
                         </div>
                     ) : (
-                        <div className="space-y-6 animate-fade-in-right">
+                        <div className="space-y-8 animate-fade-in-right">
                             {/* Basic Info */}
-                            <div className="space-y-4">
+                            <div className="space-y-6">
                                 <div>
                                     <label className="block text-sm font-bold text-gray-700 mb-1">Nombre de la Unidad</label>
                                     <input
                                         autoFocus
-                                        className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-shadow"
                                         placeholder={newUnit.type === 'packing' ? "Ej: Caja, Bulto, Paquete" : "Ej: Gramo, Metro"}
                                         value={newUnit.unit_name}
                                         onChange={e => setNewUnit({ ...newUnit, unit_name: e.target.value })}
                                     />
                                 </div>
 
-                                <div>
-                                    <label className="block text-sm font-bold text-gray-700 mb-1">
-                                        {newUnit.type === 'packing' ? `¿Cuántos ${baseUnitType} contiene?` : `¿En cuántas partes se divide 1 ${baseUnitType}?`}
-                                    </label>
-                                    <input
-                                        type="number"
-                                        className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono font-bold text-lg"
-                                        value={newUnit.user_input}
-                                        onChange={e => setNewUnit({ ...newUnit, user_input: e.target.value })}
-                                    />
-                                    <div className="mt-2 text-xs bg-blue-50 text-blue-700 p-3 rounded-lg flex items-start">
-                                        <Info size={16} className="mr-2 mt-0.5 flex-shrink-0" />
-                                        <span>{feedbackMessage}</span>
+                                <div className="grid grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 mb-1">
+                                            {newUnit.type === 'packing' ? `Cantidad (${baseUnitType})` : `Divisor (1/${baseUnitType})`}
+                                        </label>
+                                        <input
+                                            type="number"
+                                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono font-bold text-lg"
+                                            value={newUnit.user_input}
+                                            onChange={e => setNewUnit({ ...newUnit, user_input: e.target.value })}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 mb-1">Código de Barras</label>
+                                        <input
+                                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                            placeholder="SCAN..."
+                                            value={newUnit.barcode}
+                                            onChange={e => setNewUnit({ ...newUnit, barcode: e.target.value })}
+                                        />
                                     </div>
                                 </div>
 
-                                <div>
-                                    <label className="block text-sm font-bold text-gray-700 mb-1">Código de Barras</label>
-                                    <input
-                                        className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                                        placeholder="SCAN..."
-                                        value={newUnit.barcode}
-                                        onChange={e => setNewUnit({ ...newUnit, barcode: e.target.value })}
-                                    />
+                                <div className="bg-blue-50 text-blue-800 p-3 rounded-lg flex items-start text-sm border border-blue-100">
+                                    <Info size={16} className="mr-2 mt-0.5 flex-shrink-0" />
+                                    <span>{feedbackMessage}</span>
                                 </div>
                             </div>
 
                             {/* Cost Display */}
                             {newUnit.cost_price > 0 && (
-                                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-sm font-semibold text-yellow-800">💰 Costo de esta presentación:</span>
-                                        <span className="text-xl font-bold text-yellow-900">${parseFloat(newUnit.cost_price).toFixed(2)}</span>
-                                    </div>
-                                    <p className="text-xs text-yellow-700 mt-1">
-                                        Calculado: ${baseCost} × {newUnit.user_input} {newUnit.type === 'packing' ? 'unidades' : '÷ ' + newUnit.user_input}
-                                    </p>
+                                <div className="p-4 border border-gray-200 rounded-xl bg-gray-50 flex justify-between items-center">
+                                    <span className="text-sm font-semibold text-gray-600">Costo Base Calculado:</span>
+                                    <span className="text-xl font-bold text-gray-800">${parseFloat(newUnit.cost_price).toFixed(2)}</span>
                                 </div>
                             )}
 
                             {/* Pricing Section */}
-                            <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-5 border border-green-200">
-                                <h4 className="text-lg font-bold text-green-800 mb-4 flex items-center">
-                                    <TrendingUp className="mr-2" size={20} /> Precio de Venta
+                            <div className="border border-gray-200 rounded-xl p-6 relative">
+                                <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4 border-b pb-2 flex items-center">
+                                    <TrendingUp className="mr-2" size={16} /> Configuración de Precio
                                 </h4>
 
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-2 gap-6">
                                     <div>
-                                        <label className="block text-sm font-semibold text-gray-700 mb-1">% Ganancia Deseado</label>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-1">% Ganancia</label>
                                         <div className="relative">
                                             <input
                                                 type="number"
                                                 step="0.01"
                                                 value={newUnit.profit_margin}
                                                 onChange={(e) => setNewUnit({ ...newUnit, profit_margin: e.target.value })}
-                                                className="w-full pr-8 border-green-300 rounded-lg shadow-sm focus:border-green-500 focus:ring-green-500 py-3"
+                                                className="w-full pr-8 border-gray-300 rounded-lg shadow-sm focus:border-green-500 focus:ring-green-500 py-2"
                                                 placeholder="Ej: 30"
                                             />
-                                            <span className="absolute right-3 top-3 text-gray-500 font-bold">%</span>
+                                            <span className="absolute right-3 top-2 text-gray-500 font-bold">%</span>
                                         </div>
                                     </div>
 
                                     <div>
                                         <label className="block text-sm font-semibold text-gray-700 mb-1">Precio Venta USD</label>
                                         <div className="relative">
-                                            <span className="absolute left-3 top-3 text-gray-500 font-bold">$</span>
+                                            <span className="absolute left-3 top-2 text-gray-500 font-bold">$</span>
                                             <input
                                                 type="number"
                                                 step="0.01"
                                                 value={newUnit.price_usd}
                                                 onChange={(e) => setNewUnit({ ...newUnit, price_usd: e.target.value })}
-                                                className="w-full pl-8 border-green-300 rounded-lg shadow-sm focus:border-green-500 focus:ring-green-500 py-3 font-bold"
+                                                className="w-full pl-8 border-green-300 rounded-lg shadow-sm focus:border-green-500 focus:ring-green-500 py-2 font-bold text-green-700"
                                                 placeholder="0.00"
                                             />
                                         </div>
@@ -292,103 +289,68 @@ const ProductUnitManager = ({ units, onUnitsChange, baseUnitType, basePrice, bas
                                 </div>
 
                                 {calculatedPrice && (
-                                    <div className="mt-3 bg-white rounded-lg p-3 border border-green-300">
-                                        <p className="text-xs text-gray-600 mb-1">💰 Precio Calculado:</p>
-                                        <p className="text-xl font-bold text-green-700">${calculatedPrice}</p>
-                                    </div>
-                                )}
-
-                                {calculatedMargin && !newUnit.profit_margin && (
-                                    <div className="mt-3 bg-white rounded-lg p-3 border border-blue-300">
-                                        <p className="text-xs text-gray-600 mb-1">📈 Margen Calculado:</p>
-                                        <p className="text-xl font-bold text-blue-700">{calculatedMargin}%</p>
+                                    <div className="mt-2 text-right text-xs text-gray-500">
+                                        Precio Sugerido: <span className="font-bold text-green-600">${calculatedPrice}</span>
                                     </div>
                                 )}
                             </div>
 
-                            {/* Discount Section */}
-                            <div className="bg-gradient-to-r from-red-50 to-orange-50 rounded-xl p-5 border border-red-200">
-                                <h4 className="text-lg font-bold text-red-800 mb-3 flex items-center">
-                                    <Tag className="mr-2" size={20} /> Descuento Promocional
-                                </h4>
-
-                                <label className="flex items-center gap-3 mb-3 cursor-pointer">
+                            {/* Discount Toggle */}
+                            <div className="border border-gray-200 rounded-xl p-4">
+                                <label className="flex items-center justify-between cursor-pointer">
+                                    <div className="flex items-center gap-2">
+                                        <Tag size={16} className="text-red-500" />
+                                        <span className="font-semibold text-gray-700">Descuento Promocional</span>
+                                    </div>
                                     <input
                                         type="checkbox"
                                         checked={newUnit.is_discount_active}
                                         onChange={(e) => setNewUnit({ ...newUnit, is_discount_active: e.target.checked })}
                                         className="w-5 h-5 text-red-600 border-gray-300 rounded focus:ring-red-500"
                                     />
-                                    <span className="text-sm font-semibold text-gray-900">Activar descuento</span>
                                 </label>
 
                                 {newUnit.is_discount_active && (
-                                    <div className="space-y-3">
-                                        <div>
-                                            <label className="block text-sm font-semibold text-gray-700 mb-1">% Descuento</label>
-                                            <div className="relative">
-                                                <input
-                                                    type="number"
-                                                    step="0.01"
-                                                    min="0"
-                                                    max="100"
-                                                    value={newUnit.discount_percentage}
-                                                    onChange={(e) => setNewUnit({ ...newUnit, discount_percentage: e.target.value })}
-                                                    className="w-full pr-8 border-red-300 rounded-lg shadow-sm focus:border-red-500 focus:ring-red-500 py-3"
-                                                    placeholder="Ej: 10"
-                                                />
-                                                <span className="absolute right-3 top-3 text-gray-500 font-bold">%</span>
-                                            </div>
+                                    <div className="mt-4 pt-4 border-t border-gray-100 animate-fade-in-down flex items-center gap-4">
+                                        <div className="w-1/2">
+                                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">% Off</label>
+                                            <input
+                                                type="number"
+                                                value={newUnit.discount_percentage}
+                                                onChange={(e) => setNewUnit({ ...newUnit, discount_percentage: e.target.value })}
+                                                className="w-full border-red-200 rounded-lg py-2 px-3 focus:border-red-500 focus:ring-red-500"
+                                            />
                                         </div>
-
-                                        {finalPriceWithDiscount && (
-                                            <div className="bg-white rounded-lg p-4 border border-red-300">
-                                                <p className="text-xs text-gray-600 mb-2">Precio Final:</p>
-                                                <div className="flex items-center gap-3">
-                                                    <span className="line-through text-gray-400 text-lg">${newUnit.price_usd}</span>
-                                                    <span className="text-2xl font-bold text-red-600">${finalPriceWithDiscount}</span>
+                                        <div className="w-1/2">
+                                            {finalPriceWithDiscount && (
+                                                <div className="text-right">
+                                                    <p className="text-xs text-gray-500">Precio Final</p>
+                                                    <p className="text-lg font-bold text-red-600">${finalPriceWithDiscount}</p>
                                                 </div>
-                                                <p className="text-sm text-green-600 font-semibold mt-2">
-                                                    💰 Ahorras: ${(newUnit.price_usd - finalPriceWithDiscount).toFixed(2)}
-                                                </p>
-                                            </div>
-                                        )}
+                                            )}
+                                        </div>
                                     </div>
                                 )}
                             </div>
 
                             {/* Savings vs Unit */}
                             {savingsVsUnit && (
-                                <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-5 border border-purple-200">
-                                    <h4 className="text-sm font-bold text-purple-800 mb-2">🎁 Ahorro vs Comprar por Unidad</h4>
-                                    <p className="text-lg font-bold text-purple-900">
-                                        El cliente ahorra ${savingsVsUnit.amount} ({savingsVsUnit.percent}%)
-                                    </p>
-                                    <p className="text-xs text-purple-700 mt-1">
-                                        vs comprar {newUnit.user_input} unidades sueltas a ${basePrice} c/u
-                                    </p>
+                                <div className="bg-purple-50 rounded-xl p-4 border border-purple-100 flex items-center justify-between">
+                                    <div>
+                                        <h4 className="text-sm font-bold text-purple-800">Ahorro por Volumen</h4>
+                                        <p className="text-xs text-purple-600">vs comprar suelto</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-lg font-bold text-purple-900">${savingsVsUnit.amount}</p>
+                                        <span className="text-xs font-bold bg-purple-200 text-purple-800 px-2 py-0.5 rounded-full">{savingsVsUnit.percent}% OFF</span>
+                                    </div>
                                 </div>
                             )}
-
-                            {/* Exchange Rate */}
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-1">Tasa de Cambio Específica</label>
-                                <select
-                                    className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                                    value={newUnit.exchange_rate_id}
-                                    onChange={e => setNewUnit({ ...newUnit, exchange_rate_id: e.target.value })}
-                                >
-                                    <option value="">-- Automático / Heredado --</option>
-                                    {exchangeRates.map(r => (
-                                        <option key={r.id} value={r.id}>{r.name} ({r.currency_code})</option>
-                                    ))}
-                                </select>
-                            </div>
                         </div>
                     )}
                 </div>
 
-                <div className="bg-gray-50 p-5 flex justify-end gap-3 border-t sticky bottom-0">
+                <div className="bg-gray-50 p-6 flex justify-end gap-3 border-t sticky bottom-0">
                     {wizardStep === 2 && (
                         <button onClick={() => setWizardStep(1)} className="px-5 py-2 text-gray-600 hover:bg-gray-200 rounded-lg font-medium transition-colors">Atrás</button>
                     )}

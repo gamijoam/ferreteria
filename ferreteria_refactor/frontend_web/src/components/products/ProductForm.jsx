@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Package, DollarSign, Barcode, Tag, Layers, AlertTriangle, AlertCircle, Coins, Receipt } from 'lucide-react';
+import { X, Plus, Trash2, Package, DollarSign, Barcode, Tag, Layers, AlertTriangle, AlertCircle, Coins, Receipt, ArrowRight, Calculator, SlidersHorizontal } from 'lucide-react';
 import { useConfig } from '../../context/ConfigContext';
 import apiClient from '../../config/axios';
 import ProductUnitManager from './ProductUnitManager';
@@ -447,262 +447,175 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
                     )}
 
                     {activeTab === 'pricing' && (
-                        <div className="space-y-8 max-w-3xl mx-auto anime-fade-in">
-                            {/* Stock Section - Prominent */}
-                            <div className="bg-blue-50 rounded-xl p-6 border border-blue-100">
-                                <h4 className="text-lg font-bold text-blue-800 mb-4 flex items-center">
-                                    <Package className="mr-2" size={20} /> Inventario Inicial
-                                </h4>
-                                <div className="grid grid-cols-2 gap-6">
-                                    <div>
-                                        <label className="block text-sm font-bold text-blue-900 mb-1">Stock Actual (Cantidad Real)</label>
-                                        <input
-                                            type="number"
-                                            name="stock"
-                                            value={formData.stock}
-                                            onChange={handleInputChange}
-                                            className="w-full border-blue-200 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 py-3 text-xl font-bold text-gray-800 bg-white"
-                                            placeholder="0"
-                                        />
-                                        <p className="text-xs text-blue-600 mt-1">Este valor actualizará el inventario inmediatamente.</p>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-semibold text-gray-700 mb-1">Stock Mínimo (Alerta)</label>
-                                        <input
-                                            type="number"
-                                            name="min_stock"
-                                            value={formData.min_stock}
-                                            onChange={handleInputChange}
-                                            className="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 py-3"
-                                            placeholder="5.0"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
+                        <div className="space-y-6 max-w-4xl mx-auto anime-fade-in p-1">
 
-                            <hr className="border-gray-200" />
-
-                            {/* Pricing Section */}
-                            <div className="grid grid-cols-2 gap-8">
-                                <div>
-                                    <label className="block text-sm font-semibold text-gray-700 mb-1">Costo de Compra ({anchorCurrency.symbol})</label>
-                                    <div className="relative">
-                                        <span className="absolute left-3 top-3 text-gray-500 font-bold">{anchorCurrency.symbol}</span>
-                                        <input
-                                            type="number"
-                                            name="cost"
-                                            value={formData.cost}
-                                            onChange={handleInputChange}
-                                            className="w-full pl-8 border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 py-3 text-lg"
-                                            placeholder="0.00"
-                                        />
-                                    </div>
-
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-bold text-green-700 mb-1">Precio de Venta ({anchorCurrency.symbol})</label>
-                                    <div className="relative">
-                                        <span className="absolute left-3 top-3 text-gray-500 font-bold">{anchorCurrency.symbol}</span>
-                                        <input
-                                            type="number"
-                                            name="price"
-                                            value={formData.price}
-                                            onChange={handleInputChange}
-                                            className="w-full pl-8 border-green-300 rounded-lg shadow-sm focus:border-green-500 focus:ring-green-500 py-3 text-lg font-bold text-gray-900 bg-green-50/30"
-                                            placeholder="0.00"
-                                        />
-                                    </div>
-
-                                </div>
-                            </div>
-
-                            {/* NEW: Profit Margin Section */}
-                            <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 border border-green-200">
-                                <h4 className="text-lg font-bold text-green-800 mb-4 flex items-center">
-                                    📊 Margen de Ganancia
+                            {/* SECTION 1: PRICING ENGINE */}
+                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                                <h4 className="text-lg font-bold text-gray-800 mb-6 flex items-center border-b pb-4">
+                                    <Calculator className="mr-2 text-green-600" size={20} /> Estructura de Precios
                                 </h4>
 
-                                <div className="grid grid-cols-2 gap-6">
-                                    <div>
-                                        <label className="block text-sm font-semibold text-gray-700 mb-1">
-                                            % Ganancia Deseado
-                                        </label>
+                                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+                                    {/* Cost */}
+                                    <div className="md:col-span-3">
+                                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Costo Neto</label>
                                         <div className="relative">
+                                            <span className="absolute left-3 top-3 text-gray-400 font-bold">{anchorCurrency.symbol}</span>
                                             <input
                                                 type="number"
-                                                step="0.01"
-                                                value={formData.profit_margin || ''}
-                                                onChange={(e) => setFormData({ ...formData, profit_margin: e.target.value })}
-                                                className="w-full pr-8 border-green-300 rounded-lg shadow-sm focus:border-green-500 focus:ring-green-500 py-3 text-lg"
-                                                placeholder="Ej: 30 para 30%"
-                                            />
-                                            <span className="absolute right-3 top-3 text-gray-500 font-bold">%</span>
-                                        </div>
-                                        <p className="text-xs text-green-600 mt-1">
-                                            El precio se calculará automáticamente
-                                        </p>
-                                    </div>
-
-                                    <div>
-                                        {calculatedPrice && (
-                                            <div className="bg-white rounded-lg p-4 border border-green-300">
-                                                <p className="text-xs text-gray-600 mb-1">💰 Precio Calculado:</p>
-                                                <p className="text-2xl font-bold text-green-700">
-                                                    {anchorCurrency.symbol}{calculatedPrice}
-                                                </p>
-                                            </div>
-                                        )}
-
-                                        {calculatedMargin && !formData.profit_margin && (
-                                            <div className="bg-white rounded-lg p-4 border border-blue-300">
-                                                <p className="text-xs text-gray-600 mb-1">📈 Margen Calculado:</p>
-                                                <p className="text-2xl font-bold text-blue-700">
-                                                    {calculatedMargin}%
-                                                </p>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Tax Section */}
-                            <div className="bg-orange-50 rounded-xl p-6 border border-orange-100">
-                                <h4 className="text-lg font-bold text-orange-800 mb-4 flex items-center">
-                                    <Receipt className="mr-2" size={20} /> Impuestos (IVA)
-                                </h4>
-                                <div className="grid grid-cols-2 gap-6">
-                                    <div>
-                                        <label className="block text-sm font-semibold text-gray-700 mb-1">Porcentaje de Impuesto</label>
-                                        <div className="relative">
-                                            <input
-                                                type="number"
-                                                step="0.01"
-                                                name="tax_rate"
-                                                value={formData.tax_rate}
+                                                name="cost"
+                                                value={formData.cost}
                                                 onChange={handleInputChange}
-                                                className="w-full pr-8 border-orange-200 rounded-lg shadow-sm focus:border-orange-500 focus:ring-orange-500 py-3 text-lg font-bold text-gray-800"
+                                                className="w-full pl-8 border-gray-300 rounded-lg shadow-sm focus:border-green-500 focus:ring-green-500 py-2.5 font-bold text-gray-700"
                                                 placeholder="0.00"
                                             />
-                                            <span className="absolute right-3 top-3 text-gray-500 font-bold">%</span>
                                         </div>
                                     </div>
-                                    <div className="flex items-center">
-                                        <p className="text-sm text-orange-700">
-                                            El precio final de venta incluirá este porcentaje sobre el costo + margen.
-                                        </p>
+
+                                    {/* Visual Flow + */}
+                                    <div className="hidden md:flex md:col-span-1 justify-center text-gray-300">
+                                        <Plus size={20} />
+                                    </div>
+
+                                    {/* Margin & Tax */}
+                                    <div className="md:col-span-3 space-y-3">
+                                        <div className="relative">
+                                            <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Margen %</label>
+                                            <div className="relative">
+                                                <input
+                                                    type="number"
+                                                    value={formData.profit_margin || ''}
+                                                    onChange={(e) => setFormData({ ...formData, profit_margin: e.target.value })}
+                                                    className="w-full pr-8 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-blue-500 py-2 text-sm"
+                                                    placeholder="0"
+                                                />
+                                                <span className="absolute right-3 top-2 text-gray-400 text-xs">%</span>
+                                            </div>
+                                        </div>
+                                        <div className="relative">
+                                            <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Impuesto (IVA) %</label>
+                                            <div className="relative">
+                                                <input
+                                                    type="number"
+                                                    name="tax_rate"
+                                                    value={formData.tax_rate}
+                                                    onChange={handleInputChange}
+                                                    className="w-full pr-8 border-gray-200 rounded-lg focus:border-orange-500 focus:ring-orange-500 py-2 text-sm"
+                                                    placeholder="0"
+                                                />
+                                                <span className="absolute right-3 top-2 text-gray-400 text-xs">%</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Visual Flow = */}
+                                    <div className="hidden md:flex md:col-span-1 justify-center text-gray-300">
+                                        <ArrowRight size={20} />
+                                    </div>
+
+                                    {/* Final Price */}
+                                    <div className="md:col-span-4 bg-green-50 rounded-xl border border-green-100 p-4">
+                                        <label className="block text-xs font-bold text-green-700 uppercase tracking-wider mb-1">Precio Venta Final</label>
+                                        <div className="relative">
+                                            <span className="absolute left-3 top-4 text-green-600 font-bold text-xl">{anchorCurrency.symbol}</span>
+                                            <input
+                                                type="number"
+                                                name="price"
+                                                value={formData.price}
+                                                onChange={handleInputChange}
+                                                className="w-full pl-8 text-3xl font-black text-green-700 bg-transparent border-none focus:ring-0 p-0 placeholder-green-300"
+                                                placeholder="0.00"
+                                            />
+                                        </div>
+                                        <p className="text-xs text-green-600 mt-1 font-medium">Autocalculado según costo y tasas.</p>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* NEW: Discount Section */}
-                            <div className="bg-gradient-to-r from-red-50 to-orange-50 rounded-xl p-6 border border-red-200">
-                                <h4 className="text-lg font-bold text-red-800 mb-4 flex items-center">
-                                    🏷️ Descuento Promocional
-                                </h4>
-
-                                <label className="flex items-center gap-3 mb-4 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={formData.is_discount_active}
-                                        onChange={(e) => setFormData({ ...formData, is_discount_active: e.target.checked })}
-                                        className="w-5 h-5 text-red-600 border-gray-300 rounded focus:ring-red-500"
-                                    />
-                                    <span className="text-sm font-semibold text-gray-900">
-                                        Activar descuento para este producto
-                                    </span>
-                                </label>
-
-                                {formData.is_discount_active && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {/* SECTION 2: INVENTORY */}
+                                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 h-full">
+                                    <h4 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
+                                        <Package className="mr-2 text-blue-600" size={20} /> Inventario
+                                    </h4>
                                     <div className="space-y-4">
-                                        <div className="grid grid-cols-2 gap-6">
-                                            <div>
-                                                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                                                    % Descuento
-                                                </label>
-                                                <div className="relative">
-                                                    <input
-                                                        type="number"
-                                                        step="0.01"
-                                                        min="0"
-                                                        max="100"
-                                                        value={formData.discount_percentage}
-                                                        onChange={(e) => setFormData({ ...formData, discount_percentage: e.target.value })}
-                                                        className="w-full pr-8 border-red-300 rounded-lg shadow-sm focus:border-red-500 focus:ring-red-500 py-3 text-lg"
-                                                        placeholder="Ej: 10"
-                                                    />
-                                                    <span className="absolute right-3 top-3 text-gray-500 font-bold">%</span>
-                                                </div>
-                                            </div>
-
-                                            <div>
-                                                {finalPriceWithDiscount && (
-                                                    <div className="bg-white rounded-lg p-4 border border-red-300">
-                                                        <p className="text-xs text-gray-600 mb-2">Precio Final:</p>
-                                                        <div className="flex items-center gap-3">
-                                                            <span className="line-through text-gray-400 text-lg">
-                                                                {anchorCurrency.symbol}{formData.price}
-                                                            </span>
-                                                            <span className="text-2xl font-bold text-red-600">
-                                                                {anchorCurrency.symbol}{finalPriceWithDiscount}
-                                                            </span>
-                                                        </div>
-                                                        <p className="text-sm text-green-600 font-semibold mt-2">
-                                                            💰 Ahorras: {anchorCurrency.symbol}{(formData.price - finalPriceWithDiscount).toFixed(2)}
-                                                        </p>
-                                                    </div>
-                                                )}
-                                            </div>
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-700 mb-1">Stock Actual (Físico)</label>
+                                            <input
+                                                type="number"
+                                                name="stock"
+                                                value={formData.stock}
+                                                onChange={handleInputChange}
+                                                className="w-full border-blue-100 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 py-3 text-lg font-bold bg-blue-50/30 text-gray-800"
+                                                placeholder="0"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-700 mb-1">Stock Mínimo (Alerta)</label>
+                                            <input
+                                                type="number"
+                                                name="min_stock"
+                                                value={formData.min_stock}
+                                                onChange={handleInputChange}
+                                                className="w-full border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2.5"
+                                                placeholder="5.0"
+                                            />
                                         </div>
                                     </div>
-                                )}
-                            </div>
+                                </div>
 
-                            {/* Exchange Rate Selector */}
-                            <div className="bg-purple-50 rounded-xl p-6 border border-purple-100">
-                                <h4 className="text-lg font-bold text-purple-800 mb-2 flex items-center">
-                                    <Coins className="mr-2" size={20} /> Perfil de Tasa de Cambio
-                                </h4>
-                                <p className="text-sm text-purple-600 mb-4">Selecciona qué tasa usar para calcular precios en otras monedas</p>
+                                {/* SECTION 3: ADVANCED OPTIONS */}
+                                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 h-full">
+                                    <h4 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
+                                        <SlidersHorizontal className="mr-2 text-purple-600" size={20} /> Opciones
+                                    </h4>
 
-                                <select
-                                    name="exchange_rate_id"
-                                    value={formData.exchange_rate_id || ''}
-                                    onChange={handleInputChange}
-                                    className="w-full border-purple-200 rounded-lg shadow-sm focus:border-purple-500 focus:ring-purple-500 py-3 bg-white"
-                                >
-                                    <option value="">Usar Predeterminada (por moneda)</option>
-                                    {exchangeRates.map(rate => (
-                                        <option key={rate.id} value={rate.id}>
-                                            {rate.name} - {rate.currency_code} ({Number(rate.rate).toFixed(2)})
-                                        </option>
-                                    ))}
-                                </select>
+                                    {/* Discount Toggle */}
+                                    <div className="mb-6">
+                                        <label className="flex items-center cursor-pointer mb-2">
+                                            <input
+                                                type="checkbox"
+                                                checked={formData.is_discount_active}
+                                                onChange={(e) => setFormData({ ...formData, is_discount_active: e.target.checked })}
+                                                className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                                            />
+                                            <span className="ml-2 text-sm font-semibold text-gray-700">Activar Descuento</span>
+                                        </label>
 
-                                {formData.exchange_rate_id && formData.price > 0 && (
-                                    <div className="mt-4 p-3 bg-white rounded-lg border border-purple-200">
-                                        <p className="text-xs font-semibold text-purple-700 mb-2">Vista Previa de Precio:</p>
-                                        {(() => {
-                                            const selectedRate = exchangeRates.find(r => r.id === parseInt(formData.exchange_rate_id));
-                                            if (selectedRate) {
-                                                const convertedPrice = formData.price * Number(selectedRate.rate);
-                                                return (
-                                                    <p className="text-lg font-bold text-purple-900">
-                                                        {convertedPrice.toFixed(2)} {selectedRate.currency_symbol}
-                                                        <span className="text-sm font-normal text-purple-600 ml-2">
-                                                            (usando {selectedRate.name})
-                                                        </span>
-                                                    </p>
-                                                );
-                                            }
-                                            return null;
-                                        })()}
+                                        {formData.is_discount_active && (
+                                            <div className="flex items-center gap-3 animate-fade-in-down">
+                                                <input
+                                                    type="number"
+                                                    value={formData.discount_percentage}
+                                                    onChange={(e) => setFormData({ ...formData, discount_percentage: e.target.value })}
+                                                    className="w-24 border-red-200 rounded-lg py-2 px-3 text-sm focus:border-red-500 focus:ring-red-500"
+                                                    placeholder="%"
+                                                />
+                                                <div className="text-sm text-gray-500">
+                                                    Precio final: <span className="font-bold text-red-600">{anchorCurrency.symbol}{finalPriceWithDiscount}</span>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
-                                )}
-                            </div>
 
-                            <div className={`p-4 rounded-lg flex items-center justify-between ${formData.margin < 0 ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
-                                <span className="font-semibold">Margen de Ganancia:</span>
-                                <span className="text-2xl font-bold">{formData.margin.toFixed(2)}%</span>
+                                    {/* Exchange Rate */}
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Tasa de Cambio</label>
+                                        <select
+                                            name="exchange_rate_id"
+                                            value={formData.exchange_rate_id || ''}
+                                            onChange={handleInputChange}
+                                            className="w-full border-gray-200 rounded-lg shadow-sm focus:border-purple-500 focus:ring-purple-500 py-2 text-sm bg-gray-50 mb-2"
+                                        >
+                                            <option value="">Automática (Según configuración)</option>
+                                            {exchangeRates.map(rate => (
+                                                <option key={rate.id} value={rate.id}>
+                                                    {rate.name} - {rate.currency_code} ({Number(rate.rate).toFixed(2)})
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     )}
