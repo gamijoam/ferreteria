@@ -515,14 +515,44 @@ def get_low_stock_products(threshold: int = 5, db: Session = Depends(get_db)):
 
 @router.get("/inventory-valuation")
 def get_inventory_valuation(exchange_rate: float = 1.0, db: Session = Depends(get_db)):
-    """Total inventory value (stock * price)"""
-    products = db.query(models.Product).all()
-    total_value = sum(p.stock * p.price for p in products)
+    """
+    Inventory Financials:
+    - Total Cost: Sum(Stock * Cost Price)
+    - Potential Revenue: Sum(Stock * Sale Price)
+    - Potential Profit: Revenue - Cost
+    """
+    products = db.query(models.Product).filter(models.Product.is_active == True).all()
+    
+    total_cost_usd = Decimal("0.00")
+    total_revenue_usd = Decimal("0.00")
+    total_stock_units = Decimal("0.00")
+    
+    for p in products:
+        stock = p.stock or Decimal("0")
+        cost = p.cost_price or Decimal("0")
+        price = p.price or Decimal("0")
+        
+        # Only count positive stock
+        if stock > 0:
+            total_stock_units += stock
+            total_cost_usd += (stock * cost)
+            total_revenue_usd += (stock * price)
+            
+    potential_profit = total_revenue_usd - total_cost_usd
+    margin_percent = 0
+    if total_revenue_usd > 0:
+        margin_percent = (potential_profit / total_revenue_usd) * 100
+
     return {
         "total_products": len(products),
-        "total_stock_units": sum(p.stock for p in products),
-        "total_value": total_value,
-        "total_value_bs": total_value * exchange_rate
+        "total_stock_units": float(total_stock_units),
+        "total_cost_usd": float(total_cost_usd),
+        "total_revenue_usd": float(total_revenue_usd),
+        "potential_profit_usd": float(potential_profit),
+        "margin_percent": float(round(margin_percent, 2)),
+        # Bs values for display if needed
+        "total_cost_bs": float(total_cost_usd) * exchange_rate,
+        "total_revenue_bs": float(total_revenue_usd) * exchange_rate
     }
 
 # ===== PROFIT ANALYSIS ENDPOINTS =====
