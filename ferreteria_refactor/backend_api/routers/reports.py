@@ -1299,3 +1299,107 @@ def get_sales_by_customer(
         }
         for r in results
     ]
+@router.get("/export/detailed")
+def export_detailed_report(
+    start_date: date,
+    end_date: date,
+    format: str = "xlsx",
+    db: Session = Depends(get_db)
+):
+    """
+    Export detailed combined report to Excel (Multi-sheet).
+    Sheet 1: Payment Methods
+    Sheet 2: Top Customers
+    """
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        from openpyxl.utils import get_column_letter
+        from io import BytesIO
+        
+        # Styles
+        header_font = Font(bold=True, color="FFFFFF")
+        header_fill = PatternFill(start_color="3366FF", end_color="3366FF", fill_type="solid")
+        border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
+
+        workbook = Workbook()
+        # Remove default sheet
+        default_ws = workbook.active
+        workbook.remove(default_ws)
+
+        def create_sheet(wb, sheet_title, report_title, headers, data):
+            ws = wb.create_sheet(title=sheet_title)
+            
+            # Title Row
+            ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(headers))
+            ws.cell(row=1, column=1, value=f"{report_title} ({start_date} - {end_date})").font = Font(size=14, bold=True)
+            ws.cell(row=1, column=1).alignment = Alignment(horizontal='center')
+            
+            # Header Row
+            for col_idx, header in enumerate(headers, 1):
+                cell = ws.cell(row=3, column=col_idx, value=header)
+                cell.font = header_font
+                cell.fill = header_fill
+                cell.alignment = Alignment(horizontal='center')
+                cell.border = border
+                
+            # Data Rows
+            row_idx = 4
+            for row_data in data:
+                for col_idx, value in enumerate(row_data, 1):
+                    cell = ws.cell(row=row_idx, column=col_idx, value=value)
+                    cell.border = border
+                    # Format currency columns (usually last column)
+                    if col_idx == 3: 
+                         cell.number_format = '$#,##0.00'
+                row_idx += 1
+                
+            # Total Row
+            if data:
+                ws.cell(row=row_idx, column=1, value="TOTAL GENERADO").font = Font(bold=True)
+                total_sales = sum(row[2] for row in data)
+                total_cell = ws.cell(row=row_idx, column=3, value=total_sales)
+                total_cell.font = Font(bold=True)
+                total_cell.number_format = '$#,##0.00'
+                
+            # Auto-adjust column width
+            for col_idx, column in enumerate(ws.columns, 1):
+                max_length = 0
+                column_letter = get_column_letter(col_idx)
+                for cell in column:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                ws.column_dimensions[column_letter].width = max_length + 2
+
+        # --- SHEET 1: Payment Methods ---
+        raw_payments = get_sales_by_payment_method(start_date, end_date, db)
+        data_payments = [[r['method'], r['count'], r['total_amount']] for r in raw_payments]
+        create_sheet(workbook, "Métodos de Pago", "Ventas por Método de Pago", ["Método", "Transacciones", "Total (USD)"], data_payments)
+
+        # --- SHEET 2: Customers ---
+        raw_customers = get_sales_by_customer(start_date, end_date, limit=100, db=db)
+        data_customers = [[r['customer_name'], r['transaction_count'], r['total_purchased']] for r in raw_customers]
+        create_sheet(workbook, "Clientes Top", "Ventas por Cliente", ["Cliente", "Compras", "Total (USD)"], data_customers)
+
+        # Save & Return
+        final_output = BytesIO()
+        workbook.save(final_output)
+        final_output.seek(0)
+        
+        filename = f"Reporte_Completo_{start_date}_{end_date}.xlsx"
+        
+        return StreamingResponse(
+            final_output,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}"
+            }
+        )
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error exporting report: {str(e)}")
