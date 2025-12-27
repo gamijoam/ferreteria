@@ -52,7 +52,13 @@ function App() {
                     </ProtectedRoute>
                   } />
 
-                  {/* POS Routes */}
+                  {/* Standalone POS Routes (No Dashboard Layout) */}
+                  <Route element={<ProtectedRoute roles={['ADMIN', 'SELLER']} />}>
+                    <Route path="/pos" element={<POS />} />
+                    <Route path="/cash-close" element={<CashClose />} />
+                  </Route>
+
+                  {/* Dashboard Layout Routes */}
                   <Route element={<ProtectedRoute />}>
                     <Route element={<DashboardLayout />}>
                       <Route path="/" element={<Dashboard />} />
@@ -74,62 +80,77 @@ function App() {
                         </ProtectedRoute>
                       } />
 
-                      {/* Sales - ADMIN or CASHIER */}
-                      <Route path="/pos" element={
-                        <ProtectedRoute roles={['ADMIN', 'CASHIER']}>
-                          <POS />
-                        </ProtectedRoute>
-                      } />
+                      {/* Sales - ADMIN or SELLER */}
                       <Route path="/sales-history" element={
-                        <ProtectedRoute roles={['ADMIN', 'CASHIER']}>
+                        <ProtectedRoute roles={['ADMIN', 'SELLER']}>
                           <SalesHistory />
                         </ProtectedRoute>
                       } />
+                      <Route path="/cash-history" element={
+                        <ProtectedRoute roles={['ADMIN', 'SELLER']}>
+                          <CashHistory />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="/customers" element={
+                        <ProtectedRoute roles={['ADMIN', 'SELLER']}>
+                          <CustomerManager />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="/accounts-receivable" element={
+                        <ProtectedRoute roles={['ADMIN', 'SELLER']}>
+                          <AccountsReceivable />
+                        </ProtectedRoute>
+                      } />
+
+                      {/* Purchases - ADMIN or WAREHOUSE */}
+                      <Route path="/purchases" element={
+                        <ProtectedRoute roles={['ADMIN', 'WAREHOUSE']}>
+                          <Purchases />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="/purchases/new" element={
+                        <ProtectedRoute roles={['ADMIN', 'WAREHOUSE']}>
+                          <CreatePurchase />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="/purchases/:id" element={
+                        <ProtectedRoute roles={['ADMIN', 'WAREHOUSE']}>
+                          <PurchaseDetail />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="/suppliers" element={
+                        <ProtectedRoute roles={['ADMIN', 'WAREHOUSE']}>
+                          <Suppliers />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="/accounts-payable" element={
+                        <ProtectedRoute roles={['ADMIN', 'WAREHOUSE']}>
+                          <AccountsPayable />
+                        </ProtectedRoute>
+                      } />
                       <Route path="/returns" element={
-                        <ProtectedRoute roles={['ADMIN', 'CASHIER']}>
+                        <ProtectedRoute roles={['ADMIN', 'WAREHOUSE']}>
                           <ReturnsManager />
                         </ProtectedRoute>
                       } />
-                      <Route path="/cash-close" element={
-                        <ProtectedRoute roles={['ADMIN', 'CASHIER']}>
-                          <CashClose />
-                        </ProtectedRoute>
-                      } />
-
-                      {/* Finance - All roles can view */}
-                      <Route path="/customers" element={<CustomerManager />} />
-                      <Route path="/accounts-receivable" element={<AccountsReceivable />} />
-                      <Route path="/suppliers" element={<Suppliers />} />
-                      <Route path="/accounts-payable" element={<AccountsPayable />} />
-
-                      {/* Operations - All roles can view */}
-                      <Route path="/purchases" element={<Purchases />} />
-                      <Route path="/purchases/create" element={<CreatePurchase />} />
-                      <Route path="/purchases/:id" element={<PurchaseDetail />} />
 
                       {/* Admin Only */}
                       <Route path="/settings" element={
-                        <ProtectedRoute roles="ADMIN">
+                        <ProtectedRoute roles={['ADMIN']}>
                           <Settings />
                         </ProtectedRoute>
                       } />
                       <Route path="/users" element={
-                        <ProtectedRoute roles="ADMIN">
+                        <ProtectedRoute roles={['ADMIN']}>
                           <UsersManager />
                         </ProtectedRoute>
                       } />
-                      <Route path="/cash-history" element={
-                        <ProtectedRoute roles="ADMIN">
-                          <CashHistory />
-                        </ProtectedRoute>
-                      } />
                       <Route path="/audit-logs" element={
-                        <ProtectedRoute roles="ADMIN">
+                        <ProtectedRoute roles={['ADMIN']}>
                           <AuditLogs />
                         </ProtectedRoute>
                       } />
 
-                      {/* Help - Available to all authenticated users */}
                       <Route path="/help" element={<Help />} />
                     </Route>
                   </Route>

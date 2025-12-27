@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
-import { Search, ShoppingCart, Trash2, Plus, Minus, CreditCard, RotateCcw } from 'lucide-react';
+import { Search, ShoppingCart, Trash2, Plus, Minus, CreditCard, RotateCcw, Package, Receipt, AlertTriangle, Layers } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useCash } from '../context/CashContext';
 import { useConfig } from '../context/ConfigContext';
@@ -495,266 +495,279 @@ const POS = () => {
     return (
         <div className="flex flex-col md:flex-row h-[calc(100vh-64px)] overflow-hidden bg-gray-100 relative">
 
-            {/* LEFT COLUMN: Catalog (Mobile: Show only if tab is catalog. Desktop: Always 70%) */}
+            {/* =====================================================================================
+                LEFT COLUMN: CATALOG & TOOLS (65% Width)
+                Fullscreen Visual Mode: Elegant, Spacious, Search-Centric
+               ===================================================================================== */}
             <div className={`
-                flex-col p-4 border-r border-gray-300 transition-all min-w-0
-                ${mobileTab === 'catalog' ? 'flex w-full' : 'hidden md:flex w-full md:w-[70%]'}
-                h-full
+                flex-col bg-slate-50 min-w-0 transition-all z-0
+                ${mobileTab === 'catalog' ? 'flex w-full' : 'hidden md:flex flex-1'}
             `}>
-                {/* Search */}
-                <div className="mb-4 relative">
-                    <Search className="absolute left-4 top-3.5 text-gray-400" size={24} />
-                    <input
-                        ref={searchInputRef}
-                        type="text"
-                        className="w-full text-lg md:text-xl pl-12 pr-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-0 outline-none shadow-sm"
-                        placeholder="Buscar producto (F3)..."
-                        value={searchTerm}
-                        onChange={(e) => {
-                            setSearchTerm(e.target.value);
-                            setSelectedProductIndex(-1); // Reset selection on search change
-                        }}
-                        autoFocus
-                    />
-                    {/* Keyboard hint - Hide on mobile */}
-                    <div className="hidden md:flex absolute right-3 top-3 gap-1">
-                        <kbd className="px-2 py-1 text-xs font-semibold text-gray-600 bg-gray-100 border border-gray-300 rounded shadow-sm">F3</kbd>
-                        <kbd className="px-2 py-1 text-xs font-semibold text-gray-600 bg-gray-100 border border-gray-300 rounded shadow-sm">↑↓</kbd>
+                {/* Header Bar */}
+                <div className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center shadow-sm">
+                    <div className="flex items-center gap-4">
+                        <Link to="/" className="p-2 -ml-2 hover:bg-slate-100 rounded-full text-slate-500 transition-colors" title="Volver al Menú">
+                            <RotateCcw className="rotate-90" size={20} />
+                        </Link>
+                        <h1 className="text-xl font-bold text-slate-800">Punto de Venta</h1>
+                    </div>
+                    {/* Search Bar - Centered & Elegant */}
+                    <div className="flex-1 max-w-xl mx-4 relative group">
+                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                            <Search className="text-slate-400 group-focus-within:text-blue-500 transition-colors" size={20} />
+                        </div>
+                        <input
+                            ref={searchInputRef}
+                            type="text"
+                            className="
+                                w-full pl-11 pr-4 py-2.5
+                                bg-slate-100 border-none rounded-full shadow-inner text-base text-slate-700 placeholder-slate-400
+                                focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all
+                            "
+                            placeholder="Buscar productos (F3)..."
+                            value={searchTerm}
+                            onChange={(e) => {
+                                setSearchTerm(e.target.value);
+                                setSelectedProductIndex(-1);
+                            }}
+                            autoFocus
+                        />
+                    </div>
+
+                    {/* Status/User Info */}
+                    <div className="flex items-center gap-3">
+                        <div className="text-right hidden lg:block">
+                            <p className="text-xs font-bold text-slate-700">Caja Principal</p>
+                            <p className="text-[10px] text-slate-500">{new Date().toLocaleDateString()}</p>
+                        </div>
+                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-bold text-xs ring-2 ring-white shadow-sm">
+                            AD
+                        </div>
                     </div>
                 </div>
 
-                {/* Category Filters */}
-                <div className="mb-4">
-                    {/* Parent Categories */}
-                    <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-300 touch-pan-x">
+                {/* Categories Bar - Floating Pills */}
+                <div className="px-6 py-3 flex items-center gap-2 overflow-x-auto scrollbar-hide">
+                    <button
+                        onClick={() => setSelectedCategory(null)}
+                        className={`
+                            px-4 py-1.5 rounded-full text-sm font-bold transition-all shadow-sm
+                            ${!selectedCategory
+                                ? 'bg-slate-800 text-white shadow-md transform scale-105'
+                                : 'bg-white text-slate-600 hover:bg-slate-100'
+                            }
+                        `}
+                    >
+                        Todos
+                    </button>
+                    {rootCategories.map(category => (
                         <button
-                            onClick={() => setSelectedCategory(null)}
-                            className={`px-4 py-2 rounded-full font-medium whitespace-nowrap transition-all ${!selectedCategory
-                                ? 'bg-blue-600 text-white shadow-md'
-                                : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
-                                }`}
+                            key={category.id}
+                            onClick={() => setSelectedCategory(category.id)}
+                            className={`
+                                px-4 py-1.5 rounded-full text-sm font-semibold whitespace-nowrap transition-all shadow-sm border border-transparent
+                                ${selectedCategory === category.id
+                                    ? 'bg-blue-600 text-white shadow-blue-200 shadow-md transform scale-105'
+                                    : 'bg-white text-slate-600 hover:bg-slate-50 border-slate-100'
+                                }
+                            `}
                         >
-                            📦 Todos
+                            {category.name}
                         </button>
-                        {rootCategories.map(category => (
-                            <button
-                                key={category.id}
-                                onClick={() => setSelectedCategory(category.id)}
-                                className={`px-4 py-2 rounded-full font-medium whitespace-nowrap transition-all ${selectedCategory === category.id
-                                    ? 'bg-blue-600 text-white shadow-md'
-                                    : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
-                                    }`}
+                    ))}
+                </div>
+
+                {/* Catalog Grid */}
+                <div className="flex-1 overflow-y-auto px-6 pb-20 pt-2">
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
+                        {filteredCatalog.map((product, index) => (
+                            <div
+                                key={product.id}
+                                onClick={() => handleProductClick(product)}
+                                className={`
+                                    group relative flex flex-col justify-between bg-white rounded-2xl cursor-pointer transition-all duration-300
+                                    border border-transparent h-full min-h-[180px]
+                                    ${index === selectedProductIndex
+                                        ? 'ring-4 ring-blue-500/30 shadow-xl'
+                                        : 'shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-blue-100'
+                                    }
+                                `}
                             >
-                                {category.name}
-                            </button>
+                                <div className="p-4 flex-1 flex flex-col">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <span className="text-[10px] font-mono text-slate-400 bg-slate-50 px-1.5 rounded tracking-tighter">
+                                            {product.sku || '---'}
+                                        </span>
+                                        {product.stock <= (product.min_stock || 5) && (
+                                            <span className="flex items-center gap-1 text-[10px] font-bold text-red-600 bg-red-50 px-1.5 rounded-full animate-pulse">
+                                                <AlertTriangle size={10} /> Stock
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    <h3 className="font-bold text-slate-700 text-sm md:text-base leading-snug line-clamp-3 mb-3 group-hover:text-blue-600 transition-colors">
+                                        {product.name}
+                                    </h3>
+
+                                    {/* Stock Bar Visualization (Optional aesthetic touch) */}
+                                    {product.stock > 0 && (
+                                        <div className="w-full bg-slate-100 h-1 rounded-full mb-1 overflow-hidden">
+                                            <div
+                                                className={`h-full rounded-full ${product.stock < 10 ? 'bg-red-400' : 'bg-green-400'}`}
+                                                style={{ width: `${Math.min((product.stock / 50) * 100, 100)}%` }}
+                                            />
+                                        </div>
+                                    )}
+
+                                    <div className="mt-auto flex justify-between items-end border-t border-slate-50 pt-3">
+                                        <div className="flex flex-col">
+                                            <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Precio</span>
+                                            <span className="text-lg font-black text-slate-800 leading-none">
+                                                ${Number(product.price).toFixed(2)}
+                                            </span>
+                                            {/* Presentations Indicator */}
+                                            {product.units?.length > 0 && (
+                                                <div className="flex items-center gap-1 mt-1">
+                                                    <Layers size={10} className="text-orange-500" />
+                                                    <span className="text-[9px] font-bold text-orange-600 uppercase tracking-tight">
+                                                        +{product.units.length} Opciones
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="w-8 h-8 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity transform group-hover:scale-110">
+                                            <Plus size={18} />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         ))}
                     </div>
-
-                    {/* Subcategories (if parent selected) */}
-                    {selectedCategory && getSubcategories(selectedCategory).length > 0 && (
-                        <div className="flex items-center gap-2 overflow-x-auto mt-2 pb-2 scrollbar-thin scrollbar-thumb-gray-300 touch-pan-x">
-                            <span className="text-xs text-gray-500 font-medium whitespace-nowrap">Subcategorías:</span>
-                            {getSubcategories(selectedCategory).map(subcategory => (
-                                <button
-                                    key={subcategory.id}
-                                    onClick={() => setSelectedCategory(subcategory.id)}
-                                    className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all ${selectedCategory === subcategory.id
-                                        ? 'bg-blue-500 text-white shadow'
-                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-300'
-                                        }`}
-                                >
-                                    └─ {subcategory.name}
-                                </button>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                {/* Grid */}
-                {/* Mobile: grid-cols-2, Desktop: grid-cols-3/4. Added pb-24 for mobile fab space */}
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4 overflow-y-auto pr-2 pb-24 md:pb-20">
-                    {filteredCatalog.map((product, index) => (
-                        <div
-                            key={product.id}
-                            onClick={() => handleProductClick(product)}
-                            className={`bg-white p-3 md:p-4 rounded-xl shadow-sm hover:shadow-md cursor-pointer border transition-all flex flex-col justify-between h-40 ${index === selectedProductIndex
-                                ? 'border-blue-500 ring-2 ring-blue-300 bg-blue-50'
-                                : 'border-transparent hover:border-blue-400'
-                                }`}
-                        >
-                            <div className="overflow-hidden">
-                                <h3 className="font-bold text-gray-800 leading-tight mb-1 text-sm md:text-base line-clamp-2">{product.name}</h3>
-                                <span className="text-[10px] md:text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded inline-block">
-                                    Stock: {formatStock(product.stock || 0)}
-                                </span>
-                            </div>
-                            <div className="mt-2 self-end w-full">
-                                <span className="block text-right text-base md:text-lg font-bold text-blue-600">
-                                    ${Number(product.price).toFixed(2)}
-                                </span>
-                                {product.units?.length > 0 && (
-                                    <span className="block text-right text-[10px] md:text-xs text-orange-500 font-medium truncate">
-                                        + {product.units.length} Pres.
-                                    </span>
-                                )}
-                            </div>
-                        </div>
-                    ))}
                 </div>
             </div>
 
-            {/* RIGHT COLUMN: Ticket (Mobile: Show only if tab is ticket. Desktop: Always 30% and flex) */}
+            {/* =====================================================================================
+                RIGHT COLUMN: TICKET (35% Width)
+                Clean, Functional, Always Visible
+               ===================================================================================== */}
             <div className={`
-                bg-white flex-col shadow-2xl h-full border-l min-w-0
-                ${mobileTab === 'ticket' ? 'flex w-full absolute inset-0 z-10' : 'hidden md:flex w-[30%]'}
+                bg-white flex-col shadow-2xl z-20 h-full min-w-0 border-l border-slate-200
+                ${mobileTab === 'ticket' ? 'flex w-full absolute inset-0' : 'hidden md:flex w-[35%] lg:w-[30%]'}
             `}>
-                <div className="bg-slate-800 text-white p-4 shadow-md flex justify-between items-center">
-                    <div className="flex items-center">
-                        {/* Mobile Back Button */}
-                        <button
-                            onClick={() => setMobileTab('catalog')}
-                            className="mr-3 md:hidden p-1 hover:bg-slate-700 rounded"
-                        >
-                            <Search size={20} />
-                        </button>
-                        <h2 className="text-xl font-bold flex items-center">
-                            <ShoppingCart className="mr-2" size={20} /> <span className="hidden sm:inline">Ticket</span>
+                {/* Ticket Header */}
+                <div className="bg-slate-900 text-white p-5 shadow-md flex justify-between items-center z-10">
+                    <div>
+                        <h2 className="text-xl font-bold flex items-center gap-2">
+                            Ticket de Venta
                         </h2>
+                        <span className="text-xs text-slate-400 flex items-center gap-1 mt-1">
+                            <ShoppingCart size={12} /> {cart.reduce((acc, item) => acc + item.quantity, 0)} Items
+                        </span>
                     </div>
-
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={clearCart}
-                            className="text-xs bg-red-500 hover:bg-red-600 px-3 py-1.5 rounded transition flex items-center gap-1 font-bold"
-                            title="Nueva Venta (F2)"
-                        >
-                            <Trash2 size={14} />
-                            <span className="hidden lg:inline">Limpiar</span>
-                        </button>
-                    </div>
-                </div>
-
-                {/* Operations Toolbar */}
-                <div className="bg-slate-100 p-2 flex space-x-2 border-b">
                     <button
-                        onClick={() => setIsMovementOpen(true)}
-                        className="flex-1 text-xs bg-white hover:bg-gray-50 text-slate-700 py-2 rounded text-center border shadow-sm font-medium"
+                        onClick={clearCart}
+                        className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white p-2 rounded-lg transition-all border border-slate-700"
+                        title="Limpiar (F2)"
                     >
-                        Gasto/Retiro
+                        <Trash2 size={18} />
                     </button>
-                    <Link
-                        to="/cash-close"
-                        className="flex-1 text-xs bg-white hover:bg-gray-50 text-slate-700 py-2 rounded text-center border shadow-sm font-medium block"
-                    >
-                        Cerrar Caja
-                    </Link>
                 </div>
 
-                {/* Cart List */}
-                <div className="flex-1 overflow-y-auto p-2 space-y-2 pb-32 md:pb-0">
-                    {cart.length === 0 && (
-                        <div className="flex flex-col items-center justify-center h-full text-gray-400 opacity-50">
-                            <ShoppingCart size={48} className="mb-2" />
-                            <p>Carrito Vacío</p>
-                            <button
-                                onClick={() => setMobileTab('catalog')}
-                                className="mt-4 text-blue-500 underline md:hidden"
-                            >
-                                Ir al Catálogo
-                            </button>
-                        </div>
-                    )}
+                {/* Cart Items List */}
+                <div className="flex-1 overflow-y-auto bg-white">
                     {cart.map((item, idx) => (
                         <div
                             key={`${item.id}-${item.unit_id}-${idx}`}
                             onClick={() => setSelectedItemForEdit(item)}
-                            className="bg-white p-3 rounded-xl border border-gray-100 shadow-sm hover:shadow-md hover:border-blue-200 cursor-pointer transition-all group relative"
+                            className="p-4 border-b border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors group"
                         >
-                            {/* Header: Name & SKU */}
-                            <div className="flex justify-between items-start mb-2">
+                            <div className="flex justify-between items-start mb-1">
                                 <div className="min-w-0 pr-2">
-                                    <div className="font-bold text-gray-800 text-sm md:text-base leading-tight line-clamp-2">
+                                    <div className="font-bold text-slate-800 text-sm line-clamp-2 leading-tight">
                                         {item.name}
                                     </div>
-                                    <div className="flex items-center gap-2 mt-1">
+                                    <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                                        {/* SKU Badge */}
                                         {item.sku && (
-                                            <span className="text-[10px] font-mono bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded border border-gray-200">
+                                            <span className="text-[9px] font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
                                                 {item.sku}
                                             </span>
                                         )}
-                                        {/* Stock Warning Badge */}
+                                        {/* Special Rate Badge */}
+                                        {item.is_special_rate && (
+                                            <span className="flex items-center gap-1 px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded text-[9px] font-bold border border-purple-200">
+                                                <RotateCcw size={8} />
+                                                {item.exchange_rate_name || 'TASA'}
+                                            </span>
+                                        )}
+                                        {/* Stock Warning */}
                                         {Number(item.stock) <= Number(item.quantity) * Number(item.conversion_factor || 1) && (
-                                            <span className="text-[10px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded border border-red-100 font-medium">
-                                                Poco Stock
+                                            <span className="text-[9px] text-red-600 font-bold bg-red-50 px-1.5 py-0.5 rounded flex items-center gap-1 border border-red-100">
+                                                <AlertTriangle size={8} /> Stock
                                             </span>
                                         )}
                                     </div>
                                 </div>
-                                {/* Quantity Large Display */}
-                                <div className="flex flex-col items-end">
-                                    <span className="text-xl md:text-2xl font-bold text-blue-600 leading-none">
-                                        x{item.quantity}
-                                    </span>
+                                <div className="text-right shrink-0">
+                                    <div className="font-bold text-slate-900">${Number(item.subtotal_usd || 0).toFixed(2)}</div>
                                 </div>
                             </div>
 
-                            {/* Divider with Unit Info */}
-                            <div className="flex items-center gap-2 mb-2">
-                                <span className="bg-blue-50 text-blue-700 text-xs px-2 py-1 rounded-md font-medium border border-blue-100">
-                                    {item.unit_name} {item.unit_id ? <span className="text-blue-500 opacity-75 text-[10px]">(x{item.conversion_factor})</span> : null}
+                            <div className="flex justify-between items-end mt-2 pt-2 border-t border-slate-50">
+                                <div className="text-xs text-slate-600 flex items-center gap-1">
+                                    <span className="font-bold bg-blue-50 text-blue-700 px-1.5 rounded">{item.quantity}</span>
+                                    <span className="lowercase font-semibold text-slate-500 italic">{item.unit_name}</span>
+                                    <span className="text-slate-400">x</span>
+                                    <span className="font-medium">${Number(item.unit_price_usd).toFixed(2)}</span>
+                                </div>
+                                <span className="text-[10px] text-slate-400 font-medium font-mono">
+                                    Bs. {Number(item.subtotal_bs || 0).toLocaleString('es-VE', { maximumFractionDigits: 2 })}
                                 </span>
-                                {item.is_special_rate && (
-                                    <span className="bg-purple-50 text-purple-700 text-xs px-2 py-1 rounded-md font-medium flex items-center gap-1 border border-purple-100" title={item.exchange_rate_name}>
-                                        <RotateCcw size={10} />
-                                        <span className="truncate max-w-[60px] uppercase text-[10px]">{item.exchange_rate_name || 'Tasa'}</span>
-                                    </span>
-                                )}
-                            </div>
-
-                            {/* Footer: Prices */}
-                            <div className="flex justify-between items-end border-t border-dashed pt-2">
-                                {/* Unit Price Detail */}
-                                <div className="text-xs text-gray-400">
-                                    <div>Unit: ${Number(item.unit_price_usd).toFixed(2)}</div>
-                                    <div className="text-gray-500 font-medium">
-                                        Bs. {(Number(item.unit_price_usd) * Number(item.exchange_rate)).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                    </div>
-                                </div>
-
-                                {/* Totals */}
-                                <div className="text-right">
-                                    <div className="font-bold text-gray-900 text-sm md:text-base">
-                                        ${Number(item.subtotal_usd || 0).toFixed(2)}
-                                    </div>
-                                    <div className="text-xs text-gray-500 font-medium">
-                                        Bs. {Number(item.subtotal_bs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                    </div>
-                                </div>
                             </div>
                         </div>
                     ))}
+                    {cart.length === 0 && (
+                        <div className="h-full flex flex-col items-center justify-center text-slate-300 select-none">
+                            <Package size={64} className="mb-4 opacity-50" />
+                            <p className="text-lg font-medium">Carrito Vacío</p>
+                            <p className="text-sm">Agrega productos del catálogo</p>
+                        </div>
+                    )}
                 </div>
 
-                {/* Footer Totals (Fixed at bottom on desktop, integrated in flow) */}
-                <div className="bg-gray-50 p-4 border-t-2 border-slate-200 mt-auto shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-20">
-                    <div className="space-y-2 mb-4">
-                        {/* Base Currency (Anchor) */}
-                        <div className="flex justify-between items-end border-b pb-2">
-                            <span className="text-gray-500 text-sm font-medium">Total ({anchorCurrency.symbol})</span>
-                            <span className="text-3xl font-bold text-gray-800">{anchorCurrency.symbol}{Number(totalUSD).toFixed(2)}</span>
+                {/* Footer Actions */}
+                <div className="bg-slate-50 border-t border-slate-200 p-4 space-y-3 z-20">
+                    <div className="grid grid-cols-2 gap-3">
+                        <button
+                            onClick={() => setIsMovementOpen(true)}
+                            className="flex items-center justify-center gap-2 py-3 bg-white border border-slate-200 rounded-xl shadow-sm hover:border-blue-300 text-slate-600 text-sm font-bold transition-all"
+                        >
+                            <CreditCard size={16} /> Gastos
+                        </button>
+                        <Link
+                            to="/cash-close"
+                            className="flex items-center justify-center gap-2 py-3 bg-white border border-slate-200 rounded-xl shadow-sm hover:border-blue-300 text-slate-600 text-sm font-bold transition-all"
+                        >
+                            <Receipt size={16} /> Caja
+                        </Link>
+                    </div>
+
+                    <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+                        <div className="flex justify-between items-end mb-2">
+                            <span className="text-slate-500 font-medium text-sm">Total a Pagar</span>
+                            <span className="text-3xl font-black text-slate-900 tracking-tight">
+                                {anchorCurrency.symbol}{Number(totalUSD).toFixed(2)}
+                            </span>
                         </div>
-                        {/* Other Currencies Compact View */}
-                        <div className="flex flex-wrap gap-4 justify-end">
+                        {/* Secondary Currencies - Compact Line */}
+                        <div className="flex justify-end gap-3 text-xs text-slate-400 pt-2 border-t border-dashed border-slate-100">
                             {getActiveCurrencies().map(curr => {
-                                const currencyTotal = totalsByCurrency?.[curr.currency_code] || 0;
+                                if (curr.currency_code === anchorCurrency.currency_code) return null;
                                 return (
-                                    <div key={curr.id} className="text-right">
-                                        <span className="text-[10px] text-gray-500 block">{curr.name}</span>
-                                        <span className="text-sm font-bold text-blue-600 font-mono">
-                                            {curr.symbol} {currencyTotal.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                        </span>
-                                    </div>
-                                );
+                                    <span key={curr.id} className="font-mono">
+                                        <span className="font-bold">{curr.symbol}</span> {totalsByCurrency?.[curr.currency_code]?.toLocaleString('es-VE', { maximumFractionDigits: 2 })}
+                                    </span>
+                                )
                             })}
                         </div>
                     </div>
@@ -762,17 +775,25 @@ const POS = () => {
                     <button
                         onClick={() => setIsPaymentOpen(true)}
                         disabled={cart.length === 0}
-                        className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-3 md:py-4 rounded-xl shadow-lg transform active:scale-95 transition-all text-lg md:text-xl flex items-center justify-center gap-2"
+                        className="
+                            w-full bg-slate-900 hover:bg-black text-white
+                            disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed
+                            py-4 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl hover:-translate-y-0.5
+                            transition-all flex items-center justify-center gap-3
+                        "
                     >
-                        COBRAR ${Number(totalUSD).toFixed(2)}
-                        <kbd className="hidden md:inline px-2 py-1 text-sm font-semibold bg-blue-700 rounded shadow-sm">F5</kbd>
+                        COBRAR
+                        <span className="bg-white/20 px-2 py-0.5 rounded text-sm text-white/90 font-mono">
+                            ${Number(totalUSD).toFixed(2)}
+                        </span>
                     </button>
+
                     {/* Botón para volver al catálogo en móvil (solo visible si estamos en modo ticket) */}
                     <button
                         onClick={() => setMobileTab('catalog')}
-                        className="md:hidden w-full mt-2 text-gray-500 py-2 text-sm"
+                        className="md:hidden w-full text-slate-500 font-medium py-2 text-sm"
                     >
-                        Seguir Comprando
+                        ← Seguir Comprando
                     </button>
                 </div>
             </div>
