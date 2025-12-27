@@ -207,11 +207,29 @@ const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onCon
                                 <div className="text-center">
                                     <div className="text-sm text-green-300 mb-1">Cambio / Vuelto</div>
                                     <div className="text-3xl font-bold text-green-400">${changeUSD.toFixed(2)}</div>
+                                    {currencies.find(c => !c.is_anchor) && (
+                                        <div className="text-lg font-bold text-green-400/70 mt-1">
+                                            {(() => {
+                                                const local = currencies.find(c => !c.is_anchor);
+                                                const amount = changeUSD * (local.rate || 1);
+                                                return `${local.symbol} ${amount.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                                            })()}
+                                        </div>
+                                    )}
                                 </div>
                             ) : (
                                 <div className="text-center">
                                     <div className="text-sm text-red-300 mb-1">Falta por Pagar</div>
                                     <div className="text-3xl font-bold text-red-400">${Math.abs(remainingUSD).toFixed(2)}</div>
+                                    {currencies.find(c => !c.is_anchor) && (
+                                        <div className="text-lg font-bold text-red-400/70 mt-1">
+                                            {(() => {
+                                                const local = currencies.find(c => !c.is_anchor);
+                                                const amount = Math.abs(remainingUSD) * (local.rate || 1);
+                                                return `${local.symbol} ${amount.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                                            })()}
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
