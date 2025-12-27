@@ -232,6 +232,14 @@ export const ConfigProvider = ({ children }) => {
         return product.price * (targetRate?.rate || 1);
     };
 
+    const formatCurrency = (amount, currency = 'USD') => {
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: currency,
+            minimumFractionDigits: 2
+        }).format(amount);
+    };
+
     return (
         <ConfigContext.Provider value={{
             business,
@@ -243,7 +251,9 @@ export const ConfigProvider = ({ children }) => {
             convertPrice,
             getProductExchangeRate,
             convertProductPrice,
-            paymentMethods
+            convertProductPrice,
+            paymentMethods,
+            formatCurrency
         }}>
             {children}
         </ConfigContext.Provider>

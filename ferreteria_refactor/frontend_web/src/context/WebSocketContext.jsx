@@ -20,17 +20,20 @@ export const WebSocketProvider = ({ children }) => {
         }
 
         // --- LÓGICA DINÁMICA DE WEBSOCKET ---
-        // Detectar si usamos https (wss) o http (ws)
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        // Detectar el host actual (ej: demo.invensoft.lat o localhost:8000)
-        const host = window.location.host;
-        // Construir la URL final
+
+        let host = window.location.host;
+        // DEVELOPMENT OVERRIDE: If on localhost:5173, point to backend at 8000
+        if (window.location.hostname === 'localhost' && window.location.port === '5173') {
+            host = 'localhost:8000';
+        }
+
         const wsUrl = `${protocol}//${host}/api/v1/ws`;
 
         console.log("🔌 Conectando WS a:", wsUrl);
-
         console.log(`🔌 WS: Connecting to ${wsUrl} (Attempt ${retryCount.current + 1})`);
-        setStatus(retryCount.current > 0 ? 'RECONNECTING' : 'DISCONNECTED'); // Visual state
+
+        setStatus(retryCount.current > 0 ? 'RECONNECTING' : 'DISCONNECTED');
 
         ws.current = new WebSocket(wsUrl);
 
@@ -82,7 +85,7 @@ export const WebSocketProvider = ({ children }) => {
 
         ws.current.onerror = (err) => {
             console.error('WS: Error', err);
-            ws.current.close(); // Force close to trigger onclose logic
+            ws.current?.close(); // Force close to trigger onclose logic safely
         };
 
     }, []);

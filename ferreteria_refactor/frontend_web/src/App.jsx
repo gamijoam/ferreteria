@@ -15,6 +15,7 @@ import Purchases from './pages/Purchases';
 import CreatePurchase from './pages/Purchases/CreatePurchase';
 import PurchaseDetail from './pages/Purchases/PurchaseDetail';
 import AccountsPayable from './pages/Suppliers/AccountsPayable';
+import DetailedReports from './pages/Reports/DetailedReports';
 import Suppliers from './pages/Suppliers';
 import ReturnsManager from './pages/Returns/ReturnsManager';
 import SalesHistory from './pages/SalesHistory';
@@ -44,7 +45,14 @@ function App() {
                   <Route path="/login" element={<Login />} />
                   <Route path="/unauthorized" element={<Unauthorized />} />
 
-                  {/* Protected Routes */}
+                  {/* Reports Routes */}
+                  <Route path="/reports/detailed" element={
+                    <ProtectedRoute allowedRoles={['ADMIN']}>
+                      <DetailedReports />
+                    </ProtectedRoute>
+                  } />
+
+                  {/* POS Routes */}
                   <Route element={<ProtectedRoute />}>
                     <Route element={<DashboardLayout />}>
                       <Route path="/" element={<Dashboard />} />

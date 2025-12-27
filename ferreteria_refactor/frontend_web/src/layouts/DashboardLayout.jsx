@@ -5,6 +5,7 @@ import { useConfig } from '../context/ConfigContext';
 import RoleGuard from '../components/RoleGuard';
 import {
     LayoutDashboard,
+    BarChart,
     Package,
     ShoppingCart,
     Settings as SettingsIcon,
@@ -42,7 +43,8 @@ const DashboardLayout = () => {
         inventory: true,
         sales: true,
         finance: true,
-        operations: false
+        operations: false,
+        reports: false
     });
 
     const handleLogout = () => {
@@ -205,6 +207,30 @@ const DashboardLayout = () => {
                         </div>
                     )}
                 </div>
+
+                {/* Reportes - ADMIN ONLY */}
+                <RoleGuard allowed={['ADMIN']}>
+                    <div>
+                        <button
+                            onClick={() => toggleSection('reports')}
+                            className="flex items-center justify-between w-full p-3 rounded hover:bg-slate-700 transition-colors"
+                        >
+                            <div className="flex items-center space-x-3">
+                                <BarChart size={20} />
+                                <span className="font-medium">Reportes</span>
+                            </div>
+                            {openSections.reports ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                        </button>
+                        {openSections.reports && (
+                            <div className="ml-4 mt-1 space-y-1">
+                                <Link to="/reports/detailed" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center space-x-3 p-2 pl-4 rounded text-sm transition-colors ${isActive('/reports/detailed') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
+                                    <FileText size={16} />
+                                    <span>Detalles de Ventas</span>
+                                </Link>
+                            </div>
+                        )}
+                    </div>
+                </RoleGuard>
 
                 {/* Users - ADMIN ONLY */}
                 <RoleGuard allowed="ADMIN">
