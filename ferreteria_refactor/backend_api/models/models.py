@@ -96,6 +96,7 @@ class Product(Base):
     profit_margin = Column(Numeric(5, 2), nullable=True)  # Profit margin percentage (e.g., 30.00 = 30%)
     discount_percentage = Column(Numeric(5, 2), default=0.00)  # Promotional discount percentage
     is_discount_active = Column(Boolean, default=False)  # Enable/disable promotional discount
+    tax_rate = Column(Numeric(5, 2), default=0.00) # Tax rate percentage (e.g. 16.00 for 16%)
     
     stock = Column(Numeric(12, 3), default=0.000) # Base units
     min_stock = Column(Numeric(12, 3), default=5.000) # Low stock alert threshold
@@ -264,6 +265,9 @@ class SaleDetail(Base):
     discount = Column(Numeric(12, 2), default=0.00)  # Discount amount or percentage
     discount_type = Column(String, default="NONE")  # NONE, PERCENT, FIXED
     
+    # Tax Support
+    tax_rate = Column(Numeric(5, 2), default=0.00)  # Tax rate applied at moment of sale (e.g. 16.00)
+
     subtotal = Column(Numeric(12, 2), nullable=False)
     is_box_sale = Column(Boolean, default=False) # Was it sold as a box?
 
@@ -271,7 +275,7 @@ class SaleDetail(Base):
     product = relationship("Product")
 
     def __repr__(self):
-        return f"<SaleDetail(product='{self.product_id}', qty={self.quantity})>"
+        return f"<SaleDetail(product='{self.product_id}', qty={self.quantity}, tax={self.tax_rate})>"
 
 class CashSession(Base):
     __tablename__ = "cash_sessions"

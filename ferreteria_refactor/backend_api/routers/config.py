@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any
 import requests
+from decimal import Decimal
 from datetime import datetime
 from ..database.db import get_db
 from ..models import models
@@ -436,6 +437,40 @@ def set_configs_batch(
     
     db.commit()
     return {"message": "Configurations updated", "data": results}
+
+@router.get("/tax-rate/default", response_model=Dict[str, Decimal])
+def get_default_tax_rate(db: Session = Depends(get_db)):
+    """Get the default tax rate percentage"""
+    config = db.query(models.BusinessConfig).get("default_tax_rate")
+    if not config or not config.value:
+        return {"rate": Decimal("0.00")}
+    try:
+        return {"rate": Decimal(config.value)}
+    except:
+        return {"rate": Decimal("0.00")}
+
+@router.put("/tax-rate/default")
+def set_default_tax_rate(
+    rate_data: Dict[str, Any], 
+    db: Session = Depends(get_db),
+    user: Any = Depends(admin_only)
+):
+    """Set the default tax rate percentage"""
+    try:
+        rate_val = Decimal(str(rate_data.get("rate", 0)))
+        key = "default_tax_rate"
+        
+        config = db.query(models.BusinessConfig).get(key)
+        if not config:
+            config = models.BusinessConfig(key=key, value=str(rate_val))
+            db.add(config)
+        else:
+            config.value = str(rate_val)
+        
+        db.commit()
+        return {"message": "Default tax rate updated", "rate": rate_val}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 def init_exchange_rates(db: Session):
     """Seed default exchange rates if table is empty"""

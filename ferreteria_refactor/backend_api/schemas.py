@@ -23,6 +23,7 @@ class ProductBase(BaseModel):
     profit_margin: Optional[Decimal] = Field(None, description="Margen de ganancia en porcentaje", example="30.00")
     discount_percentage: Optional[Decimal] = Field(Decimal("0.00"), description="Descuento promocional en porcentaje", example="10.00")
     is_discount_active: bool = Field(False, description="Activar/desactivar descuento promocional")
+    tax_rate: Optional[Decimal] = Field(Decimal("0.00"), description="Porcentaje de Impuesto (IVA)", example="16.00")
     
     min_stock: Optional[Decimal] = Field(Decimal("5.000"), description="Nivel mínimo para alerta de reabastecimiento", example="5.000")
     unit_type: Optional[str] = Field("Unidad", description="Unidad de medida base", example="Unidad")
@@ -131,6 +132,7 @@ class ProductUpdate(BaseModel):
     profit_margin: Optional[Decimal] = None
     discount_percentage: Optional[Decimal] = None
     is_discount_active: Optional[bool] = None
+    tax_rate: Optional[Decimal] = None
     
     units: Optional[List[ProductUnitCreate]] = None
     combo_items: Optional[List[ComboItemCreate]] = None  # NEW: Allow updating combo items
@@ -168,6 +170,7 @@ class SaleDetailCreate(BaseModel):
     conversion_factor: Decimal = Decimal("1.0")
     discount: Decimal = Decimal("0.00")
     discount_type: str = "NONE"  # NONE, PERCENT, FIXED
+    tax_rate: Decimal = Decimal("0.00")
 
 class SalePaymentCreate(BaseModel):
     sale_id: Optional[int] = None # Optional for inline creation
@@ -207,6 +210,7 @@ class SaleDetailRead(BaseModel):
     subtotal: Decimal
     discount: Decimal = Decimal("0.00")
     discount_type: str = "NONE"
+    tax_rate: Decimal = Decimal("0.00")
     product: Optional['ProductRead'] = None  # Include product info
     
     class Config:

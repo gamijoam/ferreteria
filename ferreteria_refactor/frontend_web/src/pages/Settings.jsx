@@ -34,6 +34,10 @@ const Settings = () => {
     const [isRatesLoading, setIsRatesLoading] = useState(false);
     const [ratesError, setRatesError] = useState(null);
 
+    // Tax Settings State
+    const [defaultTaxRate, setDefaultTaxRate] = useState('');
+    const [isSavingTax, setIsSavingTax] = useState(false);
+
     useEffect(() => {
         if (business) {
             setBizForm({
@@ -48,8 +52,19 @@ const Settings = () => {
     useEffect(() => {
         if (activeTab === 'currencies') {
             fetchExchangeRates();
+        } else if (activeTab === 'taxes') {
+            fetchDefaultTaxRate();
         }
     }, [activeTab]);
+
+    const fetchDefaultTaxRate = async () => {
+        try {
+            const response = await apiClient.get('/config/tax-rate/default');
+            setDefaultTaxRate(response.data.rate);
+        } catch (error) {
+            console.error('Error fetching tax rate:', error);
+        }
+    };
 
     const fetchExchangeRates = async () => {
         setIsRatesLoading(true);
@@ -81,6 +96,19 @@ const Settings = () => {
             alert("✅ Datos de negocio actualizados");
             refreshConfig();
         } catch (e) { console.error(e); alert("❌ Error al guardar"); }
+    };
+
+    const handleSaveTaxRate = async () => {
+        setIsSavingTax(true);
+        try {
+            await apiClient.put('/config/tax-rate/default', { rate: parseFloat(defaultTaxRate) });
+            alert("✅ Impuesto por defecto actualizado");
+        } catch (error) {
+            console.error(error);
+            alert("❌ Error al guardar impuesto");
+        } finally {
+            setIsSavingTax(false);
+        }
     };
 
     const handleAddRate = async () => {
@@ -591,12 +619,52 @@ const Settings = () => {
                 </div>
             )}
 
-            {/* Taxes Tab (Placeholder) */}
+            {/* Taxes Tab */}
             {activeTab === 'taxes' && (
-                <div className="bg-white p-12 rounded-xl shadow-sm border border-gray-100 text-center">
-                    <Receipt className="mx-auto text-gray-200 mb-4" size={64} />
-                    <h3 className="text-xl font-bold text-gray-400 mb-2">Configuración de Impuestos</h3>
-                    <p className="text-gray-400">Próximamente... En esta sección podrás configurar el IVA y otros impuestos.</p>
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 max-w-2xl mx-auto">
+                    <div className="text-center mb-8">
+                        <div className="bg-orange-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <Receipt className="text-orange-600" size={32} />
+                        </div>
+                        <h2 className="text-2xl font-bold text-gray-800">Configuración de Impuestos</h2>
+                        <p className="text-gray-500">Define el impuesto por defecto para nuevos productos.</p>
+                    </div>
+
+                    <div className="bg-orange-50 rounded-xl p-8 border border-orange-200">
+                        <label className="block text-sm font-bold text-gray-700 mb-3 uppercase tracking-wider">
+                            Tasa de Impuesto General (Default)
+                        </label>
+
+                        <div className="flex items-center gap-4">
+                            <div className="relative flex-1">
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    max="100"
+                                    value={defaultTaxRate}
+                                    onChange={(e) => setDefaultTaxRate(e.target.value)}
+                                    className="w-full pl-5 pr-12 py-4 text-3xl font-black text-gray-800 bg-white border-2 border-orange-200 rounded-xl focus:border-orange-500 focus:ring-4 focus:ring-orange-100 outline-none transition-all placeholder-gray-300"
+                                    placeholder="0.00"
+                                />
+                                <span className="absolute right-6 top-1/2 transform -translate-y-1/2 text-xl font-bold text-gray-400">%</span>
+                            </div>
+
+                            <button
+                                onClick={handleSaveTaxRate}
+                                disabled={isSavingTax}
+                                className="bg-orange-600 hover:bg-orange-700 text-white px-8 py-4 rounded-xl font-bold shadow-lg shadow-orange-200 transition-all hover:-translate-y-1 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                            >
+                                {isSavingTax ? <Loader2 className="animate-spin" size={24} /> : <Save size={24} />}
+                                <span className="ml-2">Guardar</span>
+                            </button>
+                        </div>
+
+                        <p className="mt-4 text-sm text-orange-700 font-medium flex items-start">
+                            <AlertCircle size={16} className="mr-2 mt-0.5 flex-shrink-0" />
+                            Este valor se aplicará automáticamente a los nuevos productos que crees. Puedes anularlo manualmente en cada producto.
+                        </p>
+                    </div>
                 </div>
             )}
 

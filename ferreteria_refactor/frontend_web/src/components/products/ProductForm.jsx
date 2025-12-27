@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Package, DollarSign, Barcode, Tag, Layers, AlertTriangle, AlertCircle, Coins } from 'lucide-react';
+import { X, Plus, Trash2, Package, DollarSign, Barcode, Tag, Layers, AlertTriangle, AlertCircle, Coins, Receipt } from 'lucide-react';
 import { useConfig } from '../../context/ConfigContext';
 import apiClient from '../../config/axios';
 import ProductUnitManager from './ProductUnitManager';
@@ -27,8 +27,10 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
         is_combo: false,
         // Pricing System Fields
         profit_margin: null,
+        profit_margin: null,
         discount_percentage: 0,
         is_discount_active: false,
+        tax_rate: 0, // NEW: Tax Rate
         units: [],
         combo_items: []
     });
@@ -44,7 +46,10 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
             // Fetch categories
             fetchCategories();
             // Fetch exchange rates
+            // Fetch exchange rates
             fetchExchangeRates();
+            // Fetch default tax rate
+            fetchDefaultTaxRate();
 
             if (initialData) {
                 // Map backend units to frontend format
@@ -92,8 +97,10 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
                     is_combo: initialData.is_combo || false,  // NEW
                     // Pricing System Fields - Fix Uncontrolled Input
                     profit_margin: initialData.profit_margin || null,
+                    profit_margin: initialData.profit_margin || null,
                     discount_percentage: initialData.discount_percentage || 0,
                     is_discount_active: initialData.is_discount_active || false,
+                    tax_rate: initialData.tax_rate !== undefined ? initialData.tax_rate : 0, // Load tax rate
                     units: mappedUnits,
                     combo_items: initialData.combo_items || []  // NEW
                 });
@@ -103,7 +110,8 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
                     name: '', sku: '', category_id: null,
                     cost: 0, price: 0, stock: 0, min_stock: 5, location: '',
                     margin: 0, unit_type: 'UNID', exchange_rate_id: null,
-                    is_combo: false, units: [], combo_items: []
+                    is_combo: false, units: [], combo_items: [],
+                    tax_rate: 0 // Reset tax
                 });
             }
             setActiveTab('general');
@@ -114,21 +122,28 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
     // PRICING CALCULATIONS
     // ========================================
 
-    // Auto-calculate price from cost + profit margin
+    // Auto-calculate price from cost + profit margin + tax
+    // Auto-calculate price from cost + profit margin + tax
     useEffect(() => {
-        if (formData.cost && formData.profit_margin) {
+        // Calculate if we have at least a cost
+        if (formData.cost) {
             const cost = parseFloat(formData.cost);
-            const margin = parseFloat(formData.profit_margin);
-            if (cost > 0 && margin >= 0) {
-                const price = cost * (1 + margin / 100);
-                setCalculatedPrice(price.toFixed(2));
+            const margin = parseFloat(formData.profit_margin) || 0; // Default to 0 if empty
+            const tax = parseFloat(formData.tax_rate) || 0; // Default to 0 if empty
+
+            if (cost > 0) {
+                // Price = Cost * (1 + Margin) * (1 + Tax)
+                const priceBeforeTax = cost * (1 + margin / 100);
+                const finalPrice = priceBeforeTax * (1 + tax / 100);
+
+                setCalculatedPrice(finalPrice.toFixed(2));
                 // Auto-update price field
-                setFormData(prev => ({ ...prev, price: price.toFixed(2) }));
+                setFormData(prev => ({ ...prev, price: finalPrice.toFixed(2) }));
             }
         } else {
             setCalculatedPrice(null);
         }
-    }, [formData.cost, formData.profit_margin]);
+    }, [formData.cost, formData.profit_margin, formData.tax_rate]);
 
     // Reverse-calculate margin from cost + price (when margin is not set)
     useEffect(() => {
@@ -207,6 +222,16 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
         }
     };
 
+    const fetchDefaultTaxRate = async () => {
+        if (initialData) return; // Don't override if editing
+        try {
+            const response = await apiClient.get('/config/tax-rate/default');
+            setFormData(prev => ({ ...prev, tax_rate: response.data.rate || 0 }));
+        } catch (error) {
+            console.error('Error fetching default tax rate:', error);
+        }
+    };
+
     // ... Unit Management (keep existing helper functions)
     const handleAddUnit = (type) => {
         const newUnit = {
@@ -261,8 +286,10 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
             is_combo: formData.is_combo,
             // Pricing System Fields
             profit_margin: formData.profit_margin ? parseFloat(formData.profit_margin) : null,
+            profit_margin: formData.profit_margin ? parseFloat(formData.profit_margin) : null,
             discount_percentage: parseFloat(formData.discount_percentage) || 0,
             is_discount_active: formData.is_discount_active,
+            tax_rate: parseFloat(formData.tax_rate) || 0, // Send Tax Rate
             units: formData.units.map(u => {
                 let factor = parseFloat(u.user_input);
                 if (u.type === 'fraction') factor = factor !== 0 ? 1 / factor : 0;
@@ -534,6 +561,35 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
                                                 </p>
                                             </div>
                                         )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Tax Section */}
+                            <div className="bg-orange-50 rounded-xl p-6 border border-orange-100">
+                                <h4 className="text-lg font-bold text-orange-800 mb-4 flex items-center">
+                                    <Receipt className="mr-2" size={20} /> Impuestos (IVA)
+                                </h4>
+                                <div className="grid grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-1">Porcentaje de Impuesto</label>
+                                        <div className="relative">
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                name="tax_rate"
+                                                value={formData.tax_rate}
+                                                onChange={handleInputChange}
+                                                className="w-full pr-8 border-orange-200 rounded-lg shadow-sm focus:border-orange-500 focus:ring-orange-500 py-3 text-lg font-bold text-gray-800"
+                                                placeholder="0.00"
+                                            />
+                                            <span className="absolute right-3 top-3 text-gray-500 font-bold">%</span>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center">
+                                        <p className="text-sm text-orange-700">
+                                            El precio final de venta incluirá este porcentaje sobre el costo + margen.
+                                        </p>
                                     </div>
                                 </div>
                             </div>
