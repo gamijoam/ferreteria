@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, Package, Filter, X } from 'lucide-react';
+import { Plus, Search, Package, Filter, X, Trash2, Pencil } from 'lucide-react';
 import ProductForm from '../components/products/ProductForm';
 import BulkProductActions from '../components/products/BulkProductActions';
 import InventoryValuationCard from '../components/products/InventoryValuationCard';
@@ -38,6 +38,19 @@ const Products = () => {
             console.error("Error fetching products:", error);
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleDelete = async (product) => {
+        if (window.confirm(`¿Estás seguro de que deseas eliminar el producto "${product.name}"?`)) {
+            try {
+                await apiClient.delete(`/products/${product.id}`);
+                // State update is handled by WebSocket subscription
+                alert("Producto eliminado correctamente");
+            } catch (error) {
+                console.error("Error deleting product:", error);
+                alert("Error al eliminar el producto");
+            }
         }
     };
 
@@ -242,16 +255,26 @@ const Products = () => {
                                             {formatStock(product.stock)}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 cursor-pointer hover:underline">
-                                        <span
-                                            onClick={() => {
-                                                setSelectedProduct(product);
-                                                setIsModalOpen(true);
-                                            }}
-                                            className="text-blue-600 hover:text-blue-800 font-medium cursor-pointer"
-                                        >
-                                            Editar
-                                        </span>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        <div className="flex items-center gap-3">
+                                            <button
+                                                onClick={() => {
+                                                    setSelectedProduct(product);
+                                                    setIsModalOpen(true);
+                                                }}
+                                                className="text-blue-600 hover:text-blue-800 transition-colors"
+                                                title="Editar"
+                                            >
+                                                <Pencil size={18} />
+                                            </button>
+                                            <button
+                                                onClick={() => handleDelete(product)}
+                                                className="text-red-600 hover:text-red-900 transition-colors"
+                                                title="Eliminar"
+                                            >
+                                                <Trash2 size={18} />
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             ))}
@@ -306,15 +329,24 @@ const Products = () => {
                                         ))}
                                     </div>
                                 </div>
-                                <button
-                                    onClick={() => {
-                                        setSelectedProduct(product);
-                                        setIsModalOpen(true);
-                                    }}
-                                    className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                                >
-                                    Editar
-                                </button>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => {
+                                            setSelectedProduct(product);
+                                            setIsModalOpen(true);
+                                        }}
+                                        className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                                    >
+                                        Editar
+                                    </button>
+                                    <button
+                                        onClick={() => handleDelete(product)}
+                                        className="bg-red-50 hover:bg-red-100 text-red-600 p-2 rounded-lg transition-colors"
+                                        title="Eliminar"
+                                    >
+                                        <Trash2 size={20} />
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     ))}
@@ -354,7 +386,7 @@ const Products = () => {
                     }
                 }}
             />
-        </div>
+        </div >
     );
 };
 
