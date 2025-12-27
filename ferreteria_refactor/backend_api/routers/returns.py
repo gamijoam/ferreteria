@@ -5,7 +5,7 @@ from typing import List, Optional
 from ..database.db import get_db
 from ..models import models
 from .. import schemas
-from datetime import datetime
+from datetime import datetime, date
 
 router = APIRouter(
     prefix="/returns",
@@ -13,25 +13,52 @@ router = APIRouter(
 )
 
 @router.get("/sales/search", response_model=List[schemas.SaleRead])
-def search_sales(q: Optional[str] = None, limit: int = 50, db: Session = Depends(get_db)):
-    """Search sales by ID (partial) or customer name (partial)"""
+def search_sales(
+    q: Optional[str] = None,
+    limit: int = 100,
+    payment_method: Optional[str] = None,
+    status: Optional[str] = None,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    db: Session = Depends(get_db)
+):
+    """Search sales with filters"""
     query = db.query(models.Sale).options(
         joinedload(models.Sale.customer),
-        joinedload(models.Sale.payments)  # ✅ Include payments data
+        joinedload(models.Sale.payments),
+        joinedload(models.Sale.returns)
     )
     
-    if not q:
-        # Return recent sales if no query
-        return query.order_by(models.Sale.date.desc()).limit(limit).all()
-    
-    # Hybrid Search: Partial match on ID (converted to text) OR Customer Name
-    # CAST(id AS VARCHAR) ILIKE '%q%' OR name ILIKE '%q%'
-    query = query.join(models.Customer, isouter=True).filter(
-        or_(
-            cast(models.Sale.id, String).ilike(f"%{q}%"),
-            models.Customer.name.ilike(f"%{q}%")
+    # Text Search
+    if q:
+        query = query.join(models.Customer, isouter=True).filter(
+            or_(
+                cast(models.Sale.id, String).ilike(f"%{q}%"),
+                models.Customer.name.ilike(f"%{q}%")
+            )
         )
-    )
+    
+    # Filter by Payment Method
+    if payment_method:
+        query = query.filter(models.Sale.payment_method == payment_method)
+    
+    # Filter by Status (Derived from existence of Return)
+    if status:
+        if status == "VOIDED":
+            # Show only sales with returns
+            query = query.join(models.Return)
+        elif status == "COMPLETED":
+            # Show only sales WITHOUT returns
+            query = query.outerjoin(models.Return).filter(models.Return.id == None)
+
+    # Filter by Date Range
+    if start_date:
+        start_dt = datetime.combine(start_date, datetime.min.time())
+        query = query.filter(models.Sale.date >= start_dt)
+    
+    if end_date:
+        end_dt = datetime.combine(end_date, datetime.max.time())
+        query = query.filter(models.Sale.date <= end_dt)
     
     return query.order_by(models.Sale.date.desc()).limit(limit).all()
 

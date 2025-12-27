@@ -231,6 +231,7 @@ class SaleRead(BaseModel):
     paid: bool = True
     currency: str = "USD"  # NEW: Include currency
     exchange_rate_used: Decimal = Decimal("1.0")  # NEW: Include exchange rate
+    status: str = "COMPLETED" # Derived from property
     
     class Config:
         from_attributes = True

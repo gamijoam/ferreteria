@@ -236,6 +236,11 @@ class Sale(Base):
     details = relationship("SaleDetail", back_populates="sale")
     customer = relationship("Customer", back_populates="sales")
     payments = relationship("SalePayment", back_populates="sale", lazy="joined")
+    returns = relationship("Return", back_populates="sale")
+
+    @property
+    def status(self):
+        return "VOIDED" if self.returns else "COMPLETED"
 
     def __repr__(self):
         return f"<Sale(id={self.id}, total={self.total_amount})>"
@@ -364,7 +369,7 @@ class Return(Base):
     total_refunded = Column(Numeric(12, 2), nullable=False)
     reason = Column(Text, nullable=True)
 
-    sale = relationship("Sale")
+    sale = relationship("Sale", back_populates="returns")
     details = relationship("ReturnDetail", back_populates="return_obj")
 
     def __repr__(self):

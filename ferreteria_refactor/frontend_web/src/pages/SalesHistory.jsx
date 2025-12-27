@@ -8,7 +8,7 @@ import InvoicePDF from '../components/pdf/InvoicePDF';
 
 const SalesHistory = () => {
     const { user } = useAuth();
-    const { business } = useConfig();
+    const { business, paymentMethods } = useConfig();
     const [sales, setSales] = useState([]);
     const [filteredSales, setFilteredSales] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -17,7 +17,8 @@ const SalesHistory = () => {
     const [dateFrom, setDateFrom] = useState(new Date().toISOString().split('T')[0]);
     const [dateTo, setDateTo] = useState(new Date().toISOString().split('T')[0]);
     const [searchQuery, setSearchQuery] = useState('');
-    const [selectedCashier, setSelectedCashier] = useState('');
+    const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('');
+    const [selectedStatus, setSelectedStatus] = useState('COMPLETED'); // Default to completed? Or '' for all? Let's say '' for all.
 
     // Modals
     const [showDetailModal, setShowDetailModal] = useState(false);
@@ -31,22 +32,32 @@ const SalesHistory = () => {
 
     useEffect(() => {
         fetchSales();
-    }, [dateFrom, dateTo]);
+    }, [dateFrom, dateTo, selectedPaymentMethod, selectedStatus]);
 
+    // Debounce search
     useEffect(() => {
-        applyFilters();
-    }, [sales, searchQuery, selectedCashier]);
+        const timer = setTimeout(() => {
+            fetchSales();
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
 
     const fetchSales = async () => {
         setLoading(true);
         try {
-            // Use the search endpoint without query to get all recent sales
-            const response = await apiClient.get('/returns/sales/search', {
-                params: {
-                    limit: 100 // Get last 100 sales
-                }
-            });
+            const params = {
+                limit: 100,
+                start_date: dateFrom,
+                end_date: dateTo
+            };
+
+            if (searchQuery) params.q = searchQuery;
+            if (selectedPaymentMethod) params.payment_method = selectedPaymentMethod;
+            if (selectedStatus) params.status = selectedStatus;
+
+            const response = await apiClient.get('/returns/sales/search', { params });
             setSales(response.data);
+            setFilteredSales(response.data); // No more client-side filtering needed for main list
         } catch (error) {
             console.error('Error fetching sales:', error);
         } finally {
@@ -54,29 +65,7 @@ const SalesHistory = () => {
         }
     };
 
-    const applyFilters = () => {
-        if (!Array.isArray(sales)) {
-            console.warn('Sales is not an array:', sales);
-            return;
-        }
-
-        let filtered = [...sales];
-
-        // Search filter
-        if (searchQuery) {
-            filtered = filtered.filter(sale =>
-                sale.id.toString().includes(searchQuery) ||
-                sale.customer?.name?.toLowerCase().includes(searchQuery.toLowerCase())
-            );
-        }
-
-        // Cashier filter
-        if (selectedCashier) {
-            filtered = filtered.filter(sale => sale.user_id === parseInt(selectedCashier));
-        }
-
-        setFilteredSales(filtered);
-    };
+    // Removed client-side applyFilters as backend handles it now
 
     const handleViewDetails = async (sale) => {
         try {
@@ -290,15 +279,31 @@ const SalesHistory = () => {
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Cajero
+                            Estado
                         </label>
                         <select
-                            value={selectedCashier}
-                            onChange={(e) => setSelectedCashier(e.target.value)}
+                            value={selectedStatus}
+                            onChange={(e) => setSelectedStatus(e.target.value)}
                             className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                         >
                             <option value="">Todos</option>
-                            {/* Add cashier options dynamically */}
+                            <option value="COMPLETED">Completada</option>
+                            <option value="VOIDED">Anulada</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Método Pago
+                        </label>
+                        <select
+                            value={selectedPaymentMethod}
+                            onChange={(e) => setSelectedPaymentMethod(e.target.value)}
+                            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                        >
+                            <option value="">Todos</option>
+                            {paymentMethods.map(method => (
+                                <option key={method.id} value={method.name}>{method.name}</option>
+                            ))}
                         </select>
                     </div>
                 </div>
