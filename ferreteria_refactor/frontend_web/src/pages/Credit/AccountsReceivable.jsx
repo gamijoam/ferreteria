@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { DollarSign, Calendar, AlertCircle, CheckCircle, X, Filter, Eye } from 'lucide-react';
+import { DollarSign, Calendar, AlertCircle, CheckCircle, X, Filter, Eye, Users, ChevronDown, ChevronRight } from 'lucide-react';
 import apiClient from '../../config/axios';
 import { useConfig } from '../../context/ConfigContext';
 import InvoiceDetailModal from '../../components/credit/InvoiceDetailModal';
@@ -15,6 +15,8 @@ const AccountsReceivable = () => {
 
     const [invoices, setInvoices] = useState([]);
     const [filteredInvoices, setFilteredInvoices] = useState([]);
+    const [viewMode, setViewMode] = useState('invoices'); // 'invoices' | 'clients'
+    const [expandedClients, setExpandedClients] = useState({}); // { clientName: boolean }
     const [filter, setFilter] = useState('pending'); // pending, overdue, paid
     const [loading, setLoading] = useState(false);
 
@@ -214,6 +216,46 @@ const AccountsReceivable = () => {
 
     const stats = getTotalStats();
 
+    // Group invoices by client
+    const clientsData = filteredInvoices.reduce((acc, invoice) => {
+        const clientName = invoice.customer?.name || 'Cliente General';
+        const clientId = invoice.customer?.id || 'unknown';
+        const clientKey = `${clientId}_${clientName}`; // Ensure uniqueness
+
+        if (!acc[clientKey]) {
+            acc[clientKey] = {
+                id: clientId,
+                name: clientName,
+                id_number: invoice.customer?.id_number || 'Sin ID',
+                total_debt: 0,
+                invoices_count: 0,
+                invoices: [],
+                overdue_count: 0
+            };
+        }
+
+        const balance = Number(invoice.balance_pending || invoice.total_amount || 0);
+        acc[clientKey].total_debt += balance;
+        acc[clientKey].invoices_count += 1;
+        acc[clientKey].invoices.push(invoice);
+
+        if (!invoice.paid && invoice.due_date && new Date(invoice.due_date) < new Date()) {
+            acc[clientKey].overdue_count += 1;
+        }
+
+        return acc;
+    }, {});
+
+    const clientsArray = Object.values(clientsData).sort((a, b) => b.total_debt - a.total_debt);
+
+    const toggleClientExpand = (clientKey) => {
+        setExpandedClients(prev => ({
+            ...prev,
+            [clientKey]: !prev[clientKey]
+        }));
+    };
+
+
     return (
         <div className="p-6">
             <div className="mb-6">
@@ -244,13 +286,13 @@ const AccountsReceivable = () => {
                 </div>
             </div>
 
-            {/* Filters */}
-            <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-                <div className="flex items-center gap-4">
-                    <Filter className="text-gray-600" size={20} />
+            {/* Filters & View Toggle */}
+            <div className="bg-white rounded-lg shadow-md p-4 mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
+                <div className="flex items-center gap-4 overflow-x-auto w-full md:w-auto pb-2 md:pb-0">
+                    <Filter className="text-gray-600 flex-shrink-0" size={20} />
                     <button
                         onClick={() => setFilter('pending')}
-                        className={`px-4 py-2 rounded-lg font-medium transition-colors ${filter === 'pending'
+                        className={`px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap ${filter === 'pending'
                             ? 'bg-blue-600 text-white'
                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                             }`}
@@ -259,7 +301,7 @@ const AccountsReceivable = () => {
                     </button>
                     <button
                         onClick={() => setFilter('overdue')}
-                        className={`px-4 py-2 rounded-lg font-medium transition-colors ${filter === 'overdue'
+                        className={`px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap ${filter === 'overdue'
                             ? 'bg-red-600 text-white'
                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                             }`}
@@ -268,7 +310,7 @@ const AccountsReceivable = () => {
                     </button>
                     <button
                         onClick={() => setFilter('paid')}
-                        className={`px-4 py-2 rounded-lg font-medium transition-colors ${filter === 'paid'
+                        className={`px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap ${filter === 'paid'
                             ? 'bg-green-600 text-white'
                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                             }`}
@@ -276,116 +318,239 @@ const AccountsReceivable = () => {
                         Pagadas ({invoices.filter(i => i.paid).length})
                     </button>
                 </div>
+
+                <div className="flex bg-gray-100 p-1 rounded-lg">
+                    <button
+                        onClick={() => setViewMode('invoices')}
+                        className={`px-4 py-2 rounded-md text-sm font-bold flex items-center gap-2 transition-all ${viewMode === 'invoices' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                        <Calendar size={16} /> Facturas
+                    </button>
+                    <button
+                        onClick={() => setViewMode('clients')}
+                        className={`px-4 py-2 rounded-md text-sm font-bold flex items-center gap-2 transition-all ${viewMode === 'clients' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                        <Users size={16} /> Por Clientes
+                    </button>
+                </div>
             </div>
 
-            {/* Invoices Table */}
-            <div className="bg-white rounded-lg shadow-md overflow-hidden">
-                <table className="w-full">
-                    <thead className="bg-gray-50">
-                        <tr>
-                            <th className="text-left p-4 font-semibold text-gray-700">Cliente</th>
-                            <th className="text-left p-4 font-semibold text-gray-700">Factura #</th>
-                            <th className="text-left p-4 font-semibold text-gray-700">Fecha Emisión</th>
-                            <th className="text-left p-4 font-semibold text-gray-700">Fecha Vencimiento</th>
-                            <th className="text-right p-4 font-semibold text-gray-700">Monto Original</th>
-                            <th className="text-right p-4 font-semibold text-gray-700">Saldo Pendiente</th>
-                            <th className="text-center p-4 font-semibold text-gray-700">Días de Retraso</th>
-                            <th className="text-center p-4 font-semibold text-gray-700">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                        {loading ? (
+            {/* Content: Invoices Table or Client Cards */}
+            {viewMode === 'invoices' ? (
+                <div className="bg-white rounded-lg shadow-md overflow-hidden animate-fade-in-up">
+                    <table className="w-full">
+                        <thead className="bg-gray-50">
                             <tr>
-                                <td colSpan="8" className="text-center p-8 text-gray-500">
-                                    Cargando facturas...
-                                </td>
+                                <th className="text-left p-4 font-semibold text-gray-700">Cliente</th>
+                                <th className="text-left p-4 font-semibold text-gray-700">Factura #</th>
+                                <th className="text-left p-4 font-semibold text-gray-700">Fecha Emisión</th>
+                                <th className="text-left p-4 font-semibold text-gray-700">Fecha Vencimiento</th>
+                                <th className="text-right p-4 font-semibold text-gray-700">Monto Original</th>
+                                <th className="text-right p-4 font-semibold text-gray-700">Saldo Pendiente</th>
+                                <th className="text-center p-4 font-semibold text-gray-700">Días de Retraso</th>
+                                <th className="text-center p-4 font-semibold text-gray-700">Acciones</th>
                             </tr>
-                        ) : filteredInvoices.length === 0 ? (
-                            <tr>
-                                <td colSpan="8" className="text-center p-8 text-gray-500">
-                                    No hay facturas en esta categoría
-                                </td>
-                            </tr>
-                        ) : (
-                            filteredInvoices.map(invoice => {
-                                const daysOverdue = getDaysOverdue(invoice.due_date);
-                                const balancePending = invoice.balance_pending || invoice.total_amount;
+                        </thead>
+                        <tbody className="divide-y">
+                            {loading ? (
+                                <tr>
+                                    <td colSpan="8" className="text-center p-8 text-gray-500">
+                                        Cargando facturas...
+                                    </td>
+                                </tr>
+                            ) : filteredInvoices.length === 0 ? (
+                                <tr>
+                                    <td colSpan="8" className="text-center p-8 text-gray-500">
+                                        No hay facturas en esta categoría
+                                    </td>
+                                </tr>
+                            ) : (
+                                filteredInvoices.map(invoice => {
+                                    const daysOverdue = getDaysOverdue(invoice.due_date);
+                                    const balancePending = invoice.balance_pending || invoice.total_amount;
 
-                                return (
-                                    <tr key={invoice.id} className="hover:bg-gray-50">
-                                        <td className="p-4">
-                                            <div>
-                                                <p className="font-semibold text-gray-800">
-                                                    {invoice.customer?.name || 'Cliente General'}
-                                                </p>
-                                                <p className="text-xs text-gray-500">
-                                                    {invoice.customer?.id_number || 'Sin ID'}
-                                                </p>
-                                            </div>
-                                        </td>
-                                        <td className="p-4 font-medium">#{invoice.id}</td>
-                                        <td className="p-4">
-                                            {new Date(invoice.date).toLocaleDateString('es-ES')}
-                                        </td>
-                                        <td className="p-4">
-                                            {invoice.due_date
-                                                ? new Date(invoice.due_date).toLocaleDateString('es-ES')
-                                                : 'Sin fecha'
-                                            }
-                                        </td>
-                                        <td className="p-4 text-right font-semibold">
-                                            ${Number(invoice.total_amount).toFixed(2)}
-                                        </td>
-                                        <td className="p-4 text-right">
-                                            <span className={`font-bold ${invoice.paid ? 'text-green-600' : 'text-red-600'
-                                                }`}>
-                                                ${Number(balancePending).toFixed(2)}
-                                            </span>
-                                        </td>
-                                        <td className="p-4 text-center">
-                                            {daysOverdue > 0 ? (
-                                                <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm font-bold">
-                                                    +{daysOverdue} días
+                                    return (
+                                        <tr key={invoice.id} className="hover:bg-gray-50">
+                                            <td className="p-4">
+                                                <div>
+                                                    <p className="font-semibold text-gray-800">
+                                                        {invoice.customer?.name || 'Cliente General'}
+                                                    </p>
+                                                    <p className="text-xs text-gray-500">
+                                                        {invoice.customer?.id_number || 'Sin ID'}
+                                                    </p>
+                                                </div>
+                                            </td>
+                                            <td className="p-4 font-medium">#{invoice.id}</td>
+                                            <td className="p-4">
+                                                {new Date(invoice.date).toLocaleDateString('es-ES')}
+                                            </td>
+                                            <td className="p-4">
+                                                {invoice.due_date
+                                                    ? new Date(invoice.due_date).toLocaleDateString('es-ES')
+                                                    : 'Sin fecha'
+                                                }
+                                            </td>
+                                            <td className="p-4 text-right font-semibold">
+                                                ${Number(invoice.total_amount).toFixed(2)}
+                                            </td>
+                                            <td className="p-4 text-right">
+                                                <span className={`font-bold ${invoice.paid ? 'text-green-600' : 'text-red-600'
+                                                    }`}>
+                                                    ${Number(balancePending).toFixed(2)}
                                                 </span>
-                                            ) : invoice.paid ? (
-                                                <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm">
-                                                    Pagada
-                                                </span>
-                                            ) : (
-                                                <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
-                                                    Al día
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td className="p-4 text-center">
-                                            <div className="flex items-center justify-center gap-2">
-                                                {/* NEW: View Detail Button */}
-                                                <button
-                                                    onClick={() => handleViewDetail(invoice)}
-                                                    className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
-                                                    title="Ver detalle de factura"
-                                                >
-                                                    <Eye size={16} />
-                                                    Ver Detalle
-                                                </button>
-                                                {!invoice.paid && (
+                                            </td>
+                                            <td className="p-4 text-center">
+                                                {daysOverdue > 0 ? (
+                                                    <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm font-bold">
+                                                        +{daysOverdue} días
+                                                    </span>
+                                                ) : invoice.paid ? (
+                                                    <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm">
+                                                        Pagada
+                                                    </span>
+                                                ) : (
+                                                    <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
+                                                        Al día
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="p-4 text-center">
+                                                <div className="flex items-center justify-center gap-2">
                                                     <button
-                                                        onClick={() => handleRegisterPayment(invoice)}
-                                                        className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+                                                        onClick={() => handleViewDetail(invoice)}
+                                                        className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+                                                        title="Ver detalle de factura"
                                                     >
-                                                        <DollarSign size={16} />
-                                                        Registrar Abono
+                                                        <Eye size={16} />
+                                                        Ver Detalle
                                                     </button>
+                                                    {!invoice.paid && (
+                                                        <button
+                                                            onClick={() => handleRegisterPayment(invoice)}
+                                                            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+                                                        >
+                                                            <DollarSign size={16} />
+                                                            Registrar Abono
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 gap-6 animate-fade-in-up">
+                    {clientsArray.length === 0 ? (
+                        <div className="text-center py-12 bg-white rounded-xl shadow-sm">
+                            <Users className="mx-auto text-gray-300 mb-3" size={48} />
+                            <p className="text-gray-500 font-medium">No hay clientes con facturas en este estado.</p>
+                        </div>
+                    ) : (
+                        clientsArray.map(client => {
+                            const clientKey = `${client.id}_${client.name}`;
+                            const isExpanded = expandedClients[clientKey];
+
+                            return (
+                                <div key={clientKey} className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100">
+                                    <div
+                                        className="p-6 cursor-pointer hover:bg-gray-50 transition-colors flex flex-col md:flex-row justify-between items-center gap-4"
+                                        onClick={() => toggleClientExpand(clientKey)}
+                                    >
+                                        <div className="flex items-center gap-4 w-full md:w-auto">
+                                            <div className="bg-blue-100 p-3 rounded-full text-blue-600 hidden md:block">
+                                                <Users size={24} />
+                                            </div>
+                                            <div>
+                                                <h3 className="text-xl font-bold text-gray-800">{client.name}</h3>
+                                                <p className="text-sm text-gray-500">{client.id_number}</p>
+                                                {client.overdue_count > 0 && (
+                                                    <span className="inline-flex items-center gap-1 text-xs font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded mt-1">
+                                                        <AlertCircle size={10} /> {client.overdue_count} facturas vencidas
+                                                    </span>
                                                 )}
                                             </div>
-                                        </td>
-                                    </tr>
-                                );
-                            })
-                        )}
-                    </tbody>
-                </table>
-            </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-8 w-full md:w-auto justify-between md:justify-end">
+                                            <div className="text-right">
+                                                <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">Deuda Total</p>
+                                                <p className="text-2xl font-black text-gray-800">${client.total_debt.toLocaleString('es-ES', { minimumFractionDigits: 2 })}</p>
+                                                <p className="text-sm text-gray-400">{client.invoices_count} facturas</p>
+                                            </div>
+                                            <div className="text-gray-400">
+                                                {isExpanded ? <ChevronDown size={24} /> : <ChevronRight size={24} />}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {isExpanded && (
+                                        <div className="border-t bg-gray-50 p-4 animate-fade-in-down">
+                                            <table className="w-full text-sm">
+                                                <thead>
+                                                    <tr className="text-gray-500 border-b">
+                                                        <th className="text-left py-2 font-medium">Factura #</th>
+                                                        <th className="text-left py-2 font-medium">Vencimiento</th>
+                                                        <th className="text-right py-2 font-medium">Saldo</th>
+                                                        <th className="text-center py-2 font-medium">Estado</th>
+                                                        <th className="text-right py-2 font-medium">Acción</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y">
+                                                    {client.invoices.map(inv => {
+                                                        const bal = Number(inv.balance_pending || inv.total_amount);
+                                                        const isOd = inv.due_date && new Date(inv.due_date) < new Date() && !inv.paid;
+
+                                                        return (
+                                                            <tr key={inv.id} className="bg-white">
+                                                                <td className="py-3 font-medium">#{inv.id}</td>
+                                                                <td className="py-3 text-gray-600">{new Date(inv.due_date).toLocaleDateString()}</td>
+                                                                <td className="py-3 text-right font-bold text-gray-800">${bal.toFixed(2)}</td>
+                                                                <td className="py-3 text-center">
+                                                                    {inv.paid ? (
+                                                                        <span className="text-green-600 font-bold text-xs">PAGADO</span>
+                                                                    ) : isOd ? (
+                                                                        <span className="text-red-600 font-bold text-xs bg-red-50 px-2 py-1 rounded">VENCIDO</span>
+                                                                    ) : (
+                                                                        <span className="text-blue-600 font-bold text-xs">PENDIENTE</span>
+                                                                    )}
+                                                                </td>
+                                                                <td className="py-3 text-right">
+                                                                    <div className="flex justify-end gap-2">
+                                                                        <button
+                                                                            onClick={(e) => { e.stopPropagation(); handleViewDetail(inv); }}
+                                                                            className="text-gray-400 hover:text-blue-600 p-1"
+                                                                            title="Ver Detalle"
+                                                                        >
+                                                                            <Eye size={16} />
+                                                                        </button>
+                                                                        {!inv.paid && (
+                                                                            <button
+                                                                                onClick={(e) => { e.stopPropagation(); handleRegisterPayment(inv); }}
+                                                                                className="text-green-600 hover:text-green-800 text-xs font-bold border border-green-200 hover:border-green-600 px-2 py-1 rounded transition-colors"
+                                                                            >
+                                                                                Abonar
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })
+                    )}
+                </div>
+            )}
 
             {/* Payment Modal */}
             {showPaymentModal && selectedInvoice && (
