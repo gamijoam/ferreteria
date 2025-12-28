@@ -74,12 +74,16 @@ def get_dashboard_financials(
         # Safety check: total_collected usually isn't None but SQL sum can be
         if total_collected is None:
             total_collected = Decimal("0.00")
+        else:
+            total_collected = Decimal(str(total_collected))
             
         # Subtract returns for this currency
         refunds = returns_map.get(currency or "USD", Decimal("0.00"))
         # Ensure refunds is Decimal (just in case)
         if refunds is None: 
             refunds = Decimal("0.00")
+        else:
+            refunds = Decimal(str(refunds))
             
         net_collected = total_collected - refunds
         
@@ -528,9 +532,10 @@ def get_inventory_valuation(exchange_rate: float = 1.0, db: Session = Depends(ge
     total_stock_units = Decimal("0.00")
     
     for p in products:
-        stock = p.stock or Decimal("0")
-        cost = p.cost_price or Decimal("0")
-        price = p.price or Decimal("0")
+        # Safety check for None and force Decimal conversion
+        stock = Decimal(str(p.stock)) if p.stock is not None else Decimal("0")
+        cost = Decimal(str(p.cost_price)) if p.cost_price is not None else Decimal("0")
+        price = Decimal(str(p.price)) if p.price is not None else Decimal("0")
         
         # Only count positive stock
         if stock > 0:

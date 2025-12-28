@@ -20,7 +20,8 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Add cost_price column to product_units table."""
-    op.add_column('product_units', sa.Column('cost_price', sa.Numeric(precision=14, scale=4), nullable=True))
+    # Safe add column
+    op.execute("ALTER TABLE product_units ADD COLUMN IF NOT EXISTS cost_price NUMERIC(14, 4)")
 
 
 def downgrade() -> None:

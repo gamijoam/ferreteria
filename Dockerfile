@@ -37,6 +37,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy backend code
 # Only copying the necessary package structure
 COPY ferreteria_refactor /app/ferreteria_refactor
+COPY ferreteria_refactor/alembic.ini /app/ferreteria_refactor/alembic.ini
 
 # Copy built frontend from Stage 1 to /app/static
 COPY --from=frontend-build /app/frontend/dist /app/static

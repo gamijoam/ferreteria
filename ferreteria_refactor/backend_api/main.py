@@ -85,9 +85,15 @@ def run_migrations():
     from alembic.config import Config
     try:
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        # Robust path for Docker: /app/ferreteria_refactor/alembic.ini
         alembic_ini_path = os.path.join(base_dir, "alembic.ini")
+        if not os.path.exists(alembic_ini_path):
+             # Fallback: check current directory
+             alembic_ini_path = "alembic.ini"
+             
         if os.path.exists(alembic_ini_path):
             alembic_cfg = Config(alembic_ini_path)
+            # Ensure script location is correct relative to ini
             alembic_cfg.set_main_option("script_location", os.path.join(base_dir, "alembic"))
             command.upgrade(alembic_cfg, "head")
             print("✅ Migraciones aplicadas correctamente.")

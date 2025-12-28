@@ -15,7 +15,7 @@ class ProductBase(BaseModel):
     price: Decimal = Field(..., description="Precio de venta al público en USD", gt=0, example="45.99")
     price_mayor_1: Optional[Decimal] = Field(Decimal("0.00"), description="Precio mayorista nivel 1", example="42.00")
     price_mayor_2: Optional[Decimal] = Field(Decimal("0.00"), description="Precio mayorista nivel 2", example="40.00")
-    stock: Decimal = Field(..., description="Cantidad actual en inventario físico", example="10.000")
+    stock: Optional[Decimal] = Field(Decimal("0.000"), description="Cantidad actual en inventario físico", example="10.000")
     description: Optional[str] = Field(None, description="Descripción detallada del producto", example="Incluye maletín y brocas")
     cost_price: Optional[Decimal] = Field(Decimal("0.0000"), description="Costo de adquisición en USD", example="25.0000")
     

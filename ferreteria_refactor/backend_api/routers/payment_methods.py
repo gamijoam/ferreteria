@@ -29,6 +29,7 @@ class PaymentMethodResponse(PaymentMethodBase):
         from_attributes = True
 
 @router.get("/", response_model=List[PaymentMethodResponse])
+@router.get("", response_model=List[PaymentMethodResponse], include_in_schema=False)
 def get_payment_methods(db: Session = Depends(get_db)):
     """Get all payment methods"""
     return db.query(models.PaymentMethod).all()
