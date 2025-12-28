@@ -180,7 +180,10 @@ export const CartProvider = ({ children }) => {
                     is_discount_active: unit.is_discount_active || false,
                     // Redesign Data
                     sku: product.sku || '',
-                    stock: product.stock || 0
+                    stock: product.stock || 0,
+                    // Image fields for thumbnails
+                    image_url: product.image_url || null,
+                    updated_at: product.updated_at || null
                 };
 
                 console.log('   newItem created:', newItem);
