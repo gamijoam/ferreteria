@@ -125,6 +125,111 @@ Stock nuevo:    761.5 KG ✅
 
 ---
 
+## ☕ CASO 1.5: La Cafetería (Café por Gramos)
+
+### El Problema Real
+
+Compras café en **sacos de 1 kilo**, pero tus clientes piden:
+- Cafeterías: Kilos completos
+- Particulares: 250g, 500g, 750g
+- Tiendas pequeñas: Gramos sueltos
+
+**Pregunta clave**: ¿Configuro el sistema en GRAMOS o en KILOS?
+
+### ✅ Opción Recomendada: Base en KILOS
+
+**Por qué**: Es más fácil de leer y los proveedores venden por kilos.
+
+#### Paso 1: Define la Unidad Base
+
+```
+Producto: Café Arábica Premium
+├─ Unidad Base: KILOGRAMO
+├─ Stock Actual: 850 kilos
+└─ Precio Base: $15.00 USD/kilo
+```
+
+#### Paso 2: Crea la Presentación "Gramo" (FRACCIÓN)
+
+En el sistema:
+
+1. Ve a la pestaña **"Presentaciones"**
+2. Presiona **"+ Agregar Unidad"** → Selecciona **"Fracción ✂️"**
+3. Completa:
+
+| Campo | Valor | Explicación |
+|-------|-------|-------------|
+| Nombre | Gramo | Unidad de venta al menudeo |
+| Pregunta | ¿Cuántos Gramos hay en 1 KILOGRAMO? | Nueva interfaz clara |
+| Respuesta | 1000 | 1 kilo = 1000 gramos |
+| **Preview Automático** | **💰 $0.015** | El sistema lo muestra en grande |
+| Cálculo mostrado | $15.00 ÷ 1000 = $0.015 | Transparente |
+
+**Resultado**: Cuando vendas 250 Gramos, el sistema descontará **0.25 KG** del inventario.
+
+#### Paso 3: Ejemplo de Venta
+
+**Cliente pide: 250 gramos de café**
+
+```
+En el POS:
+1. Busca "Café Arábica"
+2. Aparecen 2 opciones:
+   - Café Arábica - KILOGRAMO ($15.00)
+   - Café Arábica - Gramo ($0.015)
+3. Selecciona "Gramo"
+4. Cambia cantidad a 250
+5. Total: $3.75
+6. Stock descuenta: 0.25 kilos
+```
+
+### Tabla de Conversión Automática
+
+| Venta | Descuento en Inventario (KG) | Precio USD |
+|-------|------------------------------|------------|
+| 1 Kilo | -1 KG | $15.00 |
+| 500 Gramos | -0.5 KG | $7.50 |
+| 250 Gramos | -0.25 KG | $3.75 |
+| 100 Gramos | -0.1 KG | $1.50 |
+
+### 🔄 Opción Alternativa: Base en GRAMOS
+
+**Solo si vendes PRINCIPALMENTE por gramos y rara vez por kilos.**
+
+#### Configuración:
+
+```
+Producto: Café Arábica Premium
+├─ Unidad Base: GRAMO
+├─ Stock Actual: 850,000 gramos
+└─ Precio Base: $0.015 USD/gramo
+```
+
+#### Presentación "Kilo" (EMPAQUE):
+
+| Campo | Valor |
+|-------|-------|
+| Nombre | Kilo de Café |
+| Tipo | EMPAQUE 📦 |
+| ¿Cuántos GRAMOS contiene? | 1000 |
+| Preview Automático | 💰 $15.00 |
+
+**Ventaja**: Números más precisos para ventas pequeñas.
+**Desventaja**: Stock se muestra como 850,000 (menos legible).
+
+### 🎯 Comparación: ¿Cuál Elegir?
+
+| Criterio | Base: KILO ✅ | Base: GRAMO |
+|----------|--------------|-------------|
+| **Legibilidad** | Stock: 850 | Stock: 850,000 |
+| **Proveedores** | Venden por kilos | Venden por kilos |
+| **Ventas comunes** | 250g, 500g, 1kg | 250g, 500g, 1kg |
+| **Recomendado para** | Mayoría de casos | Venta ultra-precisa |
+
+> **💡 Recomendación**: Usa **KILO como base** a menos que vendas exclusivamente gramos sueltos (ej: tienda de especias a granel).
+
+---
+
 ## 🥚 CASO 2: El Bodegón (Los Huevos)
 
 ### El Problema Real
@@ -327,14 +432,42 @@ No te dejará completar la venta.
 **Pregúntate**:
 - ¿Cuál es la unidad más pequeña que vendo?
 - ¿Cuál es la unidad en la que cuento mi stock físicamente?
+- ¿Qué unidad usa mi proveedor?
 
 **Ejemplos**:
 - Tornillos → UNIDAD (cuentas tornillos)
 - Cemento → KILOGRAMO (pesas kilos)
 - Cable → METRO (mides metros)
 - Pintura → LITRO (mides litros)
+- **Café → KILOGRAMO** (aunque vendas por gramos, el stock se cuenta en kilos)
 
-### 6. ¿Puedo vender en negativo (bajo pedido)?
+**Regla de Oro**: Usa la unidad que hace los números más legibles. Stock de 850 es mejor que 850,000.
+
+### 6. ¿El sistema me muestra el precio calculado antes de guardar?
+
+**¡Sí!** Con las nuevas mejoras de UX (Diciembre 2024):
+
+Cuando creas una presentación, verás un **cuadro azul grande** que muestra:
+
+```
+💰 Precio Calculado Automáticamente: $0.015
+Cálculo: $15.00 ÷ 1000 = $0.015
+```
+
+Esto te permite verificar que el precio es correcto ANTES de guardar.
+
+### 7. ¿Qué significa "¿Cuántos Gramos hay en 1 KILOGRAMO?"?
+
+Esta es la **nueva pregunta clara** del sistema (antes decía "Divisor").
+
+**Cómo responder**:
+- Si 1 kilo = 1000 gramos → Escribe **1000**
+- Si 1 metro = 100 centímetros → Escribe **100**
+- Si 1 litro = 1000 mililitros → Escribe **1000**
+
+El sistema automáticamente calculará el factor de conversión (0.001, 0.01, etc.).
+
+### 8. ¿Puedo vender en negativo (bajo pedido)?
 
 **R**: Depende de la configuración del sistema. Por defecto, no. Pero el administrador puede habilitar "Ventas en Negativo" para productos bajo pedido.
 
@@ -353,22 +486,30 @@ No te dejará completar la venta.
 
 ### ✅ DO (Haz esto)
 
-1. **Define la Unidad Base pensando en el stock físico**
-   - Si cuentas kilos, usa KG
+1. **Define la Unidad Base pensando en legibilidad**
+   - Si cuentas kilos, usa KG (no gramos)
    - Si cuentas unidades, usa UNIDAD
+   - Evita números gigantes (850 es mejor que 850,000)
 
 2. **Usa nombres descriptivos para presentaciones**
    - ✅ "Caja Master 360 Huevos"
+   - ✅ "Gramo (para café)"
    - ❌ "Caja Grande"
+   - ❌ "Unidad 2"
 
-3. **Asigna códigos de barras a cada presentación**
+3. **Verifica el preview de precio antes de guardar**
+   - El sistema muestra 💰 Precio Calculado Automáticamente
+   - Si el precio no tiene sentido, revisa el factor
+
+4. **Asigna códigos de barras a cada presentación**
    - Acelera el proceso de venta
    - Reduce errores humanos
 
-4. **Revisa los precios calculados automáticamente**
-   - El sistema los calcula, pero verifica que tengan sentido comercial
+5. **Lee el mensaje de feedback**
+   - El sistema te muestra un ejemplo de cómo se descontará el stock
+   - Ejemplo: "Al vender 250 gramos, se descontarán 0.250 KILOGRAMO"
 
-5. **Usa tasas diferenciadas solo cuando sea necesario**
+6. **Usa tasas diferenciadas solo cuando sea necesario**
    - Para importaciones con costos en tasa paralela
    - Para productos con márgenes especiales
 
@@ -454,5 +595,6 @@ Precio mostrado: Bs 500 ❌ (debería ser Bs 450)
 
 ---
 
-**Última actualización**: Diciembre 2024  
-**Versión del documento**: 1.0
+**Última actualización**: Diciembre 2024 (v1.1 - Mejoras de UX)  
+**Versión del documento**: 1.1  
+**Cambios en v1.1**: Agregado caso de café, nuevas preguntas del FAQ, documentación de mejoras de interfaz

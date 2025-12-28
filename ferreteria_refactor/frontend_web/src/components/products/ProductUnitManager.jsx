@@ -151,9 +151,11 @@ const ProductUnitManager = ({ units, onUnitsChange, baseUnitType, basePrice, bas
     const feedbackMessage = useMemo(() => {
         const val = parseFloat(newUnit.user_input) || 0;
         if (newUnit.type === 'packing') {
-            return `Entendido: Al vender 1 ${newUnit.unit_name || '[Nueva Unidad]'}, se descontarán ${val} ${baseUnitType} del inventario.`;
+            return `✅ Perfecto: 1 ${newUnit.unit_name || '[Unidad]'} contiene ${val} ${baseUnitType}. Al venderla, se descontarán ${val} ${baseUnitType} del inventario.`;
         } else {
-            return `Entendido: 1 ${newUnit.unit_name || '[Nueva Unidad]'} equivale a una fracción 1/${val} de ${baseUnitType}.`;
+            const exampleQty = Math.round(val / 4); // Example: 1/4 of the divisor
+            const exampleDeduction = (exampleQty / val).toFixed(3);
+            return `✅ Perfecto: Hay ${val} ${newUnit.unit_name || '[Unidades]'} en 1 ${baseUnitType}. Ejemplo: Al vender ${exampleQty} ${newUnit.unit_name || '[unidades]'}, se descontarán ${exampleDeduction} ${baseUnitType} del inventario.`;
         }
     }, [newUnit.user_input, newUnit.type, newUnit.unit_name, baseUnitType]);
 
@@ -215,21 +217,26 @@ const ProductUnitManager = ({ units, onUnitsChange, baseUnitType, basePrice, bas
 
                                 <div className="grid grid-cols-2 gap-6">
                                     <div>
-                                        <label className="block text-sm font-bold text-gray-700 mb-1">
-                                            {newUnit.type === 'packing' ? `Cantidad (${baseUnitType})` : `Divisor (1/${baseUnitType})`}
+                                        <label className="block text-sm font-bold text-gray-700 mb-2">
+                                            {newUnit.type === 'packing'
+                                                ? `¿Cuántos ${baseUnitType} contiene?`
+                                                : `¿Cuántos ${newUnit.unit_name || '[unidades]'} hay en 1 ${baseUnitType}?`
+                                            }
                                         </label>
                                         <input
                                             type="number"
+                                            step="any"
                                             className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono font-bold text-lg"
+                                            placeholder={newUnit.type === 'packing' ? 'Ej: 12, 50, 100' : 'Ej: 1000 (gramos en 1 kilo)'}
                                             value={newUnit.user_input}
                                             onChange={e => setNewUnit({ ...newUnit, user_input: e.target.value })}
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-bold text-gray-700 mb-1">Código de Barras</label>
+                                        <label className="block text-sm font-bold text-gray-700 mb-2">Código de Barras (Opcional)</label>
                                         <input
                                             className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                                            placeholder="SCAN..."
+                                            placeholder="Escanea o escribe..."
                                             value={newUnit.barcode}
                                             onChange={e => setNewUnit({ ...newUnit, barcode: e.target.value })}
                                         />
@@ -242,11 +249,24 @@ const ProductUnitManager = ({ units, onUnitsChange, baseUnitType, basePrice, bas
                                 </div>
                             </div>
 
-                            {/* Cost Display */}
-                            {newUnit.cost_price > 0 && (
-                                <div className="p-4 border border-gray-200 rounded-xl bg-gray-50 flex justify-between items-center">
-                                    <span className="text-sm font-semibold text-gray-600">Costo Base Calculado:</span>
-                                    <span className="text-xl font-bold text-gray-800">${parseFloat(newUnit.cost_price).toFixed(2)}</span>
+                            {/* Cost & Price Preview */}
+                            {newUnit.user_input > 0 && basePrice && (
+                                <div className="p-5 border-2 border-blue-200 rounded-xl bg-blue-50 space-y-3">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-sm font-semibold text-blue-700">💰 Precio Calculado Automáticamente:</span>
+                                        <span className="text-3xl font-black text-blue-900">
+                                            ${newUnit.type === 'packing'
+                                                ? (parseFloat(basePrice) * parseFloat(newUnit.user_input)).toFixed(2)
+                                                : (parseFloat(basePrice) / parseFloat(newUnit.user_input)).toFixed(4)
+                                            }
+                                        </span>
+                                    </div>
+                                    <div className="text-xs text-blue-600 bg-white/50 p-2 rounded">
+                                        {newUnit.type === 'packing'
+                                            ? `Cálculo: $${basePrice} × ${newUnit.user_input} = $${(parseFloat(basePrice) * parseFloat(newUnit.user_input)).toFixed(2)}`
+                                            : `Cálculo: $${basePrice} ÷ ${newUnit.user_input} = $${(parseFloat(basePrice) / parseFloat(newUnit.user_input)).toFixed(4)}`
+                                        }
+                                    </div>
                                 </div>
                             )}
 
