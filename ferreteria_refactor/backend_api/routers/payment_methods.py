@@ -35,6 +35,7 @@ def get_payment_methods(db: Session = Depends(get_db)):
     return db.query(models.PaymentMethod).all()
 
 @router.post("/", response_model=PaymentMethodResponse)
+@router.post("", response_model=PaymentMethodResponse, include_in_schema=False)
 def create_payment_method(method: PaymentMethodCreate, db: Session = Depends(get_db)):
     """Create a new payment method"""
     existing = db.query(models.PaymentMethod).filter(models.PaymentMethod.name == method.name).first()

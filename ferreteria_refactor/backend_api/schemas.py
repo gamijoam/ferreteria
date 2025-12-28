@@ -564,9 +564,9 @@ class SupplierCreate(SupplierBase):
 
 class SupplierRead(SupplierBase):
     id: int
-    is_active: bool
-    created_at: datetime
-    current_balance: Decimal = Decimal("0.00")
+    is_active: Optional[bool] = True
+    created_at: Optional[datetime] = None
+    current_balance: Optional[Decimal] = Decimal("0.00")
     
     class Config:
         from_attributes = True

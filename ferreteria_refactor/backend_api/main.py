@@ -79,6 +79,20 @@ app.include_router(system, prefix="/api/v1", tags=["Sistema y Licencias"])
 app.include_router(payment_methods.router, prefix="/api/v1", tags=["Métodos de Pago"])
 app.include_router(hardware_bridge_router, prefix="/api/v1", tags=["Hardware Bridge"])
 
+# DEBUG ENDPOINT - Remove after debugging
+@app.get("/api/v1/debug/routes")
+def list_routes():
+    """List all registered routes for debugging"""
+    routes = []
+    for route in app.routes:
+        if hasattr(route, 'methods') and hasattr(route, 'path'):
+            routes.append({
+                "path": route.path,
+                "methods": list(route.methods),
+                "name": route.name
+            })
+    return {"total": len(routes), "routes": routes}
+
 # --- LÓGICA DE INICIALIZACIÓN ---
 def run_migrations():
     from alembic import command

@@ -688,7 +688,7 @@ async def upload_product_image(
     
     # 4. Update database
     product.image_url = f"/images/products/{image_filename}"
-    # updated_at is auto-updated by SQLAlchemy onupdate
+    product.updated_at = datetime.now() # Force update to bust cache
     db.commit()
     
     return {

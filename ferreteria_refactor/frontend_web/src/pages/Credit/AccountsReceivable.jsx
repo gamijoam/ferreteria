@@ -43,29 +43,17 @@ const AccountsReceivable = () => {
     const fetchInvoices = async () => {
         setLoading(true);
         try {
-            // Get all credit sales
-            const response = await apiClient.get('/returns/sales/search', {
-                params: { limit: 200 }
-            });
+            // Get pending credit sales (invoices) from dedicated endpoint
+            const response = await apiClient.get('/reports/credits/pending');
 
-            console.log('📊 Total sales fetched:', response.data.length);
-            console.log('📊 Sample sale:', response.data[0]);
+            console.log('📊 Credit sales fetched:', response.data.length);
 
-            // Filter only credit sales with customer info
-            const creditSales = response.data.filter(sale => {
-                const isCredit = sale.is_credit && sale.customer_id;
-                if (isCredit) {
-                    console.log('✅ Credit sale found:', sale.id, sale.customer?.name,
-                        'Paid:', sale.paid,
-                        'Balance:', sale.balance_pending);
-                }
-                return isCredit;
-            });
-
-            console.log('💳 Total credit sales:', creditSales.length);
-            setInvoices(creditSales);
+            // No need to filter client-side, backend does it
+            setInvoices(response.data);
         } catch (error) {
             console.error('Error fetching invoices:', error);
+            // Show error to user if strictly failure
+            alert('Error al cargar cuentas por cobrar');
         } finally {
             setLoading(false);
         }
