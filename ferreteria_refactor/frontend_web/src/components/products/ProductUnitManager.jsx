@@ -1,9 +1,10 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Layers, Plus, Trash2, Package, Divide, Info, DollarSign, TrendingUp, Tag } from 'lucide-react';
+import { Layers, Plus, Trash2, Package, Divide, Info, DollarSign, TrendingUp, Tag, Edit2 } from 'lucide-react';
 
 const ProductUnitManager = ({ units, onUnitsChange, baseUnitType, basePrice, baseCost, exchangeRates, productExchangeRateId }) => {
     const [isWizardOpen, setIsWizardOpen] = useState(false);
     const [wizardStep, setWizardStep] = useState(1); // 1: Type, 2: Details & Pricing
+    const [editingUnitId, setEditingUnitId] = useState(null); // Track which unit is being edited
 
     // Wizard State
     const [newUnit, setNewUnit] = useState({
@@ -117,10 +118,30 @@ const ProductUnitManager = ({ units, onUnitsChange, baseUnitType, basePrice, bas
         });
         setWizardStep(1);
         setIsWizardOpen(false);
+        setEditingUnitId(null);
         setCalculatedPrice(null);
         setCalculatedMargin(null);
         setFinalPriceWithDiscount(null);
         setSavingsVsUnit(null);
+    };
+
+    const handleEditUnit = (unit) => {
+        // Load unit data into wizard
+        setNewUnit({
+            unit_name: unit.unit_name,
+            type: unit.type,
+            user_input: unit.user_input,
+            barcode: unit.barcode || '',
+            cost_price: unit.cost_price || 0,
+            profit_margin: unit.profit_margin || '',
+            price_usd: unit.price_usd || '',
+            discount_percentage: unit.discount_percentage || 0,
+            is_discount_active: unit.is_discount_active || false,
+            exchange_rate_id: unit.exchange_rate_id || ''
+        });
+        setEditingUnitId(unit.id);
+        setWizardStep(2); // Skip type selection
+        setIsWizardOpen(true);
     };
 
     const handleAddUnit = () => {
@@ -129,8 +150,7 @@ const ProductUnitManager = ({ units, onUnitsChange, baseUnitType, basePrice, bas
             finalFactor = finalFactor !== 0 ? 1 / finalFactor : 0;
         }
 
-        const unitToAdd = {
-            id: Date.now(),
+        const unitData = {
             unit_name: newUnit.unit_name,
             user_input: parseFloat(newUnit.user_input),
             conversion_factor: finalFactor,
@@ -144,7 +164,21 @@ const ProductUnitManager = ({ units, onUnitsChange, baseUnitType, basePrice, bas
             exchange_rate_id: newUnit.exchange_rate_id ? parseInt(newUnit.exchange_rate_id) : null
         };
 
-        onUnitsChange([...units, unitToAdd]);
+        if (editingUnitId) {
+            // Update existing unit
+            const updatedUnits = units.map(u =>
+                u.id === editingUnitId ? { ...unitData, id: editingUnitId } : u
+            );
+            onUnitsChange(updatedUnits);
+        } else {
+            // Add new unit
+            const unitToAdd = {
+                ...unitData,
+                id: Date.now()
+            };
+            onUnitsChange([...units, unitToAdd]);
+        }
+
         resetWizard();
     };
 
@@ -164,13 +198,15 @@ const ProductUnitManager = ({ units, onUnitsChange, baseUnitType, basePrice, bas
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-fade-in-up flex flex-col">
                 <div className="bg-white border-b p-6 sticky top-0 z-10">
                     <h3 className="text-xl font-bold flex items-center text-gray-800">
-                        <Layers className="mr-2 text-blue-600" /> Agregar Nueva Presentación
+                        <Layers className="mr-2 text-blue-600" /> {editingUnitId ? 'Editar Presentación' : 'Agregar Nueva Presentación'}
                     </h3>
-                    <p className="text-gray-500 text-sm mt-1">Paso {wizardStep} de 2: {wizardStep === 1 ? 'Tipo de Unidad' : 'Detalles y Precios'}</p>
+                    <p className="text-gray-500 text-sm mt-1">
+                        {editingUnitId ? 'Modifica los datos de la presentación' : `Paso ${wizardStep} de 2: ${wizardStep === 1 ? 'Tipo de Unidad' : 'Detalles y Precios'}`}
+                    </p>
                 </div>
 
                 <div className="p-8 flex-1 overflow-y-auto">
-                    {wizardStep === 1 ? (
+                    {wizardStep === 1 && !editingUnitId ? (
                         <div className="space-y-4">
                             <p className="text-gray-600 mb-4 font-medium">¿Qué tipo de unidad deseas agregar?</p>
 
@@ -315,6 +351,35 @@ const ProductUnitManager = ({ units, onUnitsChange, baseUnitType, basePrice, bas
                                 )}
                             </div>
 
+                            {/* Exchange Rate Section */}
+                            <div className="border border-purple-200 rounded-xl p-6 bg-purple-50/30">
+                                <h4 className="text-sm font-bold text-purple-700 uppercase tracking-wider mb-4 border-b border-purple-200 pb-2 flex items-center">
+                                    💱 Tasa de Cambio Específica
+                                </h4>
+                                <div className="space-y-3">
+                                    <p className="text-xs text-purple-600 bg-white/70 p-2 rounded">
+                                        Por defecto, esta presentación hereda la tasa del producto. Solo cambia esto si necesitas una tasa diferente (ej: importaciones).
+                                    </p>
+                                    <select
+                                        value={newUnit.exchange_rate_id || ''}
+                                        onChange={(e) => setNewUnit({ ...newUnit, exchange_rate_id: e.target.value })}
+                                        className="w-full border-purple-300 rounded-lg shadow-sm focus:border-purple-500 focus:ring-purple-500 py-2"
+                                    >
+                                        <option value="">🔗 Heredar del Producto</option>
+                                        {exchangeRates && exchangeRates.filter(r => r.is_active).map(rate => (
+                                            <option key={rate.id} value={rate.id}>
+                                                {rate.name} ({rate.currency_code}) - {rate.rate} {rate.is_default ? '⭐ Default' : ''}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {newUnit.exchange_rate_id && (
+                                        <div className="bg-purple-100 text-purple-800 p-2 rounded text-xs font-semibold flex items-center gap-2">
+                                            ⚠️ Esta presentación usará una tasa diferente al producto base
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
                             {/* Discount Toggle */}
                             <div className="border border-gray-200 rounded-xl p-4">
                                 <label className="flex items-center justify-between cursor-pointer">
@@ -371,17 +436,17 @@ const ProductUnitManager = ({ units, onUnitsChange, baseUnitType, basePrice, bas
                 </div>
 
                 <div className="bg-gray-50 p-6 flex justify-end gap-3 border-t sticky bottom-0">
-                    {wizardStep === 2 && (
+                    {wizardStep === 2 && !editingUnitId && (
                         <button onClick={() => setWizardStep(1)} className="px-5 py-2 text-gray-600 hover:bg-gray-200 rounded-lg font-medium transition-colors">Atrás</button>
                     )}
                     <button onClick={resetWizard} className="px-5 py-2 text-red-600 hover:bg-red-50 rounded-lg font-medium transition-colors">Cancelar</button>
-                    {wizardStep === 2 && (
+                    {(wizardStep === 2 || editingUnitId) && (
                         <button
                             disabled={!newUnit.unit_name || !newUnit.user_input || !newUnit.price_usd}
                             onClick={handleAddUnit}
                             className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-lg transition-all transform active:scale-95 disabled:opacity-50 disabled:scale-100"
                         >
-                            Guardar Unidad
+                            {editingUnitId ? 'Actualizar Unidad' : 'Guardar Unidad'}
                         </button>
                     )}
                 </div>
@@ -426,12 +491,22 @@ const ProductUnitManager = ({ units, onUnitsChange, baseUnitType, basePrice, bas
                                         </span>
                                     </div>
                                 </div>
-                                <button
-                                    onClick={() => onUnitsChange(units.filter(u => u.id !== unit.id))}
-                                    className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                                >
-                                    <Trash2 size={18} />
-                                </button>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => handleEditUnit(unit)}
+                                        className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                        title="Editar"
+                                    >
+                                        <Edit2 size={18} />
+                                    </button>
+                                    <button
+                                        onClick={() => onUnitsChange(units.filter(u => u.id !== unit.id))}
+                                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                        title="Eliminar"
+                                    >
+                                        <Trash2 size={18} />
+                                    </button>
+                                </div>
                             </div>
 
                             <div className="space-y-2 text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
@@ -451,6 +526,14 @@ const ProductUnitManager = ({ units, onUnitsChange, baseUnitType, basePrice, bas
                                     <div className="flex justify-between text-blue-700">
                                         <span>Margen:</span>
                                         <span className="font-bold">{unit.profit_margin}%</span>
+                                    </div>
+                                )}
+                                {unit.exchange_rate_id && (
+                                    <div className="flex justify-between text-purple-700">
+                                        <span>💱 Tasa:</span>
+                                        <span className="font-bold text-xs">
+                                            {exchangeRates?.find(r => r.id === unit.exchange_rate_id)?.name || 'Especial'}
+                                        </span>
                                     </div>
                                 )}
                                 {unit.is_discount_active && unit.discount_percentage > 0 && (
