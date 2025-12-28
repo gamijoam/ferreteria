@@ -430,7 +430,11 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
                                         <ProductImageUploader
                                             productId={initialData.id}
                                             currentImageUrl={formData.image_url}
-                                            onImageUpdate={(newUrl) => setFormData({ ...formData, image_url: newUrl })}
+                                            onImageUpdate={(newUrl) => setFormData({
+                                                ...formData,
+                                                image_url: newUrl,
+                                                updated_at: new Date().toISOString() // Force cache bust
+                                            })}
                                         />
                                     </div>
                                 )}

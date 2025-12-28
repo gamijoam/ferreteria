@@ -4,6 +4,7 @@ import { useConfig } from '../../context/ConfigContext';
 
 const EditItemModal = ({ isOpen, onClose, item, onUpdate, onDelete }) => {
     const [quantity, setQuantity] = useState(1);
+    const [quantityInput, setQuantityInput] = useState('1'); // String for input
     const [saleMode, setSaleMode] = useState('quantity'); // 'quantity' | 'amount'
     const [amountInput, setAmountInput] = useState(''); // User input as string
     const [selectedCurrency, setSelectedCurrency] = useState('VES'); // Default to VES
@@ -52,9 +53,12 @@ const EditItemModal = ({ isOpen, onClose, item, onUpdate, onDelete }) => {
 
     useEffect(() => {
         if (item) {
-            setQuantity(item.quantity);
+            const qty = item.quantity;
+            setQuantity(qty);
+            setQuantityInput(parseFloat(qty.toFixed(3)).toString()); // Format to 3 decimals
+
             // Calculate initial amount based on quantity
-            const initialAmount = item.quantity * item.unit_price_usd;
+            const initialAmount = qty * item.unit_price_usd;
 
             // Convert to selected currency
             const rate = item?.exchange_rate || 1;
@@ -101,11 +105,16 @@ const EditItemModal = ({ isOpen, onClose, item, onUpdate, onDelete }) => {
         setQuantity(newQty);
     };
 
-    const handleQuantityChange = (newQty) => {
-        setQuantity(newQty);
+    const handleQuantityInputChange = (value) => {
+        // Normalize comma to period
+        const normalizedValue = value.replace(',', '.');
+        setQuantityInput(normalizedValue);
+
+        const numValue = parseFloat(normalizedValue) || 0;
+        setQuantity(numValue);
 
         // Calculate amount in USD
-        const amountUSD = (item?.unit_price_usd || 0) * newQty;
+        const amountUSD = (item?.unit_price_usd || 0) * numValue;
 
         // Convert to selected currency
         const displayAmount = convertFromUSD(amountUSD, selectedCurrency);
@@ -188,11 +197,12 @@ const EditItemModal = ({ isOpen, onClose, item, onUpdate, onDelete }) => {
                                 Cantidad ({item.unit_name})
                             </label>
                             <input
-                                type="number"
-                                step="0.001"
+                                type="text"
+                                inputMode="decimal"
                                 className="text-center text-5xl font-bold border-b-4 border-blue-500 w-full focus:outline-none focus:border-blue-600 py-2"
-                                value={parseFloat(quantity.toFixed(3))}
-                                onChange={(e) => handleQuantityChange(Number(e.target.value))}
+                                value={quantityInput}
+                                onChange={(e) => handleQuantityInputChange(e.target.value)}
+                                onFocus={(e) => e.target.select()}
                                 autoFocus
                             />
                             <div className="text-center text-sm text-gray-500 mt-2">

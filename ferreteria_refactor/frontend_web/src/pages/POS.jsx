@@ -631,14 +631,18 @@ const POS = () => {
                                     )}
 
                                     <div className="mt-auto flex justify-between items-end border-t border-slate-50 pt-3">
-                                        <div className="flex flex-col">
+                                        <div className="flex flex-col gap-1">
                                             <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Precio</span>
                                             <span className="text-lg font-black text-slate-800 leading-none">
                                                 ${Number(product.price).toFixed(2)}
                                             </span>
+                                            {/* Stock Display */}
+                                            <span className="text-[9px] font-semibold text-slate-500 uppercase tracking-tight">
+                                                Stock: {Number(product.stock).toFixed(0)}
+                                            </span>
                                             {/* Presentations Indicator */}
                                             {product.units?.length > 0 && (
-                                                <div className="flex items-center gap-1 mt-1">
+                                                <div className="flex items-center gap-1">
                                                     <Layers size={10} className="text-orange-500" />
                                                     <span className="text-[9px] font-bold text-orange-600 uppercase tracking-tight">
                                                         +{product.units.length} Opciones
@@ -671,9 +675,6 @@ const POS = () => {
                         <h2 className="text-xl font-bold flex items-center gap-2">
                             Ticket de Venta
                         </h2>
-                        <span className="text-xs text-slate-400 flex items-center gap-1 mt-1">
-                            <ShoppingCart size={12} /> {cart.reduce((acc, item) => acc + item.quantity, 0)} Items
-                        </span>
                     </div>
                     <button
                         onClick={clearCart}
@@ -776,22 +777,18 @@ const POS = () => {
                     </div>
 
                     <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-                        <div className="flex justify-between items-end mb-2">
+                        <div className="flex justify-between items-end mb-3">
                             <span className="text-slate-500 font-medium text-sm">Total a Pagar</span>
                             <span className="text-3xl font-black text-slate-900 tracking-tight">
                                 {anchorCurrency.symbol}{Number(totalUSD).toFixed(2)}
                             </span>
                         </div>
-                        {/* Secondary Currencies - Compact Line */}
-                        <div className="flex justify-end gap-3 text-xs text-slate-400 pt-2 border-t border-dashed border-slate-100">
-                            {getActiveCurrencies().map(curr => {
-                                if (curr.currency_code === anchorCurrency.currency_code) return null;
-                                return (
-                                    <span key={curr.id} className="font-mono">
-                                        <span className="font-bold">{curr.symbol}</span> {totalsByCurrency?.[curr.currency_code]?.toLocaleString('es-VE', { maximumFractionDigits: 2 })}
-                                    </span>
-                                )
-                            })}
+                        {/* Total in Bs - Simple Display */}
+                        <div className="flex justify-between items-end pt-3 border-t border-dashed border-slate-100">
+                            <span className="text-slate-500 font-medium text-sm">Total en Bs</span>
+                            <span className="text-xl font-bold text-slate-700 font-mono">
+                                Bs {cart.reduce((sum, item) => sum + (Number(item.subtotal_bs) || 0), 0).toLocaleString('es-VE', { maximumFractionDigits: 2 })}
+                            </span>
                         </div>
                     </div>
 

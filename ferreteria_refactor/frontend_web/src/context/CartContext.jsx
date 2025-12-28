@@ -212,11 +212,13 @@ export const CartProvider = ({ children }) => {
         return list.map(item => {
             if (item.id === itemId) {
                 const subUsd = item.unit_price_usd * qty;
+                const subBs = subUsd * item.exchange_rate;
+
                 return {
                     ...item,
                     quantity: qty,
                     subtotal_usd: subUsd,
-                    subtotal_bs: subUsd * item.exchange_rate
+                    subtotal_bs: subBs
                 };
             }
             return item;
