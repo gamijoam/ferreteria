@@ -16,7 +16,11 @@ export default defineConfig({
       '/assets': {
         target: 'http://localhost:8000',
         changeOrigin: true,
-      }
+      },
+      '/images': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
     }
   }
 })

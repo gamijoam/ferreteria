@@ -102,8 +102,15 @@ def run_migrations():
 
 @app.on_event("startup")
 def startup_event():
-    # Create images directory
-    images_dir = "/app/data/images/products"
+    # Create images directory - environment aware
+    IS_DOCKER = os.getenv('DOCKER_CONTAINER', 'false').lower() == 'true'
+    if IS_DOCKER:
+        images_dir = "/app/data/images/products"
+    else:
+        # Local development
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        images_dir = os.path.join(base_dir, "data", "images", "products")
+    
     os.makedirs(images_dir, exist_ok=True)
     print(f"📁 Directorio de imágenes creado: {images_dir}")
     
@@ -141,12 +148,21 @@ def startup_event():
 # ============================================
 
 # 1. FIRST: Mount product images (must be before frontend catch-all)
-images_dir = "/app/data/images/products"
-if os.path.exists(images_dir):
-    app.mount("/images/products", StaticFiles(directory=images_dir), name="product_images")
-    print("✅ Imágenes montadas como archivos estáticos")
+IS_DOCKER = os.getenv('DOCKER_CONTAINER', 'false').lower() == 'true'
+if IS_DOCKER:
+    images_dir = "/app/data/images/products"
 else:
-    print(f"⚠️ Directorio de imágenes no existe: {images_dir}")
+    # Local development
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    images_dir = os.path.join(base_dir, "data", "images", "products")
+
+# Create directory if it doesn't exist
+os.makedirs(images_dir, exist_ok=True)
+print(f"📁 Directorio de imágenes: {images_dir}")
+
+# Mount the directory
+app.mount("/images/products", StaticFiles(directory=images_dir), name="product_images")
+print("✅ Imágenes montadas como archivos estáticos")
 
 # 2. THEN: Mount frontend static files
 static_dir = "/app/static"

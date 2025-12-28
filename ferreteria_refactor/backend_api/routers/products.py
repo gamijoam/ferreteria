@@ -625,9 +625,20 @@ from PIL import Image
 import os
 import io
 
-# Image storage directory
-IMAGES_DIR = "/app/data/images/products"
-PLACEHOLDER_PATH = "/app/ferreteria_refactor/backend_api/assets/placeholder.webp"
+# Image storage directory - environment aware
+IS_DOCKER = os.getenv('DOCKER_CONTAINER', 'false').lower() == 'true'
+if IS_DOCKER:
+    IMAGES_DIR = "/app/data/images/products"
+    PLACEHOLDER_PATH = "/app/ferreteria_refactor/backend_api/assets/placeholder.webp"
+else:
+    # Local development paths
+    # __file__ is in: ferreteria_refactor/backend_api/routers/products.py
+    # We need: ferreteria_refactor/backend_api/data/images/products
+    current_file = os.path.abspath(__file__)  # .../routers/products.py
+    routers_dir = os.path.dirname(current_file)  # .../routers
+    backend_api_dir = os.path.dirname(routers_dir)  # .../backend_api
+    IMAGES_DIR = os.path.join(backend_api_dir, "data", "images", "products")
+    PLACEHOLDER_PATH = os.path.join(backend_api_dir, "assets", "placeholder.webp")
 
 # Ensure directory exists
 os.makedirs(IMAGES_DIR, exist_ok=True)

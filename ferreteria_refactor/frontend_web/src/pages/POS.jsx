@@ -12,6 +12,7 @@ import PaymentModal from '../components/pos/PaymentModal';
 import CashOpeningModal from '../components/cash/CashOpeningModal';
 import CashMovementModal from '../components/cash/CashMovementModal';
 import SaleSuccessModal from '../components/pos/SaleSuccessModal';
+import ProductThumbnail from '../components/products/ProductThumbnail';
 import useBarcodeScanner from '../hooks/useBarcodeScanner';
 
 import apiClient from '../config/axios';
@@ -593,6 +594,16 @@ const POS = () => {
                                     }
                                 `}
                             >
+                                {/* Product Image */}
+                                <div className="p-3 border-b border-slate-100">
+                                    <ProductThumbnail
+                                        imageUrl={product.image_url}
+                                        productName={product.name}
+                                        updatedAt={product.updated_at}
+                                        size="lg"
+                                    />
+                                </div>
+
                                 <div className="p-4 flex-1 flex flex-col">
                                     <div className="flex justify-between items-start mb-2">
                                         <span className="text-[10px] font-mono text-slate-400 bg-slate-50 px-1.5 rounded tracking-tighter">
@@ -681,48 +692,60 @@ const POS = () => {
                             onClick={() => setSelectedItemForEdit(item)}
                             className="p-4 border-b border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors group"
                         >
-                            <div className="flex justify-between items-start mb-1">
-                                <div className="min-w-0 pr-2">
-                                    <div className="font-bold text-slate-800 text-sm line-clamp-2 leading-tight">
-                                        {item.name}
-                                    </div>
-                                    <div className="flex flex-wrap items-center gap-1 mt-1.5">
-                                        {/* SKU Badge */}
-                                        {item.sku && (
-                                            <span className="text-[9px] font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
-                                                {item.sku}
-                                            </span>
-                                        )}
-                                        {/* Special Rate Badge */}
-                                        {item.is_special_rate && (
-                                            <span className="flex items-center gap-1 px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded text-[9px] font-bold border border-purple-200">
-                                                <RotateCcw size={8} />
-                                                {item.exchange_rate_name || 'TASA'}
-                                            </span>
-                                        )}
-                                        {/* Stock Warning */}
-                                        {Number(item.stock) <= Number(item.quantity) * Number(item.conversion_factor || 1) && (
-                                            <span className="text-[9px] text-red-600 font-bold bg-red-50 px-1.5 py-0.5 rounded flex items-center gap-1 border border-red-100">
-                                                <AlertTriangle size={8} /> Stock
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="text-right shrink-0">
-                                    <div className="font-bold text-slate-900">${Number(item.subtotal_usd || 0).toFixed(2)}</div>
-                                </div>
-                            </div>
+                            <div className="flex gap-3">
+                                {/* Product Image */}
+                                <ProductThumbnail
+                                    imageUrl={item.image_url}
+                                    productName={item.name}
+                                    updatedAt={item.updated_at}
+                                    size="md"
+                                />
 
-                            <div className="flex justify-between items-end mt-2 pt-2 border-t border-slate-50">
-                                <div className="text-xs text-slate-600 flex items-center gap-1">
-                                    <span className="font-bold bg-blue-50 text-blue-700 px-1.5 rounded">{item.quantity}</span>
-                                    <span className="lowercase font-semibold text-slate-500 italic">{item.unit_name}</span>
-                                    <span className="text-slate-400">x</span>
-                                    <span className="font-medium">${Number(item.unit_price_usd).toFixed(2)}</span>
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex justify-between items-start mb-1">
+                                        <div className="min-w-0 pr-2">
+                                            <div className="font-bold text-slate-800 text-sm line-clamp-2 leading-tight">
+                                                {item.name}
+                                            </div>
+                                            <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                                                {/* SKU Badge */}
+                                                {item.sku && (
+                                                    <span className="text-[9px] font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                                                        {item.sku}
+                                                    </span>
+                                                )}
+                                                {/* Special Rate Badge */}
+                                                {item.is_special_rate && (
+                                                    <span className="flex items-center gap-1 px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded text-[9px] font-bold border border-purple-200">
+                                                        <RotateCcw size={8} />
+                                                        {item.exchange_rate_name || 'TASA'}
+                                                    </span>
+                                                )}
+                                                {/* Stock Warning */}
+                                                {Number(item.stock) <= Number(item.quantity) * Number(item.conversion_factor || 1) && (
+                                                    <span className="text-[9px] text-red-600 font-bold bg-red-50 px-1.5 py-0.5 rounded flex items-center gap-1 border border-red-100">
+                                                        <AlertTriangle size={8} /> Stock
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="text-right shrink-0">
+                                            <div className="font-bold text-slate-900">${Number(item.subtotal_usd || 0).toFixed(2)}</div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex justify-between items-end mt-2 pt-2 border-t border-slate-50">
+                                        <div className="text-xs text-slate-600 flex items-center gap-1">
+                                            <span className="font-bold bg-blue-50 text-blue-700 px-1.5 rounded">{item.quantity}</span>
+                                            <span className="lowercase font-semibold text-slate-500 italic">{item.unit_name}</span>
+                                            <span className="text-slate-400">x</span>
+                                            <span className="font-medium">${Number(item.unit_price_usd).toFixed(2)}</span>
+                                        </div>
+                                        <span className="text-[10px] text-slate-400 font-medium font-mono">
+                                            Bs. {Number(item.subtotal_bs || 0).toLocaleString('es-VE', { maximumFractionDigits: 2 })}
+                                        </span>
+                                    </div>
                                 </div>
-                                <span className="text-[10px] text-slate-400 font-medium font-mono">
-                                    Bs. {Number(item.subtotal_bs || 0).toLocaleString('es-VE', { maximumFractionDigits: 2 })}
-                                </span>
                             </div>
                         </div>
                     ))}
@@ -736,7 +759,7 @@ const POS = () => {
                 </div>
 
                 {/* Footer Actions */}
-                <div className="bg-slate-50 border-t border-slate-200 p-4 space-y-3 z-20">
+                < div className="bg-slate-50 border-t border-slate-200 p-4 space-y-3 z-20" >
                     <div className="grid grid-cols-2 gap-3">
                         <button
                             onClick={() => setIsMovementOpen(true)}
@@ -789,7 +812,7 @@ const POS = () => {
                     </button>
 
                     {/* Botón para volver al catálogo en móvil (solo visible si estamos en modo ticket) */}
-                    <button
+                    < button
                         onClick={() => setMobileTab('catalog')}
                         className="md:hidden w-full text-slate-500 font-medium py-2 text-sm"
                     >
@@ -799,24 +822,26 @@ const POS = () => {
             </div>
 
             {/* MOBILE FLOATING ACTION BUTTON (Summary) - Only visible when in Catalog mode and cart has items */}
-            {mobileTab === 'catalog' && cart.length > 0 && (
-                <div className="md:hidden fixed bottom-6 left-4 right-4 z-30">
-                    <button
-                        onClick={() => setMobileTab('ticket')}
-                        className="w-full bg-slate-800 text-white p-4 rounded-xl shadow-2xl flex justify-between items-center animate-bounce-slight"
-                    >
-                        <div className="flex items-center gap-3">
-                            <div className="bg-blue-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm">
-                                {cart.length}
+            {
+                mobileTab === 'catalog' && cart.length > 0 && (
+                    <div className="md:hidden fixed bottom-6 left-4 right-4 z-30">
+                        <button
+                            onClick={() => setMobileTab('ticket')}
+                            className="w-full bg-slate-800 text-white p-4 rounded-xl shadow-2xl flex justify-between items-center animate-bounce-slight"
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="bg-blue-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm">
+                                    {cart.length}
+                                </div>
+                                <span className="font-medium">Ver / Pagar</span>
                             </div>
-                            <span className="font-medium">Ver / Pagar</span>
-                        </div>
-                        <span className="text-xl font-bold">
-                            ${Number(totalUSD).toFixed(2)}
-                        </span>
-                    </button>
-                </div>
-            )}
+                            <span className="text-xl font-bold">
+                                ${Number(totalUSD).toFixed(2)}
+                            </span>
+                        </button>
+                    </div>
+                )
+            }
 
             {/* Modals Logic Remains Same */}
             <UnitSelectionModal
@@ -856,10 +881,12 @@ const POS = () => {
             />
 
             {/* Cash Opening Modal - only show after loading and if session is closed */}
-            {!loading && !isSessionOpen && (
-                <CashOpeningModal onOpen={openSession} />
-            )}
-        </div>
+            {
+                !loading && !isSessionOpen && (
+                    <CashOpeningModal onOpen={openSession} />
+                )
+            }
+        </div >
     );
 };
 
