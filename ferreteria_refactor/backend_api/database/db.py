@@ -3,14 +3,24 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from ..config import settings
 
-# Configuración inteligente: Si es SQLite usa una config, si es Postgres usa Pool
-connect_args = {}
-pool_config = {}
+# Hybrid Database Support
+# If DB_TYPE is 'sqlite' or DATABASE_URL contains 'sqlite', we adapt.
+import os
 
-if "sqlite" in settings.DATABASE_URL:
+DB_TYPE = os.getenv("DB_TYPE", "postgres")
+DATABASE_URL = settings.DATABASE_URL
+
+if DB_TYPE == "sqlite" or "sqlite" in str(DATABASE_URL):
+    # Desktop App Mode
+    if DB_TYPE == "sqlite":
+        db_name = os.getenv("SQLITE_DB_NAME", "ferreteria.db")
+        DATABASE_URL = f"sqlite:///./{db_name}"
+        
     connect_args = {"check_same_thread": False}
+    pool_config = {} # SQLite doesn't use the same pool config as Postgres
 else:
-    # CONFIGURACIÓN PROD PARA POSTGRESQL
+    # VPS/Docker Mode (Postgres)
+    connect_args = {}
     pool_config = {
         "pool_size": 20,        # Mantener 20 conexiones listas
         "max_overflow": 10,     # Permitir 10 extra en picos
@@ -20,7 +30,7 @@ else:
     }
 
 engine = create_engine(
-    settings.DATABASE_URL,
+    DATABASE_URL,
     connect_args=connect_args,
     **pool_config
 )

@@ -23,9 +23,9 @@ export const WebSocketProvider = ({ children }) => {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 
         let host = window.location.host;
-        // DEVELOPMENT OVERRIDE: If on localhost:5173, point to backend at 8000
+        // DEVELOPMENT OVERRIDE: If on localhost:5173, point to backend at 8001 (Offline Backend)
         if (window.location.hostname === 'localhost' && window.location.port === '5173') {
-            host = 'localhost:8000';
+            host = 'localhost:8001';
         }
 
         const wsUrl = `${protocol}//${host}/api/v1/ws`;

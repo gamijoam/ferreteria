@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
-import { Search, ShoppingCart, Trash2, Plus, Minus, CreditCard, RotateCcw, Package, Receipt, AlertTriangle, Layers } from 'lucide-react';
+import { Search, ShoppingCart, Trash2, Plus, Minus, CreditCard, RotateCcw, Package, Receipt, AlertTriangle, Layers, ArrowLeft } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useCash } from '../context/CashContext';
 import { useConfig } from '../context/ConfigContext';
@@ -507,8 +507,9 @@ const POS = () => {
                 {/* Header Bar */}
                 <div className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center shadow-sm">
                     <div className="flex items-center gap-4">
-                        <Link to="/" className="p-2 -ml-2 hover:bg-slate-100 rounded-full text-slate-500 transition-colors" title="Volver al Menú">
-                            <RotateCcw className="rotate-90" size={20} />
+                        <Link to="/" className="flex items-center gap-2 p-2 -ml-2 hover:bg-slate-100 rounded-full text-slate-600 transition-colors group" title="Volver al Menú">
+                            <ArrowLeft className="group-hover:-translate-x-1 transition-transform" size={24} />
+                            <span className="font-bold text-sm hidden sm:block">Salir</span>
                         </Link>
                         <h1 className="text-xl font-bold text-slate-800">Punto de Venta</h1>
                     </div>

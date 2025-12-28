@@ -236,6 +236,11 @@ class Sale(Base):
     
     # Sale Notes
     notes = Column(Text, nullable=True)  # Special observations or instructions
+    
+    # Hybrid/Sync Fields
+    unique_uuid = Column(String(36), nullable=True, unique=True, index=True)
+    sync_status = Column(String(20), default="SYNCED") # SYNCED, PENDING
+    is_offline_sale = Column(Boolean, default=False)
 
     details = relationship("SaleDetail", back_populates="sale")
     customer = relationship("Customer", back_populates="sales")
@@ -406,6 +411,10 @@ class Customer(Base):
     credit_limit = Column(Numeric(12, 2), default=0.00)
     payment_term_days = Column(Integer, default=15)  # Default payment term in days
     is_blocked = Column(Boolean, default=False)  # Manual credit block flag
+    
+    # Hybrid/Sync Fields
+    unique_uuid = Column(String(36), nullable=True, unique=True, index=True)
+    sync_status = Column(String(20), default="SYNCED") # SYNCED, PENDING
 
     sales = relationship("Sale", back_populates="customer")
     payments = relationship("Payment", back_populates="customer")

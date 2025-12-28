@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Lock, DollarSign } from 'lucide-react';
 import { useConfig } from '../../context/ConfigContext';
 
 const CashOpeningModal = ({ onOpen }) => {
+    const navigate = useNavigate();
     const { getActiveCurrencies } = useConfig();
     const [amounts, setAmounts] = useState({});
     const [currencies, setCurrencies] = useState([]);
@@ -88,12 +90,21 @@ const CashOpeningModal = ({ onOpen }) => {
                         </div>
                     ))}
 
-                    <button
-                        type="submit"
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg shadow transition-colors mt-6"
-                    >
-                        Abrir Turno
-                    </button>
+                    <div className="flex flex-col gap-3 mt-6">
+                        <button
+                            type="submit"
+                            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg shadow transition-colors"
+                        >
+                            Abrir Turno
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => navigate('/')}
+                            className="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-3 px-4 rounded-lg transition-colors"
+                        >
+                            Cancelar
+                        </button>
+                    </div>
                 </form>
             </div>
         </div>

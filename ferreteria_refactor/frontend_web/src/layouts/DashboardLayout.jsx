@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useConfig } from '../context/ConfigContext';
 import RoleGuard from '../components/RoleGuard';
+import SyncButton from '../components/sync/SyncButton';
 import {
     LayoutDashboard,
     BarChart,
@@ -26,7 +27,8 @@ import {
     ClipboardList,
     Menu,
     X,
-    HelpCircle
+    HelpCircle,
+    ArrowLeft
 } from 'lucide-react';
 
 const DashboardLayout = () => {
@@ -310,10 +312,25 @@ const DashboardLayout = () => {
                         >
                             <Menu size={24} />
                         </button>
+
+                        {/* Back Button (Desktop/Mobile) */}
+                        {location.pathname !== '/' && (
+                            <button
+                                onClick={() => navigate(-1)}
+                                className="mr-4 p-2 text-gray-500 hover:text-gray-900 rounded-full hover:bg-gray-200 transition-colors"
+                                title="Volver atrás"
+                            >
+                                <ArrowLeft size={20} />
+                            </button>
+                        )}
+
                         <h2 className="text-xl font-semibold text-gray-800 truncate">Panel de Control</h2>
                     </div>
 
                     <div className="flex items-center space-x-4 md:space-x-6">
+                        {/* Hybrid Sync Trigger */}
+                        <SyncButton />
+
                         {/* Quick Rate Widget - Hidden on very small screens if needed, or condensed */}
                         <div className="hidden sm:flex items-center bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
                             <div className="text-xs font-bold text-blue-800 mr-2">TASA BCV</div>

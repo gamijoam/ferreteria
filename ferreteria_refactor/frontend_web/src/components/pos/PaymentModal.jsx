@@ -130,7 +130,8 @@ const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onCon
                     quantity: item.quantity,
                     // Fix: Send original price if discount active, otherwise normal price
                     // Backend calculates subtotal using unit_price * quantity * (1 - discount/100)
-                    unit_price_usd: item.is_discount_active ? item.original_price_usd : (item.unit_price_usd || item.price_unit_usd || item.price_usd),
+                    unit_price: item.is_discount_active ? item.original_price_usd : (item.unit_price_usd || item.price_unit_usd || item.price_usd),
+                    subtotal: (item.is_discount_active ? item.original_price_usd : (item.unit_price_usd || item.price_unit_usd || item.price_usd)) * item.quantity, // Mandatory for schema validation
                     conversion_factor: item.conversion_factor || 1,
                     discount: item.is_discount_active ? item.discount_percentage : 0,
                     discount_type: item.is_discount_active ? "PERCENT" : "NONE"
@@ -156,7 +157,22 @@ const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onCon
             onClose();
         } catch (error) {
             console.error('Error creating sale:', error);
-            const errorMessage = error.response?.data?.detail || error.message || "Error desconocido al procesar venta";
+            let errorMessage = "Error desconocido al procesar venta";
+
+            if (error.response?.data?.detail) {
+                const detail = error.response.data.detail;
+                if (typeof detail === 'string') {
+                    errorMessage = detail;
+                } else if (Array.isArray(detail)) {
+                    // Pydantic validation error list
+                    errorMessage = detail.map(e => `${e.loc.join('.')}: ${e.msg}`).join(', ');
+                } else if (typeof detail === 'object') {
+                    errorMessage = JSON.stringify(detail);
+                }
+            } else if (error.message) {
+                errorMessage = error.message;
+            }
+
             toast.error(errorMessage);
             setProcessing(false);
         }

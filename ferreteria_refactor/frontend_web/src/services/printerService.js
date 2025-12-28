@@ -9,34 +9,12 @@ function getHardwareClientId() {
 
     if (!clientId) {
         // First time on this PC - prompt user to configure
-        const message =
-            '🖨️ CONFIGURACIÓN DE IMPRESORA\n\n' +
-            'Ingrese el ID de esta caja registradora.\n' +
-            'Debe coincidir con "nombre_caja" en config.ini del Hardware Bridge.\n\n' +
-            'Ejemplos:\n' +
-            '  • caja-principal\n' +
-            '  • caja-1\n' +
-            '  • escritorio-ventas\n\n' +
-            'ID de esta caja:';
-
-        clientId = prompt(message, 'caja-1');
-
-        if (!clientId || clientId.trim() === '') {
-            clientId = 'caja-1'; // Default fallback
-        }
-
-        clientId = clientId.trim();
+        // Electron does not support prompt(). Use default or configurable ID.
+        console.warn('⚠️ No Hardware ID found. Defaulting to "caja-1". Configure via Settings if needed.');
+        clientId = 'caja-1';
 
         // Save to localStorage
         localStorage.setItem('hardware_client_id', clientId);
-
-        alert(
-            `✅ Caja configurada como: ${clientId}\n\n` +
-            `IMPORTANTE: Verifique que el Hardware Bridge (BridgeInvensoft.exe)\n` +
-            `esté configurado con el mismo ID en config.ini:\n\n` +
-            `[SERVIDOR]\n` +
-            `nombre_caja = ${clientId}`
-        );
     }
 
     return clientId;

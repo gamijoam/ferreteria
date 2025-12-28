@@ -2,8 +2,10 @@ import axios from 'axios';
 
 // --- CAMBIO PARA SOPORTE HÍBRIDO (LOCAL/SAAS) ---
 // Detectar modo desarrollo y usar URL directa si el proxy falla
+// Detectar modo desarrollo y usar URL directa si el proxy falla
 const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-const baseURL = isDevelopment ? 'http://localhost:8000/api/v1' : '/api/v1';
+// In Electron/Vite, we want to use the proxy '/api/v1' to hit localhost:8001
+const baseURL = '/api/v1';
 
 console.log('🔧 Axios config:', { isDevelopment, baseURL, hostname: window.location.hostname });
 

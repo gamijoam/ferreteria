@@ -170,11 +170,15 @@ class ProductRead(ProductBase):
 class SaleDetailCreate(BaseModel):
     product_id: int
     quantity: Decimal
-    unit_price_usd: Decimal
+    unit_price: Decimal  # Renamed from unit_price_usd for consistency
+    subtotal: Decimal    # Added: Essential for sync validation
     conversion_factor: Decimal = Decimal("1.0")
     discount: Decimal = Decimal("0.00")
     discount_type: str = "NONE"  # NONE, PERCENT, FIXED
     tax_rate: Decimal = Decimal("0.00")
+
+    class Config:
+        from_attributes = True
 
 class SalePaymentCreate(BaseModel):
     sale_id: Optional[int] = None # Optional for inline creation
@@ -182,6 +186,9 @@ class SalePaymentCreate(BaseModel):
     currency: str = "USD"
     payment_method: str = "Efectivo"
     exchange_rate: Decimal = Decimal("1.0")
+
+    class Config:
+        from_attributes = True
 
 class SaleCreate(BaseModel):
     customer_id: Optional[int] = Field(None, description="ID del cliente (Opcional)", example=5)
@@ -193,6 +200,13 @@ class SaleCreate(BaseModel):
     exchange_rate: Decimal = Field(Decimal("1.0"), description="Tasa de cambio aplicada", example="35.5")
     notes: Optional[str] = Field(None, description="Notas adicionales o observaciones", example="Entregar en puerta trasera")
     is_credit: bool = Field(False, description="Indica si es una venta a crédito")
+    
+    # Hybrid/Sync Fields (Optional, for offline sales)
+    unique_uuid: Optional[str] = Field(None, description="UUID único generado offline")
+    is_offline_sale: bool = Field(False, description="Flag si la venta vino de sync")
+
+    class Config:
+        from_attributes = True
 
 
 class SalePaymentRead(BaseModel):
@@ -236,6 +250,8 @@ class SaleRead(BaseModel):
     currency: str = "USD"  # NEW: Include currency
     exchange_rate_used: Decimal = Decimal("1.0")  # NEW: Include exchange rate
     status: str = "COMPLETED" # Derived from property
+    unique_uuid: Optional[str] = None
+    is_offline_sale: bool = False
     
     class Config:
         from_attributes = True
@@ -248,6 +264,7 @@ class CustomerBase(BaseModel):
     address: Optional[str] = Field(None, description="Dirección fiscal o de entrega", example="Av. Principal, Edif. Azul")
     credit_limit: Decimal = Field(Decimal("0.00"), description="Límite máximo de crédito permitido en USD", ge=0)
     payment_term_days: int = Field(15, description="Días de crédito otorgados", ge=0)
+    unique_uuid: Optional[str] = Field(None, description="UUID único para sync")
     is_blocked: bool = Field(False, description="Bloqueo administrativo para impedir nuevas ventas")
 
 class CustomerCreate(CustomerBase):
@@ -568,6 +585,19 @@ class SupplierRead(SupplierBase):
     created_at: Optional[datetime] = None
     current_balance: Optional[Decimal] = Decimal("0.00")
     
+    class Config:
+        from_attributes = True
+
+class ExchangeRateSync(BaseModel):
+    id: int
+    name: str # BCV, Paralelo
+    currency_code: str # VES
+    currency_symbol: str # Bs
+    rate: Decimal
+    is_default: bool
+    is_active: bool
+    updated_at: datetime
+
     class Config:
         from_attributes = True
 
