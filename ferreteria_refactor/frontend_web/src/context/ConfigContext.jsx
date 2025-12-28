@@ -156,49 +156,24 @@ export const ConfigProvider = ({ children }) => {
     const getActiveCurrencies = () => {
         if (!Array.isArray(currencies)) return [];
 
-        // Filter active non-anchor currencies
-        const activeCurrencies = currencies.filter(c => c.is_active && !c.is_anchor);
+        // Filter active currencies (include anchor/USD)
+        const activeCurrencies = currencies.filter(c => c.is_active);
 
-        // Deduplicate by currency_code (group multiple rates for same physical currency)
-        const uniqueByCurrencyCode = {};
-        activeCurrencies.forEach(curr => {
-            // Normalize Code/Symbol to handle "VES" vs "VES " mismatches
+        // Format all active currencies (don't deduplicate - allow multiple rates per currency)
+        return activeCurrencies.map(curr => {
             const code = (curr.currency_code || curr.symbol || '').trim().toUpperCase();
-
-            // PRIORITY LOGIC:
-            // 1. Current iteration IS default -> Overwrite everything.
-            // 2. We don't have this code yet -> Add it.
-            // 3. We have it (non-default), and current (non-default) has HIGHER rate -> Upgrade to higher rate (heuristic).
-
-            const existing = uniqueByCurrencyCode[code];
-
-            if (curr.is_default) {
-                // Priority 1: Default always wins
-                uniqueByCurrencyCode[code] = { ...formatCurrency(curr, code) };
-            } else if (!existing) {
-                // Priority 2: New entry
-                uniqueByCurrencyCode[code] = { ...formatCurrency(curr, code) };
-            } else if (!existing.is_default && curr.rate > existing.rate) {
-                // Priority 3: Higher rate wins among non-defaults
-                uniqueByCurrencyCode[code] = { ...formatCurrency(curr, code) };
-            }
-        });
-
-        function formatCurrency(c, code) {
             return {
-                id: c.id,
-                name: c.name || code,
-                symbol: (c.currency_symbol || c.symbol || '').trim(),
+                id: curr.id,
+                name: curr.name || code,
+                symbol: (curr.currency_symbol || curr.symbol || '').trim(),
                 currency_code: code,
-                currency_symbol: (c.currency_symbol || c.symbol || '').trim(),
-                rate: c.rate,
-                is_active: c.is_active,
-                is_default: c.is_default
+                currency_symbol: (curr.currency_symbol || curr.symbol || '').trim(),
+                rate: curr.rate,
+                is_active: curr.is_active,
+                is_default: curr.is_default,
+                is_anchor: curr.is_anchor
             };
-        }
-
-        // Return array of unique currencies
-        return Object.values(uniqueByCurrencyCode);
+        });
     };
 
     const convertPrice = (priceInAnchor, targetSymbol) => {

@@ -736,7 +736,7 @@ const POS = () => {
 
                                     <div className="flex justify-between items-end mt-2 pt-2 border-t border-slate-50">
                                         <div className="text-xs text-slate-600 flex items-center gap-1">
-                                            <span className="font-bold bg-blue-50 text-blue-700 px-1.5 rounded">{item.quantity}</span>
+                                            <span className="font-bold bg-blue-50 text-blue-700 px-1.5 rounded">{parseFloat(Number(item.quantity).toFixed(3))}</span>
                                             <span className="lowercase font-semibold text-slate-500 italic">{item.unit_name}</span>
                                             <span className="text-slate-400">x</span>
                                             <span className="font-medium">${Number(item.unit_price_usd).toFixed(2)}</span>
