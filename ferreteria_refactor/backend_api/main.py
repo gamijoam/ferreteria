@@ -102,6 +102,11 @@ def run_migrations():
 
 @app.on_event("startup")
 def startup_event():
+    # Create images directory
+    images_dir = "/app/data/images/products"
+    os.makedirs(images_dir, exist_ok=True)
+    print(f"📁 Directorio de imágenes creado: {images_dir}")
+    
     run_migrations()
     try:
         from .database.db import Base
@@ -111,9 +116,6 @@ def startup_event():
 
     # Seed Data
     from .database.db import SessionLocal
-    from .routers.auth import init_admin_user
-    from .routers.config import init_exchange_rates
-    db = SessionLocal()
     from .routers.auth import init_admin_user
     from .routers.config import init_exchange_rates
     db = SessionLocal()
@@ -134,10 +136,21 @@ def startup_event():
     finally:
         db.close()
 
-# --- SERVIR FRONTEND (SPA) - CONFIGURACIÓN CRÍTICA ---
+# ============================================
+# STATIC FILES - ORDER MATTERS!
+# ============================================
+
+# 1. FIRST: Mount product images (must be before frontend catch-all)
+images_dir = "/app/data/images/products"
+if os.path.exists(images_dir):
+    app.mount("/images/products", StaticFiles(directory=images_dir), name="product_images")
+    print("✅ Imágenes montadas como archivos estáticos")
+else:
+    print(f"⚠️ Directorio de imágenes no existe: {images_dir}")
+
+# 2. THEN: Mount frontend static files
 static_dir = "/app/static"
 
-# Definimos la función de respuesta raíz explícitamente fuera del if para asegurar registro
 async def serve_index():
     if os.path.exists(os.path.join(static_dir, "index.html")):
         return FileResponse(os.path.join(static_dir, "index.html"))
@@ -157,15 +170,17 @@ if os.path.exists(static_dir):
     async def serve_spa(full_path: str):
         # 🛡️ ESCUDO DE API: Si la ruta empieza con 'api', devolver 404 JSON real
         if full_path.startswith("api"):
-            return JSONResponse(status_code=404, content={"detail": "Endpoint not found"})
-
+            return JSONResponse(status_code=404, content={"detail": "API endpoint not found"})
+        
+        # Intentar servir archivo estático si existe
         file_path = os.path.join(static_dir, full_path)
         if os.path.isfile(file_path):
             return FileResponse(file_path)
-        return await serve_index() # Fallback a index.html
-
+        
+        # Fallback: Servir index.html para React Router
+        return FileResponse(os.path.join(static_dir, "index.html"))
 else:
-    print("⚠️ FRONTEND NO ENCONTRADO. Iniciando en modo API-Only.")
+    print("⚠️ FRONTEND NO ENCONTRADO. Solo API disponible.")
     @app.get("/")
     def root():
         return {"message": "Ferreteria API (Backend Only)"}

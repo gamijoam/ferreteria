@@ -3,6 +3,7 @@ import { Plus, Search, Package, Filter, X, Trash2, Pencil } from 'lucide-react';
 import ProductForm from '../components/products/ProductForm';
 import BulkProductActions from '../components/products/BulkProductActions';
 import InventoryValuationCard from '../components/products/InventoryValuationCard';
+import ProductThumbnail from '../components/products/ProductThumbnail';
 import { useConfig } from '../context/ConfigContext';
 import { useWebSocket } from '../context/WebSocketContext';
 
@@ -192,6 +193,7 @@ const Products = () => {
                 <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                         <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Imagen</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SKU</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Precio Publico</th>
@@ -222,10 +224,15 @@ const Products = () => {
                             .map(product => (
                                 <tr key={product.id} className="hover:bg-gray-50 transition-colors">
                                     <td className="px-6 py-4 whitespace-nowrap">
+                                        <ProductThumbnail
+                                            imageUrl={product.image_url}
+                                            productName={product.name}
+                                            updatedAt={product.updated_at}
+                                            size="md"
+                                        />
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
                                         <div className="flex items-center">
-                                            <div className="h-10 w-10 flex-shrink-0 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold">
-                                                {product.name.charAt(0)}
-                                            </div>
                                             <div className="ml-4">
                                                 <div className="text-sm font-medium text-gray-900 flex items-center">
                                                     {product.name}
@@ -301,9 +308,12 @@ const Products = () => {
                         <div key={product.id} className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 flex flex-col gap-3">
                             <div className="flex justify-between items-start">
                                 <div className="flex items-center gap-3">
-                                    <div className="h-10 w-10 flex-shrink-0 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold">
-                                        {product.name.charAt(0)}
-                                    </div>
+                                    <ProductThumbnail
+                                        imageUrl={product.image_url}
+                                        productName={product.name}
+                                        updatedAt={product.updated_at}
+                                        size="md"
+                                    />
                                     <div>
                                         <div className="font-bold text-gray-800">{product.name}</div>
                                         <div className="text-xs text-gray-500 flex gap-2">

@@ -35,6 +35,10 @@ class ProductBase(BaseModel):
     exchange_rate_id: Optional[int] = Field(None, description="ID de tasa de cambio específica (opcional)", example=2)
     is_combo: bool = Field(False, description="Indica si el producto es un combo/bundle")
     is_active: bool = Field(True, description="Indica si el producto está disponible para la venta")
+    
+    # Image Support
+    image_url: Optional[str] = Field(None, description="URL relativa de la imagen del producto", example="/images/products/123.webp")
+    updated_at: Optional[datetime] = Field(None, description="Fecha de última actualización (auto-gestionada)")
 
 # Exchange Rate Schemas
 class ExchangeRateBase(BaseModel):

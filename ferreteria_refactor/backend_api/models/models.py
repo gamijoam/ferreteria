@@ -110,6 +110,10 @@ class Product(Base):
     
     # NEW: Combo/Bundle Support
     is_combo = Column(Boolean, default=False)  # True if this product is a combo/bundle
+    
+    # Image Support
+    image_url = Column(String(255), nullable=True)  # Relative path to product image
+    updated_at = Column(DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)  # Auto-updated timestamp
 
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
     supplier_id = Column(Integer, ForeignKey("suppliers.id"), nullable=True)

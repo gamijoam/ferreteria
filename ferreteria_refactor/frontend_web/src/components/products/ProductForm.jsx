@@ -4,6 +4,7 @@ import { useConfig } from '../../context/ConfigContext';
 import apiClient from '../../config/axios';
 import ProductUnitManager from './ProductUnitManager';
 import ComboManager from './ComboManager';
+import ProductImageUploader from './ProductImageUploader';
 
 const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
     const { getActiveCurrencies, convertPrice, currencies } = useConfig();
@@ -421,6 +422,18 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
                                         placeholder="Pasillo 4, Estante B"
                                     />
                                 </div>
+
+                                {/* Product Image Upload */}
+                                {initialData && initialData.id && (
+                                    <div className="col-span-2 mt-4">
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">Imagen del Producto</label>
+                                        <ProductImageUploader
+                                            productId={initialData.id}
+                                            currentImageUrl={formData.image_url}
+                                            onImageUpdate={(newUrl) => setFormData({ ...formData, image_url: newUrl })}
+                                        />
+                                    </div>
+                                )}
 
                                 {/* Combo Checkbox */}
                                 <div className="col-span-2 mt-4">
