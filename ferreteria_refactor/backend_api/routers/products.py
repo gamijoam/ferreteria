@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session, joinedload
 from typing import List
 import json
 import asyncio
-from datetime import date
+from datetime import date, datetime
 from ..database.db import get_db
 from ..models import models
 from ..models.models import UserRole
