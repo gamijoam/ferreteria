@@ -6,6 +6,12 @@ from ..config import settings
 # Hybrid Database Support
 # If DB_TYPE is 'sqlite' or DATABASE_URL contains 'sqlite', we adapt.
 import os
+import sqlite3
+from decimal import Decimal
+
+# Register adapter for Decimal -> float in SQLite to avoid "Error binding parameter: type 'decimal.Decimal' is not supported"
+sqlite3.register_adapter(Decimal, lambda x: float(x))
+sqlite3.register_converter("DECIMAL", lambda x: Decimal(x))
 
 DB_TYPE = os.getenv("DB_TYPE", "postgres")
 DATABASE_URL = settings.DATABASE_URL
@@ -30,7 +36,7 @@ if DB_TYPE == "sqlite" or "sqlite" in str(DATABASE_URL):
             DATABASE_URL = f"sqlite:///./{db_name}"
             print(f"[DB] Modo Desarrollo. Usando BD relativa: {db_name}")
         
-    connect_args = {"check_same_thread": False}
+    connect_args = {"check_same_thread": False, "timeout": 30}
     pool_config = {} # SQLite doesn't use the same pool config as Postgres
 else:
     # VPS/Docker Mode (Postgres)

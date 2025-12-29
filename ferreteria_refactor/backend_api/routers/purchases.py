@@ -79,19 +79,19 @@ async def create_purchase_order(order_data: schemas.PurchaseOrderCreate, db: Ses
                 if item.new_sale_price and item.new_sale_price > 0:
                     # Direct update from frontend
                     product.price = item.new_sale_price
-                elif item.update_cost and product.cost_price > 0 and item.unit_cost > 0:
+                elif item.update_cost and item.unit_cost > 0:
                      # Intelligent auto-update if only "update price" is checked but no value sent
-                     # Try to maintain the PREVIOUS markup/margin
-                     # But since we just updated cost_price, we need the OLD cost to know the OLD margin?
-                     # A safer simple approach: Apply the new cost + existing implied margin
-                     # Implied Margin = (CurrentPrice / OldCost) - 1
-                     
-                     # To avoid complexity and errors, we strongly prefer explicit new_sale_price.
-                     # But as a fallback, if we have a defined profit_margin in product:
+                     # Use Replacment Cost Strategy (Item Unit Cost) to protect margin
                      if product.profit_margin:
-                         product.price = product.cost_price * (1 + (product.profit_margin / 100))
+                         tax_multiplier = 1 + (product.tax_rate / 100) if product.tax_rate else 1
+                         margin_multiplier = 1 + (product.profit_margin / 100)
+                         product.price = item.unit_cost * margin_multiplier * tax_multiplier
 
             
+            # Auto-update profit margin (Markup) based on new values
+            if product.cost_price > 0 and product.price > 0:
+                product.profit_margin = ((product.price - product.cost_price) / product.cost_price) * 100
+
             # Create Kardex entry
             kardex = models.Kardex(
                 product_id=product.id,
@@ -107,8 +107,10 @@ async def create_purchase_order(order_data: schemas.PurchaseOrderCreate, db: Ses
             updated_products_info.append({
                 "id": product.id,
                 "name": product.name,
-                "price": product.price,
-                "stock": product.stock,
+                "price": float(product.price),
+                "cost_price": float(product.cost_price), # NEW: Send cost
+                "stock": float(product.stock),
+                "profit_margin": float(product.profit_margin) if product.profit_margin else 0, # NEW: Send margin
                 "exchange_rate_id": product.exchange_rate_id
             })
         
