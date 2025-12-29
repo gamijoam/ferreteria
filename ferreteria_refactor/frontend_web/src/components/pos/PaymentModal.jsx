@@ -5,6 +5,7 @@ import { useWebSocket } from '../../context/WebSocketContext';
 import apiClient from '../../config/axios';
 import toast from 'react-hot-toast';
 import QuickCustomerModal from './QuickCustomerModal';
+import CustomerSearch from './CustomerSearch';
 
 const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onConfirm }) => {
     const { getActiveCurrencies, convertPrice, getExchangeRate, paymentMethods } = useConfig();
@@ -278,38 +279,45 @@ const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onCon
                     </div>
 
                     {/* Customer Selection (Generic for ALL sales) */}
-                    <div className="mb-6">
+                    <div className={`mb-6 p-4 rounded-xl border-2 transition-colors ${isCreditSale && !selectedCustomer
+                        ? 'bg-red-50 border-red-200'
+                        : 'bg-white border-transparent'
+                        }`}>
                         <label className="block text-sm font-medium text-gray-700 mb-2 flex justify-between items-center">
-                            <span>Cliente {isCreditSale && <span className="text-red-500">*</span>}</span>
+                            <span className="flex items-center gap-1">
+                                Cliente
+                                {isCreditSale && <span className="text-red-500 font-bold" title="Requerido para crédito">*</span>}
+                            </span>
                             <button
                                 onClick={() => setIsQuickCustomerOpen(true)}
-                                className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200 transition flex items-center gap-1 font-bold"
+                                className="text-xs bg-blue-100 text-blue-700 px-3 py-1.5 rounded-full hover:bg-blue-200 transition flex items-center gap-1 font-bold shadow-sm"
                             >
                                 <UserPlus size={14} /> Nuevo Cliente
                             </button>
                         </label>
-                        <div className="relative">
-                            <User className="absolute left-3 top-3.5 text-gray-400" size={18} />
-                            <select
-                                value={selectedCustomer?.id || ''}
-                                onChange={(e) => {
-                                    const customer = customers.find(c => c.id === parseInt(e.target.value));
-                                    setSelectedCustomer(customer);
-                                }}
-                                className={`w-full pl-10 pr-3 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none appearance-none bg-white ${isCreditSale && !selectedCustomer ? 'border-red-300 ring-1 ring-red-200' : 'border-gray-300'}`}
-                            >
-                                <option value="">-- Consumidor Final (Sin Cliente) --</option>
-                                {customers.map(customer => (
-                                    <option key={customer.id} value={customer.id}>
-                                        {customer.name} - {customer.id_number || 'Sin ID'}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
+
+                        <CustomerSearch
+                            customers={customers}
+                            selectedCustomer={selectedCustomer}
+                            onSelect={setSelectedCustomer}
+                        />
+
+                        {isCreditSale && !selectedCustomer && (
+                            <div className="mt-2 text-xs text-red-600 font-medium animate-pulse">
+                                ⚠ Debe seleccionar un cliente para proceder con la venta a crédito.
+                            </div>
+                        )}
+
                         {isCreditSale && selectedCustomer && (
-                            <div className="mt-2 text-xs flex gap-3">
-                                <span className="text-green-700 font-medium">Límite: ${Number(selectedCustomer.credit_limit || 0).toFixed(2)}</span>
-                                <span className="text-blue-700 font-medium">Plazo: {selectedCustomer.payment_term_days || 15} días</span>
+                            <div className="mt-3 flex gap-3 text-sm bg-blue-50 p-2 rounded-lg border border-blue-100">
+                                <div className="flex-1">
+                                    <span className="block text-xs text-gray-500 uppercase font-bold">Límite de Crédito</span>
+                                    <span className="font-bold text-blue-700">${Number(selectedCustomer.credit_limit || 0).toFixed(2)}</span>
+                                </div>
+                                <div className="flex-1 border-l border-blue-200 pl-3">
+                                    <span className="block text-xs text-gray-500 uppercase font-bold">Plazo de Pago</span>
+                                    <span className="font-bold text-blue-700">{selectedCustomer.payment_term_days || 15} días</span>
+                                </div>
                             </div>
                         )}
                     </div>

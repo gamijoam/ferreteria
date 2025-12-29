@@ -613,6 +613,8 @@ class PurchaseItemCreate(BaseModel):
     quantity: Decimal
     unit_cost: Decimal
     update_cost: bool = False
+    update_price: bool = False  # NEW: Update sale price?
+    new_sale_price: Optional[Decimal] = None # NEW: The new sale price if update_price is True
 
 class PurchaseOrderCreate(PurchaseOrderBase):
     total_amount: Decimal

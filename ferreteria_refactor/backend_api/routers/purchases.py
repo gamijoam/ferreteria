@@ -74,6 +74,24 @@ async def create_purchase_order(order_data: schemas.PurchaseOrderCreate, db: Ses
                     total_value = (product.cost_price * old_stock) + (item.unit_cost * item.quantity)
                     product.cost_price = total_value / product.stock
             
+            # Update Sale Price (PVP) if requested
+            if item.update_price:
+                if item.new_sale_price and item.new_sale_price > 0:
+                    # Direct update from frontend
+                    product.price = item.new_sale_price
+                elif item.update_cost and product.cost_price > 0 and item.unit_cost > 0:
+                     # Intelligent auto-update if only "update price" is checked but no value sent
+                     # Try to maintain the PREVIOUS markup/margin
+                     # But since we just updated cost_price, we need the OLD cost to know the OLD margin?
+                     # A safer simple approach: Apply the new cost + existing implied margin
+                     # Implied Margin = (CurrentPrice / OldCost) - 1
+                     
+                     # To avoid complexity and errors, we strongly prefer explicit new_sale_price.
+                     # But as a fallback, if we have a defined profit_margin in product:
+                     if product.profit_margin:
+                         product.price = product.cost_price * (1 + (product.profit_margin / 100))
+
+            
             # Create Kardex entry
             kardex = models.Kardex(
                 product_id=product.id,

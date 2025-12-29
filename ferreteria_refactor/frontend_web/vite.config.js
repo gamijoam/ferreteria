@@ -15,11 +15,11 @@ export default defineConfig({
         secure: false,
       },
       '/assets': {
-        target: 'http://localhost:8000',
+        target: 'http://localhost:8001',
         changeOrigin: true,
       },
       '/images': {
-        target: 'http://localhost:8000',
+        target: 'http://localhost:8001',
         changeOrigin: true,
       },
     }
