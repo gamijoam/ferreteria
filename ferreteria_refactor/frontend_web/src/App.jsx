@@ -20,6 +20,7 @@ import Suppliers from './pages/Suppliers';
 import ReturnsManager from './pages/Returns/ReturnsManager';
 import SalesHistory from './pages/SalesHistory';
 import CustomerManager from './pages/Customers/CustomerManager';
+import QuotesManager from './pages/Quotes/QuotesManager';
 import AccountsReceivable from './pages/Credit/AccountsReceivable';
 import UsersManager from './pages/Users/UsersManager';
 import CashHistory from './pages/CashHistory';
@@ -100,6 +101,11 @@ function App() {
                             <Route path="/customers" element={
                               <ProtectedRoute roles={['ADMIN', 'SELLER']}>
                                 <CustomerManager />
+                              </ProtectedRoute>
+                            } />
+                            <Route path="/quotes" element={
+                              <ProtectedRoute roles={['ADMIN', 'SELLER']}>
+                                <QuotesManager />
                               </ProtectedRoute>
                             } />
                             <Route path="/accounts-receivable" element={

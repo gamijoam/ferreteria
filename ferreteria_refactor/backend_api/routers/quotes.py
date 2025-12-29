@@ -4,6 +4,7 @@ from typing import List
 from ..database.db import get_db
 from ..models import models
 from .. import schemas
+from sqlalchemy.orm import joinedload
 
 router = APIRouter(
     prefix="/quotes",
@@ -41,13 +42,23 @@ def create_quote(quote_data: schemas.QuoteCreate, db: Session = Depends(get_db))
 
 @router.get("", response_model=List[schemas.QuoteRead])
 def read_quotes(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    return db.query(models.Quote).order_by(models.Quote.date.desc()).offset(skip).limit(limit).all()
-
+    # Optimize query to load customer
+    return db.query(models.Quote)\
+        .options(joinedload(models.Quote.customer))\
+        .order_by(models.Quote.date.desc())\
+        .offset(skip).limit(limit).all()
 
 
 @router.get("/{quote_id}", response_model=schemas.QuoteReadWithDetails)
 def read_quote_details(quote_id: int, db: Session = Depends(get_db)):
-    quote = db.query(models.Quote).filter(models.Quote.id == quote_id).first()
+    # Optimize query to load details and products within details
+    quote = db.query(models.Quote)\
+        .options(
+            joinedload(models.Quote.customer),
+            joinedload(models.Quote.details).joinedload(models.QuoteDetail.product)
+        )\
+        .filter(models.Quote.id == quote_id).first()
+        
     if not quote:
         raise HTTPException(status_code=404, detail="Quote not found")
     return quote
@@ -61,3 +72,15 @@ def mark_quote_converted(quote_id: int, db: Session = Depends(get_db)):
     quote.status = "CONVERTED"
     db.commit()
     return {"status": "success", "message": "Quote converted to sale"}
+
+@router.delete("/{quote_id}")
+def delete_quote(quote_id: int, db: Session = Depends(get_db)):
+    quote = db.query(models.Quote).filter(models.Quote.id == quote_id).first()
+    if not quote:
+        raise HTTPException(status_code=404, detail="Quote not found")
+        
+    # Delete associated details first (though cascade might handle it, explicit is safer)
+    db.query(models.QuoteDetail).filter(models.QuoteDetail.quote_id == quote_id).delete()
+    db.delete(quote)
+    db.commit()
+    return {"status": "success", "message": "Quote deleted"}

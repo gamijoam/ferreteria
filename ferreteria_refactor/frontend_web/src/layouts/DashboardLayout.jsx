@@ -141,6 +141,10 @@ const DashboardLayout = () => {
                                     <ShoppingCart size={16} />
                                     <span>Punto de Venta</span>
                                 </Link>
+                                <Link to="/quotes" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center space-x-3 p-2 pl-4 rounded text-sm transition-colors ${isActive('/quotes') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
+                                    <ClipboardList size={16} />
+                                    <span>Cotizaciones</span>
+                                </Link>
                                 <Link to="/sales-history" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center space-x-3 p-2 pl-4 rounded text-sm transition-colors ${isActive('/sales-history') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
                                     <History size={16} />
                                     <span>Historial</span>
