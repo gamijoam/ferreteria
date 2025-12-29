@@ -32,10 +32,10 @@ def run_broadcast(event: str, data: dict):
 def read_products(skip: int = 0, limit: int = 5000, db: Session = Depends(get_db)):
     try:
         products = db.query(models.Product).options(joinedload(models.Product.units)).filter(models.Product.is_active == True).offset(skip).limit(limit).all()
-        print(f"✅ Loaded {len(products)} products successfully")
+        print(f"[OK] Loaded {len(products)} products successfully")
         return products
     except Exception as e:
-        print(f"❌ ERROR loading products: {type(e).__name__}: {str(e)}")
+        print(f"[ERROR] ERROR loading products: {type(e).__name__}: {str(e)}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error loading products: {str(e)}")
@@ -557,7 +557,7 @@ def update_sale(
     db: Session = Depends(get_db)
 ):
     """Update sale balance and paid status"""
-    print(f"🔄 UPDATE SALE {sale_id}: balance_pending={balance_pending}, paid={paid}")
+    print(f"[UPDATE] UPDATE SALE {sale_id}: balance_pending={balance_pending}, paid={paid}")
     
     sale = db.query(models.Sale).filter(models.Sale.id == sale_id).first()
     if not sale:

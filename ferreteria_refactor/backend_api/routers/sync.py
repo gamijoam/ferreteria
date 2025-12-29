@@ -58,10 +58,10 @@ def push_sales(sales_batch: List[schemas.SaleCreate], db: Session = Depends(get_
         "errors": []
     }
     
-    print(f"📥 PUSH RECEIVED: {len(sales_batch)} sales incoming.")
+    print(f"[SYNC] PUSH RECEIVED: {len(sales_batch)} sales incoming.")
     
     for sale_data in sales_batch:
-        print(f"🔎 Processing sale UUID: {sale_data.unique_uuid}")
+        print(f"[SYNC] Processing sale UUID: {sale_data.unique_uuid}")
         try:
             # 1. Check IDEMPOTENCY (The Golden Rule)
             if sale_data.unique_uuid:
@@ -118,16 +118,16 @@ def push_sales(sales_batch: List[schemas.SaleCreate], db: Session = Depends(get_
                     product.stock -= item.quantity
             
             results["processed"] += 1
-            print(f"✅ Sale {sale_data.unique_uuid} processed successfully.")
+            print(f"[OK] Sale {sale_data.unique_uuid} processed successfully.")
             
         except Exception as e:
             db.rollback()
-            print(f"❌ ERROR PROCESSING SALE {sale_data.unique_uuid}: {e}")
+            print(f"[ERROR] ERROR PROCESSING SALE {sale_data.unique_uuid}: {e}")
             import traceback
             traceback.print_exc()
             results["errors"].append({"uuid": sale_data.unique_uuid, "error": str(e)})
             continue # Try next sale in batch
             
     db.commit()
-    print(f"🏁 Sync batch completed. Processed: {results['processed']}, Errors: {len(results['errors'])}")
+    print(f"[SYNC] Sync batch completed. Processed: {results['processed']}, Errors: {len(results['errors'])}")
     return results

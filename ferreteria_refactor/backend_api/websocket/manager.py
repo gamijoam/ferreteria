@@ -18,13 +18,13 @@ class ConnectionManager:
         await websocket.accept()
         self.active_connections.append(websocket)
         self.connection_count += 1
-        print(f"✅ WebSocket Client connected. Total active: {len(self.active_connections)}")
+        print(f"[WS] Client connected. Total active: {len(self.active_connections)}")
 
     def disconnect(self, websocket: WebSocket):
         """Remove a WebSocket connection"""
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
-            print(f"❌ WebSocket Client disconnected. Total active: {len(self.active_connections)}")
+            print(f"[WS] Client disconnected. Total active: {len(self.active_connections)}")
 
     async def send_personal_message(self, message: str, websocket: WebSocket):
         """Send a message to a specific client"""
@@ -56,14 +56,14 @@ class ConnectionManager:
             "timestamp": datetime.now().isoformat()
         }, default=self._json_serializer)
         
-        print(f"📡 Broadcasting event: {event_type} to {len(self.active_connections)} clients")
+        print(f"[WS] Broadcasting event: {event_type} to {len(self.active_connections)} clients")
         
         disconnected = []
         for connection in self.active_connections:
             try:
                 await connection.send_text(message)
             except Exception as e:
-                print(f"❌ Error sending to client: {e}")
+                print(f"[WS] Error sending to client: {e}")
                 disconnected.append(connection)
         
         # Clean up disconnected clients

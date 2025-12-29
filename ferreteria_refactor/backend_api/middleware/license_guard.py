@@ -39,6 +39,7 @@ WHITELIST_PATHS = [
     "/api/v1/license/machine-id",
     "/assets",
     "/",
+    "/api/v1/ws",
 ]
 
 

@@ -19,7 +19,7 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         await manager.connect(websocket)
     except Exception as e:
-        print(f"❌ Error connecting WebSocket: {e}")
+        print(f"[WS] Error connecting WebSocket: {e}")
         return
     
     try:

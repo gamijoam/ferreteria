@@ -19,8 +19,12 @@ async def pull_catalog_from_cloud(db: Session, vps_url: str = None):
     """
     Connects to the VPS and downloads the catalog (Products, Customers, etc.)
     """
-    target_url = vps_url or "http://localhost:8000/api/v1" # Default to dev VPS URL if not provided
+    target_url = vps_url or VPS_BASE_URL  # Use environment variable
     
+    # Ensure /api/v1 is present
+    if not target_url.endswith("/api/v1"):
+         target_url = f"{target_url.rstrip('/')}/api/v1"
+
     # Use a hardcoded token or a specific 'sync' user token for now
     # In production, we'd do a proper handshake
     headers = {
@@ -28,16 +32,21 @@ async def pull_catalog_from_cloud(db: Session, vps_url: str = None):
     }
 
     try:
-        async with httpx.AsyncClient() as client:
-            print(f"⬇️ Downloading catalog from {target_url}/sync/pull/catalog...")
-            response = await client.get(f"{target_url}/sync/pull/catalog", headers=headers, timeout=60.0)
-            response.raise_for_status()
+        print(f"[SYNC] Downloading catalog from {target_url}/sync/pull/catalog...")
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(f"{target_url}/sync/pull/catalog", headers=headers)
+            
+            if response.status_code != 200:
+                print(f"[ERROR] Sync failed with status: {response.status_code}")
+                # Try to print body to see what happened (HTML error page?)
+                print(f"[ERROR] Body: {response.text[:200]}...") 
+                return {"success": False, "error": f"Status {response.status_code}"}
             
             data = response.json()
 
             # --- PROCESS CATEGORIES FIRST (FK Constraint) ---
             categories_data = data.get("categories", [])
-            print(f"📂 Processing {len(categories_data)} categories...")
+            print(f"[SYNC] Processing {len(categories_data)} categories...")
             for cat_data in categories_data:
                 category = db.query(models.Category).filter(models.Category.id == cat_data['id']).first()
                 if not category:
@@ -48,7 +57,7 @@ async def pull_catalog_from_cloud(db: Session, vps_url: str = None):
 
             # --- PROCESS EXCHANGE RATES FIRST (FK Constraint) ---
             rates_data = data.get("exchange_rates", [])
-            print(f"💱 Processing {len(rates_data)} exchange rates...")
+            print(f"[SYNC] Processing {len(rates_data)} exchange rates...")
             for r_data in rates_data:
                 rate = db.query(models.ExchangeRate).filter(models.ExchangeRate.id == r_data['id']).first()
                 if not rate:
@@ -64,7 +73,7 @@ async def pull_catalog_from_cloud(db: Session, vps_url: str = None):
 
             # --- PROCESS PRODUCTS ---
             products_data = data.get("products", [])
-            print(f"📦 Processing {len(products_data)} products...")
+            print(f"[SYNC] Processing {len(products_data)} products...")
             
             for p_data in products_data:
                 # Upsert Product
@@ -73,15 +82,16 @@ async def pull_catalog_from_cloud(db: Session, vps_url: str = None):
                     product = models.Product(id=p_data['id']) # Preserve ID
                     db.add(product)
                 
-                # Update fields
-                product.name = p_data['name']
-                product.description = p_data['description']
-                product.price = p_data['price']
-                product.stock = p_data['stock'] 
-                product.category_id = p_data['category_id']
+                
+                # Update fields (use .get() for optional fields)
+                product.name = p_data.get('name', 'Unknown')
+                product.description = p_data.get('description')
+                product.price = p_data.get('price', 0)
+                product.stock = p_data.get('stock', 0)
+                product.category_id = p_data.get('category_id')
                 product.exchange_rate_id = p_data.get('exchange_rate_id') # Crucial FK
                 product.sku = p_data.get('sku')
-                product.is_active = p_data['is_active']
+                product.is_active = p_data.get('is_active', True)
                 product.image_url = p_data.get('image_url')
                 
                 # --- PROCESS UNITS (Nested) ---
@@ -95,9 +105,9 @@ async def pull_catalog_from_cloud(db: Session, vps_url: str = None):
                             db.add(unit)
                         
                         unit.product_id = p_data['id']
-                        unit.unit_name = u_data['unit_name']
-                        unit.conversion_factor = u_data['conversion_factor']
-                        unit.price = u_data['price']
+                        unit.unit_name = u_data.get('unit_name', 'Unit')
+                        unit.conversion_factor = u_data.get('conversion_factor', 1)
+                        unit.price = u_data.get('price', 0)
                         unit.barcode = u_data.get('barcode')
                         unit.is_default = u_data.get('is_default', False)
                         
@@ -110,11 +120,12 @@ async def pull_catalog_from_cloud(db: Session, vps_url: str = None):
                     customer = models.Customer(id=c_data['id'])
                     db.add(customer)
                 
-                customer.name = c_data['name']
-                customer.email = c_data['email']
-                customer.phone = c_data['phone']
-                customer.nit = c_data['nit']
-                customer.address = c_data['address']
+                
+                customer.name = c_data.get('name', 'Unknown')
+                customer.email = c_data.get('email')
+                customer.phone = c_data.get('phone')
+                customer.nit = c_data.get('nit')
+                customer.address = c_data.get('address')
                 customer.unique_uuid = c_data.get('unique_uuid')
 
             db.commit()
@@ -122,27 +133,35 @@ async def pull_catalog_from_cloud(db: Session, vps_url: str = None):
 
     except Exception as e:
         db.rollback()
-        print(f"❌ Sync Error: {e}")
+        print(f"[ERROR] Sync Error: {e}")
         raise e
 
 async def push_sales_to_cloud(db: Session, vps_url: str = None):
     """
     Uploads pending sales to the VPS.
     """
-    target_url = vps_url or "http://localhost:8000/api/v1"
+    target_url = vps_url or VPS_BASE_URL
+    
+    # Ensure /api/v1 is present
+    if not target_url.endswith("/api/v1"):
+         target_url = f"{target_url.rstrip('/')}/api/v1"
+    
     headers = {
-        "Authorization": f"Bearer {os.getenv('SYNC_API_KEY', 'dev-sync-key')}" 
+        "Authorization": f"Bearer {os.getenv('SYNC_API_KEY', 'dev-sync-key')}"
     }
 
     try:
-        # 1. Fetch sales that are PENDING sync
-        pending_sales = db.query(models.Sale).filter(models.Sale.sync_status == "PENDING").all()
+        # 1. Get offline sales that haven't been synced
+        pending_sales = db.query(models.Sale).filter(
+            models.Sale.sync_status == 'PENDING',
+            models.Sale.is_offline_sale == True  # Only push sales created offline
+        ).all()
         
         if not pending_sales:
-            print("✅ No pending sales to push.")
-            return {"status": "success", "pushed": 0}
+            print("[SYNC] No pending sales to push.")
+            return {"synced_count": 0}
 
-        print(f"📤 Pushing {len(pending_sales)} sales to cloud...")
+        print(f"[SYNC] Push: Found {len(pending_sales)} pending sales to push to {target_url}...")
         
         sales_payload = []
         for sale in pending_sales:
@@ -200,7 +219,7 @@ async def push_sales_to_cloud(db: Session, vps_url: str = None):
             # 4. Check for Application-Level Errors (Cloud API catches exceptions and returns them in 'errors' list)
             result_data = response.json()
             if result_data.get("errors"):
-                print(f"❌ Cloud Sync Returned Errors: {result_data['errors']}")
+                print(f"[ERROR] Cloud Sync Returned Errors: {result_data['errors']}")
                 raise Exception(f"Cloud reported errors: {result_data['errors']}")
             
             # 5. If success, mark as SYNCHED
@@ -208,11 +227,11 @@ async def push_sales_to_cloud(db: Session, vps_url: str = None):
                 sale.sync_status = "SYNCED"
             
             db.commit()
-            print(f"✅ Successfully pushed {len(pending_sales)} sales. (Processed: {result_data.get('processed')})")
+            print(f"[OK] Successfully pushed {len(pending_sales)} sales. (Processed: {result_data.get('processed')})")
             return {"status": "success", "pushed": len(pending_sales)}
 
     except Exception as e:
-        print(f"❌ Push Error: {e}")
+        print(f"[ERROR] Push Error: {e}")
         import traceback
         traceback.print_exc()
         db.rollback()

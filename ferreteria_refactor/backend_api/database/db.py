@@ -12,9 +12,23 @@ DATABASE_URL = settings.DATABASE_URL
 
 if DB_TYPE == "sqlite" or "sqlite" in str(DATABASE_URL):
     # Desktop App Mode
+    # Desktop App Mode
     if DB_TYPE == "sqlite":
+        import sys
         db_name = os.getenv("SQLITE_DB_NAME", "ferreteria.db")
-        DATABASE_URL = f"sqlite:///./{db_name}"
+        
+        if getattr(sys, 'frozen', False):
+            # FROZEN: Use executable directory
+            base_path = os.path.dirname(sys.executable)
+            db_path = os.path.join(base_path, db_name)
+            DATABASE_URL = f"sqlite:///{db_path}"
+            # Asegurar que el directorio existe (aunque sea root)
+            os.makedirs(base_path, exist_ok=True)
+            print(f"[DB] Modo Congelado detectado. Usando BD en: {db_path}")
+        else:
+             # DEV: Relative to execution
+            DATABASE_URL = f"sqlite:///./{db_name}"
+            print(f"[DB] Modo Desarrollo. Usando BD relativa: {db_name}")
         
     connect_args = {"check_same_thread": False}
     pool_config = {} # SQLite doesn't use the same pool config as Postgres

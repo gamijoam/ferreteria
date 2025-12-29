@@ -477,10 +477,10 @@ def init_exchange_rates(db: Session):
     existing_count = db.query(models.ExchangeRate).count()
     
     if existing_count > 0:
-        print(f"✅ Exchange rates already seeded ({existing_count} rates found)")
+        print(f"[OK] Exchange rates already seeded ({existing_count} rates found)")
         return
     
-    print("🌱 Seeding default exchange rates...")
+    print("[SEED] Seeding default exchange rates...")
     
     default_rates = [
         models.ExchangeRate(
@@ -529,7 +529,7 @@ def init_exchange_rates(db: Session):
         db.add(rate)
     
     db.commit()
-    print(f"✅ Seeded {len(default_rates)} default exchange rates")
+    print(f"[OK] Seeded {len(default_rates)} default exchange rates")
 
 def init_currencies(db: Session):
     """Seed default currencies if table is empty"""
@@ -551,7 +551,7 @@ def init_currencies(db: Session):
         db.add(db_curr)
     
     db.commit()
-    print("✅ Currencies seeded successfully")
+    print("[OK] Currencies seeded successfully")
 
 @router.get("/debug/seed")
 def debug_seed_currencies(db: Session = Depends(get_db)):

@@ -6,12 +6,13 @@ import os
 import sys
 
 # --- DIAGNÓSTICO DE INICIO ---
-print("🔍 Verificando entorno Python...", flush=True)
+# --- DIAGNÓSTICO DE INICIO ---
+print("[INFO] Verificando entorno Python...", flush=True)
 try:
     import aiofiles
-    print("✅ aiofiles está instalado y disponible.", flush=True)
+    print("[OK] aiofiles esta instalado y disponible.", flush=True)
 except ImportError as e:
-    print(f"❌ ERROR CRÍTICO: aiofiles NO está instalado: {e}", flush=True)
+    print(f"[ERROR] ERROR CRITICO: aiofiles NO esta instalado: {e}", flush=True)
 
 from .models import models
 from .database.db import engine
@@ -19,7 +20,7 @@ from .routers import (
     products, customers, quotes, cash, suppliers, 
     inventory, returns, reports, purchases, users, 
     config, auth, categories, websocket, audit, system, payment_methods,
-    sync, sync_local # Hybrid Routers
+    sync, sync_local, cloud # Hybrid Routers + Cloud
 )
 from .routers.hardware_bridge import router as hardware_bridge_router  # WebSocket router
 from .middleware.license_guard import LicenseGuardMiddleware
@@ -35,17 +36,19 @@ from .config import settings
 @app.on_event("startup")
 async def startup_event_async():
     print("\n" + "="*60)
-    print("🚀 FERRETERÍA API INICIADA (Modo Docker SaaS v2)")
+    print("[INFO] FERRETERIA API INICIADA (Modo Docker SaaS v2)")
     print("="*60 + "\n")
 
 # --- SEGURIDAD HÍBRIDA (License Guard) ---
-if not os.getenv("DOCKER_CONTAINER"):
-    # Modo Local (PC Cliente)
-    app.add_middleware(LicenseGuardMiddleware)
-    print("🔒 MODO LOCAL: License Guard ACTIVADO")
-else:
-    # Modo SaaS (VPS)
-    print("☁️ MODO SAAS: License Guard DESACTIVADO (Gestión Centralizada)")
+# TEMPORARILY DISABLED FOR DEBUGGING
+# if not os.getenv("DOCKER_CONTAINER"):
+#     # Modo Local (PC Cliente)
+#     app.add_middleware(LicenseGuardMiddleware)
+#     print("[INFO] MODO LOCAL: License Guard ACTIVADO")
+# else:
+#     # Modo SaaS (VPS)
+#     print("[INFO] MODO SAAS: License Guard DESACTIVADO (Gestion Centralizada)")
+print("[INFO] License Guard DESACTIVADO TEMPORALMENTE PARA DEBUG")
 
 app.add_middleware(
     CORSMiddleware,
@@ -81,6 +84,7 @@ app.include_router(payment_methods.router, prefix="/api/v1", tags=["Métodos de 
 app.include_router(hardware_bridge_router, prefix="/api/v1", tags=["Hardware Bridge"])
 app.include_router(sync.router, prefix="/api/v1", tags=["Sincronización Híbrida"]) # VPS Side
 app.include_router(sync_local.router, prefix="/api/v1", tags=["Sincronización Local"]) # Client Side
+app.include_router(cloud.router, prefix="/api/v1", tags=["Cloud Configuration"]) # Cloud testing
 
 # DEBUG ENDPOINT - Remove after debugging
 @app.get("/api/v1/debug/routes")
@@ -96,32 +100,52 @@ def list_routes():
             })
     return {"total": len(routes), "routes": routes}
 
-# --- LÓGICA DE INICIALIZACIÓN ---
+# HEALTH CHECK - Para detección de conexión
+@app.get("/api/v1/health")
+def health_check():
+    """Simple health check endpoint for connectivity testing"""
+    return {"status": "ok", "service": "ferreteria-api"}
+
+# --- LOGICA DE INICIALIZACION ---
 def run_migrations():
     from alembic import command
     from alembic.config import Config
     try:
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        # Robust path for Docker: /app/ferreteria_refactor/alembic.ini
-        alembic_ini_path = os.path.join(base_dir, "alembic.ini")
-        if not os.path.exists(alembic_ini_path):
-             # Fallback: check current directory
-             alembic_ini_path = "alembic.ini"
+        if getattr(sys, 'frozen', False):
+             # FROZEN: alembic.ini is in the root of the bundle (sys._MEIPASS)
+             base_dir_frozen = sys._MEIPASS
+             alembic_ini_path = os.path.join(base_dir_frozen, "alembic.ini")
+             script_location = os.path.join(base_dir_frozen, "alembic")
+             # Override config to confirm script location
+             print(f"[MIGRATION] Buscando alembic.ini congelado en: {alembic_ini_path}")
+        else:
+             # DEV
+             base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+             alembic_ini_path = os.path.join(base_dir, "alembic.ini")
+             script_location = os.path.join(base_dir, "alembic")
              
+             if not os.path.exists(alembic_ini_path):
+                 alembic_ini_path = "alembic.ini"
+
         if os.path.exists(alembic_ini_path):
             alembic_cfg = Config(alembic_ini_path)
-            # Ensure script location is correct relative to ini
-            alembic_cfg.set_main_option("script_location", os.path.join(base_dir, "alembic"))
+            # FORCE script location to absolute path found above
+            alembic_cfg.set_main_option("script_location", script_location)
             command.upgrade(alembic_cfg, "head")
-            print("✅ Migraciones aplicadas correctamente.")
+            print("[OK] Migraciones aplicadas correctamente.")
     except Exception as e:
-        print(f"⚠️ Nota sobre migraciones: {e}")
+        print(f"[WARN] Nota sobre migraciones: {e}")
 
 @app.on_event("startup")
 def startup_event():
     # Create images directory - environment aware
     IS_DOCKER = os.getenv('DOCKER_CONTAINER', 'false').lower() == 'true'
-    if IS_DOCKER:
+    
+    if getattr(sys, 'frozen', False):
+        # FROZEN (PyInstaller): Use executable directory for data persistence
+        base_dir = os.path.dirname(sys.executable)
+        images_dir = os.path.join(base_dir, "data", "images", "products")
+    elif IS_DOCKER:
         images_dir = "/app/data/images/products"
     else:
         # Local development
@@ -129,14 +153,14 @@ def startup_event():
         images_dir = os.path.join(base_dir, "data", "images", "products")
     
     os.makedirs(images_dir, exist_ok=True)
-    print(f"📁 Directorio de imágenes creado: {images_dir}")
+    print(f"[INFO] Directorio de imagenes creado: {images_dir}")
     
     run_migrations()
     try:
         from .database.db import Base
         Base.metadata.create_all(bind=engine)
     except Exception as e:
-        print(f"⚠️ Error verificando tablas: {e}")
+        print(f"[WARN] Error verificando tablas: {e}")
 
     # Seed Data
     from .database.db import SessionLocal
@@ -149,14 +173,14 @@ def startup_event():
 
         # Initialize Payment Methods
         if db.query(models.PaymentMethod).count() == 0:
-            print("💳 Inicializando métodos de pago por defecto...")
+            print("[INFO] Inicializando metodos de pago por defecto...")
             defaults = ["Efectivo", "Pago Movil", "Punto de Venta", "Zelle", "Transferencia", "Credito"]
             for name in defaults:
                 db.add(models.PaymentMethod(name=name, is_active=True, is_system=True))
             db.commit()
-            print("✅ Métodos de pago creados.")
+            print("[OK] Metodos de pago creados.")
     except Exception as e:
-        print(f"⚠️ Nota de Inicialización: {e}")
+        print(f"[WARN] Nota de Inicializacion: {e}")
     finally:
         db.close()
 
@@ -165,8 +189,14 @@ def startup_event():
 # ============================================
 
 # 1. FIRST: Mount product images (must be before frontend catch-all)
+# 1. FIRST: Mount product images (must be before frontend catch-all)
 IS_DOCKER = os.getenv('DOCKER_CONTAINER', 'false').lower() == 'true'
-if IS_DOCKER:
+
+if getattr(sys, 'frozen', False):
+    # FROZEN (PyInstaller): Use executable directory
+    base_dir = os.path.dirname(sys.executable)
+    images_dir = os.path.join(base_dir, "data", "images", "products")
+elif IS_DOCKER:
     images_dir = "/app/data/images/products"
 else:
     # Local development
@@ -175,25 +205,38 @@ else:
 
 # Create directory if it doesn't exist
 os.makedirs(images_dir, exist_ok=True)
-print(f"📁 Directorio de imágenes: {images_dir}")
+print(f"[INFO] Directorio de imagenes: {images_dir}")
 
 # Mount the directory
 app.mount("/images/products", StaticFiles(directory=images_dir), name="product_images")
-print("✅ Imágenes montadas como archivos estáticos")
+print("[INFO] Imagenes montadas como archivos estaticos")
 
 # 2. THEN: Mount frontend static files
-static_dir = "/app/static"
+# Check for local frontend directory first (PWA mode), then Docker path
+if getattr(sys, 'frozen', False):
+    # FROZEN (PyInstaller): Frontend next to executable
+    frontend_dir = os.path.join(os.path.dirname(sys.executable), "frontend")
+elif os.path.exists("./frontend"):
+    # Local development/distribution: Frontend in ./frontend
+    frontend_dir = os.path.abspath("./frontend")
+elif os.path.exists("/app/static"):
+    # Docker: Frontend in /app/static
+    frontend_dir = "/app/static"
+else:
+    frontend_dir = None
 
 async def serve_index():
-    if os.path.exists(os.path.join(static_dir, "index.html")):
-        return FileResponse(os.path.join(static_dir, "index.html"))
+    if frontend_dir and os.path.exists(os.path.join(frontend_dir, "index.html")):
+        return FileResponse(os.path.join(frontend_dir, "index.html"))
     return JSONResponse(status_code=404, content={"detail": "Frontend index.html not found"})
 
-if os.path.exists(static_dir):
-    print(f"📂 FRONTEND ENCONTRADO en: {static_dir}")
+if frontend_dir and os.path.exists(frontend_dir):
+    print(f"[INFO] FRONTEND ENCONTRADO en: {frontend_dir}")
     
     # 1. Montar Assets
-    app.mount("/assets", StaticFiles(directory=os.path.join(static_dir, "assets")), name="assets")
+    assets_path = os.path.join(frontend_dir, "assets")
+    if os.path.exists(assets_path):
+        app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
     
     # 2. RUTA RAÍZ (Registrada explícitamente)
     app.add_api_route("/", serve_index, methods=["GET"], include_in_schema=False)
@@ -201,19 +244,19 @@ if os.path.exists(static_dir):
     # 3. Catch-All para React Router
     @app.get("/{full_path:path}", include_in_schema=False)
     async def serve_spa(full_path: str):
-        # 🛡️ ESCUDO DE API: Si la ruta empieza con 'api', devolver 404 JSON real
+        # [SECURITY] ESCUDO DE API: Si la ruta empieza con 'api', devolver 404 JSON real
         if full_path.startswith("api"):
             return JSONResponse(status_code=404, content={"detail": "API endpoint not found"})
         
         # Intentar servir archivo estático si existe
-        file_path = os.path.join(static_dir, full_path)
+        file_path = os.path.join(frontend_dir, full_path)
         if os.path.isfile(file_path):
             return FileResponse(file_path)
         
         # Fallback: Servir index.html para React Router
-        return FileResponse(os.path.join(static_dir, "index.html"))
+        return FileResponse(os.path.join(frontend_dir, "index.html"))
 else:
-    print("⚠️ FRONTEND NO ENCONTRADO. Solo API disponible.")
+    print("[WARN] FRONTEND NO ENCONTRADO. Solo API disponible.")
     @app.get("/")
     def root():
         return {"message": "Ferreteria API (Backend Only)"}

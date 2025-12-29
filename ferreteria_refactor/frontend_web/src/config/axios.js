@@ -1,13 +1,15 @@
 import axios from 'axios';
 
 // --- CAMBIO PARA SOPORTE HÍBRIDO (LOCAL/SAAS) ---
-// Detectar modo desarrollo y usar URL directa si el proxy falla
-// Detectar modo desarrollo y usar URL directa si el proxy falla
+// Detect if running in Electron (file:// protocol or no host)
+const isElectron = !window.location.host || window.location.protocol === 'file:';
 const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-// In Electron/Vite, we want to use the proxy '/api/v1' to hit localhost:8001
-const baseURL = '/api/v1';
 
-console.log('🔧 Axios config:', { isDevelopment, baseURL, hostname: window.location.hostname });
+// In Electron, use absolute URL to localhost:8001
+// In web, use relative URL (proxy handles it)
+const baseURL = isElectron ? 'http://localhost:8001/api/v1' : '/api/v1';
+
+console.log('🔧 Axios config:', { isElectron, isDevelopment, baseURL, hostname: window.location.hostname, protocol: window.location.protocol });
 
 const apiClient = axios.create({
     baseURL,
@@ -45,12 +47,17 @@ apiClient.interceptors.response.use(
 
             if (!isLoginRequest && !isLoginPage) {
                 // Unauthorized: Clear token and redirect
+                console.warn('⚠️ 401 Detectado - Limpiando sesión y redirigiendo...');
                 localStorage.removeItem('token');
                 localStorage.removeItem('user');
-                toast.error('Sesión expirada. Por favor inicie sesión.');
-                setTimeout(() => {
-                    window.location.href = '/login';
-                }, 1500);
+
+                // En Electron / HashRouter / react-router v6, cambiar window.location.href puede ser brusco.
+                // Intentamos forzar la navegación vía hash si es SPA, o recarga completa si es necesario.
+                if (window.location.hash !== '#/login') {
+                    window.location.hash = '#/login';
+                    // Fallback reload solo si no cambia nada
+                    // setTimeout(() => window.location.reload(), 500); 
+                }
             } else if (isLoginRequest) {
                 // For login failure, just clear potential stale tokens, but let the component handle the error display
                 localStorage.removeItem('token');

@@ -66,14 +66,20 @@ export const AuthProvider = ({ children }) => {
             } else {
                 throw new Error('User not found');
             }
+            return null;
         } catch (error) {
             console.error('Error fetching user profile:', error);
+
             // Fallback: decode from token
             const decoded = decodeToken(authToken);
             if (decoded) {
                 const fallbackUser = {
+                    id: 'offline-user',
                     username: decoded.sub,
-                    role: decoded.role || 'CASHIER' // Default role
+                    role: decoded.role || 'CASHIER',
+                    full_name: decoded.sub,
+                    is_active: true,
+                    isOffline: true
                 };
                 setUser(fallbackUser);
                 localStorage.setItem('user', JSON.stringify(fallbackUser));

@@ -108,6 +108,6 @@ def init_admin_user(db: Session):
         )
         db.add(new_admin)
         db.commit()
-        print("✅ Admin user created with default password 'admin123'")
+        print("[OK] Admin user created with default password 'admin123'")
     else:
-        print("✅ Admin user already exists, skipping initialization")
+        print("[OK] Admin user already exists, skipping initialization")

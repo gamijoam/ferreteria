@@ -26,14 +26,14 @@ async def hardware_bridge_websocket(websocket: WebSocket, client_id: str):
             data = await websocket.receive_text()
             
             # Log received message
-            print(f"📥 Received from {client_id}: {data}")
+            print(f"[WS] Received from {client_id}: {data}")
             
             # You can handle client messages here if needed
             # For now, we just acknowledge
             
     except WebSocketDisconnect:
         manager.disconnect(client_id)
-        print(f"🔌 WebSocket disconnected: {client_id}")
+        print(f"[WS] WebSocket disconnected: {client_id}")
     except Exception as e:
-        print(f"❌ WebSocket error for {client_id}: {e}")
+        print(f"[ERROR] WebSocket error for {client_id}: {e}")
         manager.disconnect(client_id)

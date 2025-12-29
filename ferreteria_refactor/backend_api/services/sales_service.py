@@ -277,7 +277,7 @@ class SalesService:
         except HTTPException:
             raise
         except Exception as e:
-            print(f"❌ ERROR CRÍTICO CREANDO VENTA: {e}")
+            print(f"[ERROR] ERROR CRÍTICO CREANDO VENTA: {e}")
             import traceback
             traceback.print_exc()
             db.rollback()
@@ -380,7 +380,7 @@ class SalesService:
         context["sale"]["products"] = context["sale"]["items"]
         
         # DEBUG: Print context items to verify discount
-        print("🔍 TICKET CONTEXT ITEMS:")
+        print("[DEBUG] TICKET CONTEXT ITEMS:")
         for i in context["sale"]["items"]:
             print(f"   - {i['product']['name']}: Price={i['unit_price']}, Discount%={i.get('discount_percentage')}, Subtotal={i['subtotal']}")
 

@@ -127,6 +127,9 @@ export const ConfigProvider = ({ children }) => {
             }
         } catch (err) {
             console.error("Critical Config Error", err);
+            // Emergency Fallback to prevent white screen
+            setBusiness({ name: 'Modo Offline / Error' });
+            setCurrencies([{ id: 1, name: 'USD', rate: 1, is_default: true, symbol: '$' }]);
         } finally {
             setLoading(false);
         }
