@@ -32,6 +32,9 @@ class ProductExportService:
                 'Nombre': p.name,
                 'SKU': p.sku or '',
                 'Precio USD': f"${p.price:.2f}",
+                'Costo': f"${p.cost_price:.2f}",
+                'Margen %': f"{p.profit_margin:.2f}%" if p.profit_margin else '',
+                'IVA %': f"{p.tax_rate:.2f}%" if p.tax_rate else '0%',
                 'Stock': f"{p.stock:.2f}",
                 'Stock Mínimo': f"{p.min_stock:.2f}" if p.min_stock else '',
                 'Categoría': p.category.name if p.category else '',
@@ -179,7 +182,11 @@ class ProductExportService:
         template_data = {
             'nombre': ['Ejemplo Producto'],
             'sku': ['ABC123'],
-            'precio_usd': [10.50],
+            'sku': ['ABC123'],
+            'costo': [8.50],
+            'margen_ganancia': [25.00],
+            'iva': [16.00],
+            'precio_usd': [12.33],
             'stock': [100],
             'descripcion': ['Descripción del producto'],
             'categoria': ['Ferretería'],
@@ -207,7 +214,10 @@ INSTRUCCIONES PARA IMPORTAR PRODUCTOS
 FORMATO DE DATOS:
 - nombre*: Texto (máx 200 caracteres)
 - sku: Texto único (opcional)
-- precio_usd*: Número decimal (ej: 10.50)
+- costo: Número decimal (opcional, ej: 8.50)
+- margen_ganancia: Número decimal (opcional, ej: 30.0)
+- iva: Porcentaje de impuesto (opcional, ej: 16.0)
+- precio_usd*: Número decimal (ej: 10.50) (Opcional si se indica costo+margen+iva)
 - stock*: Número entero o decimal (ej: 100 o 10.5)
 - descripcion: Texto (opcional)
 - categoria: Nombre exacto de categoría existente
@@ -221,7 +231,10 @@ FORMATO DE DATOS:
 EJEMPLO:
 Nombre: Tornillo 1/2"
 SKU: TOR-001
-Precio: 0.50
+Costo: 0.35
+Margen: 40
+IVA: 16
+Precio: 0.57
 Stock: 1000
 Categoría: Ferretería
         """

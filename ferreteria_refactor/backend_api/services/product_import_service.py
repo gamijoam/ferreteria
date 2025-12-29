@@ -14,7 +14,8 @@ class ProductImportService:
     REQUIRED_COLUMNS = ['nombre', 'precio_usd', 'stock']
     OPTIONAL_COLUMNS = [
         'sku', 'descripcion', 'categoria', 'proveedor', 'tasa_cambio',
-        'stock_minimo', 'ubicacion', 'descuento_porcentaje', 'descuento_activo'
+        'stock_minimo', 'ubicacion', 'descuento_porcentaje', 'descuento_activo',
+        'costo', 'margen_ganancia', 'iva'
     ]
     
     @staticmethod
@@ -38,13 +39,8 @@ class ProductImportService:
         if pd.isna(row.get('nombre')) or str(row.get('nombre')).strip() == '':
             errors.append(f"Fila {row_num}: Nombre es requerido")
         
-        # Price validation
-        try:
-            price = float(row.get('precio_usd', 0))
-            if price <= 0:
-                errors.append(f"Fila {row_num}: Precio debe ser mayor a 0")
-        except (ValueError, TypeError):
-            errors.append(f"Fila {row_num}: Precio inválido")
+        # Price validation (Moved to processing phase to allow calculation from Cost + Margin)
+        pass
         
         # Stock validation
         try:
@@ -53,6 +49,15 @@ class ProductImportService:
                 errors.append(f"Fila {row_num}: Stock no puede ser negativo")
         except (ValueError, TypeError):
             errors.append(f"Fila {row_num}: Stock inválido")
+            
+        # Cost validation (if provided)
+        try:
+            if not pd.isna(row.get('costo')):
+                cost = float(row.get('costo', 0))
+                if cost < 0:
+                     errors.append(f"Fila {row_num}: Costo no puede ser negativo")
+        except (ValueError, TypeError):
+            errors.append(f"Fila {row_num}: Costo inválido")
         
         # SKU uniqueness (if provided)
         if not pd.isna(row.get('sku')) and str(row.get('sku')).strip() != '':
@@ -118,15 +123,60 @@ class ProductImportService:
                 all_errors.extend(row_errors)
                 continue
             
+            # Cost Price
+            cost_price = 0.0
+            if not pd.isna(row.get('costo')):
+                cost_price = float(row.get('costo', 0))
+            
+            # Profit Margin
+            profit_margin = None
+            if not pd.isna(row.get('margen_ganancia')):
+                profit_margin = float(row.get('margen_ganancia', 0))
+
+            # Tax Rate (IVA)
+            tax_rate = 0.0
+            if not pd.isna(row.get('iva')):
+                try:
+                    parsed_tax = float(row.get('iva', 0))
+                    if 0 <= parsed_tax <= 100:
+                        tax_rate = parsed_tax
+                except (ValueError, TypeError):
+                    pass # Ignore invalid tax, default 0
+            
+            # Price Calculation Logic
+            # 1. Try to read explicit price
+            price = 0.0
+            if not pd.isna(row.get('precio_usd')):
+                try:
+                    price = float(row['precio_usd'])
+                except:
+                    price = 0.0
+            
+            # 2. If explicit price is missing/invalid, try to calculate from Cost + Margin + Tax
+            if price <= 0 and cost_price > 0 and profit_margin is not None:
+                # Formula: Cost * (1 + Margin) * (1 + Tax)
+                base_price = cost_price * (1 + profit_margin / 100)
+                price = base_price * (1 + tax_rate / 100)
+                # Round to 2 decimals
+                price = round(price, 2)
+            
+            # 3. Final Validation: Price must be > 0
+            if price <= 0:
+                all_errors.append(f"Fila {row_num}: Precio inválido (Debe ser > 0 o proveer Costo y Margen válidos para calcularlo)")
+                continue
+
             # Build product dict
             product_data = {
                 'name': str(row['nombre']).strip(),
-                'price': float(row['precio_usd']),
+                'price': price,
                 'stock': float(row['stock']),
                 'sku': str(row.get('sku', '')).strip() if not pd.isna(row.get('sku')) else None,
                 'description': str(row.get('descripcion', '')).strip() if not pd.isna(row.get('descripcion')) else None,
                 'min_stock': float(row.get('stock_minimo', 5)) if not pd.isna(row.get('stock_minimo')) else 5,
                 'location': str(row.get('ubicacion', '')).strip() if not pd.isna(row.get('ubicacion')) else None,
+                'cost_price': cost_price,
+                'profit_margin': profit_margin,
+                'tax_rate': tax_rate,
                 'is_active': True
             }
             

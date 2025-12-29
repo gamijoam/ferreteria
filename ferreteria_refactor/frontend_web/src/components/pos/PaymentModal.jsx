@@ -6,6 +6,7 @@ import apiClient from '../../config/axios';
 import toast from 'react-hot-toast';
 import QuickCustomerModal from './QuickCustomerModal';
 import CustomerSearch from './CustomerSearch';
+import CurrencyInput from '../common/CurrencyInput';
 
 // Helper to format currency consistently
 const formatCurrency = (amount, currencySymbol) => {
@@ -400,13 +401,12 @@ const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onCon
                                         <span className="flex items-center bg-gray-50 border border-gray-300 border-r-0 rounded-l-lg px-3 text-gray-500 font-bold min-w-[3rem] justify-center">
                                             {payment.currency}
                                         </span>
-                                        <input
-                                            type="number"
-                                            step="0.01"
+                                        <CurrencyInput
+                                            currencySymbol={payment.currency === 'USD' ? '$' : payment.currency}
                                             placeholder="Monto"
                                             className="flex-1 bg-white border border-gray-300 text-gray-900 text-sm rounded-r-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5"
                                             value={payment.amount}
-                                            onChange={(e) => updatePayment(index, 'amount', e.target.value)}
+                                            onChange={(val) => updatePayment(index, 'amount', val)}
                                         />
 
                                         {payments.length > 1 && (
