@@ -7,6 +7,19 @@ import toast from 'react-hot-toast';
 import QuickCustomerModal from './QuickCustomerModal';
 import CustomerSearch from './CustomerSearch';
 
+// Helper to format currency consistently
+const formatCurrency = (amount, currencySymbol) => {
+    // Determine locale based on currency
+    // USD -> en-US (1,234.56)
+    // Others (Bs, etc) -> es-VE (1.234,56)
+    const locale = currencySymbol === '$' || currencySymbol === 'USD' ? 'en-US' : 'es-VE';
+
+    return amount.toLocaleString(locale, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+};
+
 const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onConfirm }) => {
     const { getActiveCurrencies, convertPrice, getExchangeRate, paymentMethods } = useConfig();
     const { subscribe } = useWebSocket();
@@ -74,7 +87,10 @@ const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onCon
 
     const remainingUSD = totalUSD - totalPaidUSD;
     const changeUSD = totalPaidUSD - totalUSD;
-    const isComplete = remainingUSD <= 0.01;
+
+    // Strict validation: Must effectively be zero or overpaid.
+    // Floating point tolerance lowered to 0.005 (half a cent) to fix "missing 2 Bs" issue.
+    const isComplete = remainingUSD <= 0.005;
 
     const addPaymentRow = () => {
         setPayments([...payments, { amount: '', currency: 'USD', method: 'Efectivo' }]);
@@ -98,7 +114,8 @@ const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onCon
             return;
         }
 
-        if (!isCreditSale && !isComplete && Math.abs(remainingUSD) > 0.01) {
+        // Use the strict checking here too
+        if (!isCreditSale && !isComplete) {
             alert('El pago no está completo');
             return;
         }
@@ -188,7 +205,9 @@ const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onCon
 
                     <div className="mb-8">
                         <div className="text-sm text-gray-400">Total a Pagar</div>
-                        <div className="text-4xl font-bold text-white tracking-tight">${totalUSD.toFixed(2)}</div>
+                        <div className="text-4xl font-bold text-white tracking-tight">
+                            ${formatCurrency(totalUSD, 'USD')}
+                        </div>
                     </div>
 
                     <div className="space-y-4 mb-8 flex-1 overflow-y-auto">
@@ -202,14 +221,14 @@ const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onCon
                                     <div key={curr.symbol} className="flex justify-between items-center border-b border-gray-700 pb-2 last:border-0">
                                         <span className="text-gray-400 text-sm">{curr.name}</span>
                                         <span className="font-mono text-blue-300 flex flex-col items-end">
-                                            <span className={`text-lg font-bold ${amount > 0 ? 'text-white' : 'text-green-500'}`}>
-                                                {amount > 0
-                                                    ? `${amount.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${curr.symbol}`
+                                            <span className={`text-lg font-bold ${amount > 0.005 ? 'text-white' : 'text-green-500'}`}>
+                                                {amount > 0.005
+                                                    ? `${formatCurrency(amount, curr.symbol)} ${curr.symbol}`
                                                     : '¡COMPLETO!'
                                                 }
                                             </span>
                                             {curr.symbol !== 'USD' && (
-                                                <span className="text-xs text-gray-500">Tasa: {curr.rate.toLocaleString('es-VE')}</span>
+                                                <span className="text-xs text-gray-500">Tasa: {formatCurrency(curr.rate, 'VE')}</span>
                                             )}
                                         </span>
                                     </div>
@@ -223,13 +242,15 @@ const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onCon
                             {isComplete ? (
                                 <div className="text-center">
                                     <div className="text-sm text-green-300 mb-1">Cambio / Vuelto</div>
-                                    <div className="text-3xl font-bold text-green-400">${changeUSD.toFixed(2)}</div>
+                                    <div className="text-3xl font-bold text-green-400">${formatCurrency(changeUSD, 'USD')}</div>
                                     {currencies.find(c => !c.is_anchor) && (
                                         <div className="text-lg font-bold text-green-400/70 mt-1">
                                             {(() => {
                                                 const local = currencies.find(c => !c.is_anchor);
                                                 const amount = changeUSD * (local.rate || 1);
-                                                return `${local.symbol} ${amount.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                                                // Ensure we don't show negative change roughly
+                                                const displayAmount = Math.max(0, amount);
+                                                return `${local.symbol} ${formatCurrency(displayAmount, local.symbol)}`;
                                             })()}
                                         </div>
                                     )}
@@ -237,13 +258,13 @@ const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onCon
                             ) : (
                                 <div className="text-center">
                                     <div className="text-sm text-red-300 mb-1">Falta por Pagar</div>
-                                    <div className="text-3xl font-bold text-red-400">${Math.abs(remainingUSD).toFixed(2)}</div>
+                                    <div className="text-3xl font-bold text-red-400">${formatCurrency(Math.abs(remainingUSD), 'USD')}</div>
                                     {currencies.find(c => !c.is_anchor) && (
                                         <div className="text-lg font-bold text-red-400/70 mt-1">
                                             {(() => {
                                                 const local = currencies.find(c => !c.is_anchor);
                                                 const amount = Math.abs(remainingUSD) * (local.rate || 1);
-                                                return `${local.symbol} ${amount.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                                                return `${local.symbol} ${formatCurrency(amount, local.symbol)}`;
                                             })()}
                                         </div>
                                     )}
@@ -259,7 +280,7 @@ const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onCon
                                 <div className={`text-lg font-bold ${isCreditSale ? 'text-blue-400' : 'text-white'}`}>{selectedCustomer.name}</div>
                                 {isCreditSale && (
                                     <div className="text-xs text-blue-300 mt-2">
-                                        Límite: ${Number(selectedCustomer.credit_limit || 0).toFixed(2)}
+                                        Límite: ${formatCurrency(Number(selectedCustomer.credit_limit || 0), 'USD')}
                                     </div>
                                 )}
                             </div>
@@ -312,7 +333,7 @@ const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onCon
                             <div className="mt-3 flex gap-3 text-sm bg-blue-50 p-2 rounded-lg border border-blue-100">
                                 <div className="flex-1">
                                     <span className="block text-xs text-gray-500 uppercase font-bold">Límite de Crédito</span>
-                                    <span className="font-bold text-blue-700">${Number(selectedCustomer.credit_limit || 0).toFixed(2)}</span>
+                                    <span className="font-bold text-blue-700">${formatCurrency(Number(selectedCustomer.credit_limit || 0), 'USD')}</span>
                                 </div>
                                 <div className="flex-1 border-l border-blue-200 pl-3">
                                     <span className="block text-xs text-gray-500 uppercase font-bold">Plazo de Pago</span>
