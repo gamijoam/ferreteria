@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useConfig } from '../../context/ConfigContext'; // NEW
 import { DollarSign, AlertTriangle, FileText, CreditCard, ArrowLeft, TrendingDown, Eye } from 'lucide-react';
 import apiClient from '../../config/axios';
 import PurchaseItemsModal from '../../components/purchases/PurchaseItemsModal';
@@ -317,6 +318,7 @@ const AccountsPayable = () => {
 
 // Payment Modal Component
 const PaymentModal = ({ purchase, onClose, onSuccess }) => {
+    const { paymentMethods } = useConfig(); // NEW
     const balance = Number(purchase.total_amount || 0) - Number(purchase.paid_amount || 0);
     const [formData, setFormData] = useState({
         amount: balance,
@@ -402,10 +404,10 @@ const PaymentModal = ({ purchase, onClose, onSuccess }) => {
                             className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                             required
                         >
-                            <option value="Transferencia">Transferencia</option>
-                            <option value="Efectivo">Efectivo</option>
-                            <option value="Cheque">Cheque</option>
-                            <option value="Caja Chica">Caja Chica</option>
+                            <option value="">Seleccione un método</option>
+                            {paymentMethods.filter(pm => pm.is_active).map(pm => (
+                                <option key={pm.id} value={pm.name}>{pm.name}</option>
+                            ))}
                         </select>
                     </div>
 
