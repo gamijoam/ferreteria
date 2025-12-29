@@ -91,6 +91,15 @@ def register_movement(
     if not session:
         raise HTTPException(status_code=400, detail="No hay sesión de caja abierta")
 
+    # VALIDATE FUNDS FOR OUTBOUND MOVEMENTS
+    if movement.type in ["WITHDRAWAL", "EXPENSE", "OUT"]:
+        available = get_available_cash(db, session.id, movement.currency)
+        if movement.amount > available:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Fondos insuficientes en {movement.currency}. Disponible: {available}"
+            )
+
     new_movement = models.CashMovement(
         session_id=session.id,
         type=movement.type,
@@ -103,6 +112,69 @@ def register_movement(
     db.commit()
     db.refresh(new_movement)
     return new_movement
+
+@router.get("/balance")
+def get_current_balance(
+    currency: str = "USD",
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_active_user)
+):
+    """Get current available cash balance for a currency"""
+    session = db.query(models.CashSession).filter(
+        models.CashSession.status == "OPEN"
+    ).first()
+    
+    if not session:
+        return {"available": 0.0, "status": "CLOSED"}
+        
+    available = get_available_cash(db, session.id, currency)
+    return {"available": float(available), "status": "OPEN"}
+
+def get_available_cash(db: Session, session_id: int, currency: str) -> Decimal:
+    """Calculate available physical cash in the drawer for a specific currency"""
+    session = db.query(models.CashSession).filter(models.CashSession.id == session_id).first()
+    if not session:
+        return Decimal("0.00")
+
+    # 1. Initial Cash
+    initial = Decimal("0.00")
+    if currency == "USD":
+        initial = session.initial_cash
+    elif currency in ["Bs", "VES", "VEF"]:
+        initial = session.initial_cash_bs
+    
+    # 2. Cash Sales (Only "Efectivo")
+    # Query optimization: Calculate sum directly in DB would be faster, but staying consistent with existing logic
+    # We filter specifically for CASH payments in the requested currency
+    
+    # Normalize currency for query
+    target_currencies = [currency]
+    if currency in ["Bs", "VES", "VEF"]:
+        target_currencies = ["Bs", "VES", "VEF"]
+    
+    cash_sales = db.query(func.sum(models.SalePayment.amount)).\
+        join(models.Sale).\
+        filter(
+            models.Sale.date >= session.start_time,
+            models.Sale.date <= (session.end_time or datetime.now()),
+            models.SalePayment.payment_method.in_(["Efectivo", "CASH", "Cash", "efectivo"]),
+            models.SalePayment.currency.in_(target_currencies)
+        ).scalar() or Decimal("0.00")
+
+    # 3. Movements (Deposits - Withdrawals/Expenses)
+    movements_in = db.query(func.sum(models.CashMovement.amount)).filter(
+        models.CashMovement.session_id == session.id,
+        models.CashMovement.type == "DEPOSIT",
+        models.CashMovement.currency.in_(target_currencies)
+    ).scalar() or Decimal("0.00")
+    
+    movements_out = db.query(func.sum(models.CashMovement.amount)).filter(
+        models.CashMovement.session_id == session.id,
+        models.CashMovement.type.in_(["EXPENSE", "WITHDRAWAL", "OUT"]),
+        models.CashMovement.currency.in_(target_currencies)
+    ).scalar() or Decimal("0.00")
+    
+    return initial + cash_sales + movements_in - movements_out
 
 @router.get("/sessions/history")
 def get_sessions_history(
@@ -224,8 +296,9 @@ def get_session_details(
             sales_total_usd += amt
 
     # Calculate Movements
-    expenses_usd = sum((m.amount for m in movements if m.type == "EXPENSE" and m.currency == "USD"), Decimal("0.00"))
-    expenses_bs = sum((m.amount for m in movements if m.type == "EXPENSE" and (m.currency and m.currency.upper() in ["BS", "VES", "VEF"])), Decimal("0.00"))
+    # Calculate Movements
+    expenses_usd = sum((m.amount for m in movements if m.type in ["EXPENSE", "WITHDRAWAL", "OUT"] and m.currency == "USD"), Decimal("0.00"))
+    expenses_bs = sum((m.amount for m in movements if m.type in ["EXPENSE", "WITHDRAWAL", "OUT"] and (m.currency and m.currency.upper() in ["BS", "VES", "VEF"])), Decimal("0.00"))
     
     deposits_usd = sum((m.amount for m in movements if m.type == "DEPOSIT" and m.currency == "USD"), Decimal("0.00"))
     deposits_bs = sum((m.amount for m in movements if m.type == "DEPOSIT" and (m.currency and m.currency.upper() in ["BS", "VES", "VEF"])), Decimal("0.00"))
@@ -363,7 +436,7 @@ async def close_cash_session(
         
         if m.type == "DEPOSIT":
             movements_by_currency[curr]['deposits'] += m.amount
-        elif m.type == "EXPENSE":
+        elif m.type in ["EXPENSE", "WITHDRAWAL", "OUT"]:
             movements_by_currency[curr]['expenses'] += m.amount
     
     # ============================================

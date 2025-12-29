@@ -767,7 +767,7 @@ const POS = () => {
                             onClick={() => setIsMovementOpen(true)}
                             className="flex items-center justify-center gap-2 py-3 bg-white border border-slate-200 rounded-xl shadow-sm hover:border-blue-300 text-slate-600 text-sm font-bold transition-all"
                         >
-                            <CreditCard size={16} /> Gastos
+                            <CreditCard size={16} /> Caja / Avance
                         </button>
                         <Link
                             to="/cash-close"

@@ -12,6 +12,28 @@ const CashMovementModal = ({ isOpen, onClose, onSuccess }) => {
     const [currencies, setCurrencies] = useState([]);
     const [loading, setLoading] = useState(false);
 
+    const [availableBalance, setAvailableBalance] = useState(0);
+    const [loadingBalance, setLoadingBalance] = useState(false);
+
+    // Fetch balance when currency changes
+    useEffect(() => {
+        if (isOpen) {
+            fetchAvailableBalance();
+        }
+    }, [isOpen, currency]);
+
+    const fetchAvailableBalance = async () => {
+        setLoadingBalance(true);
+        try {
+            const response = await apiClient.get('/cash/balance', { params: { currency } });
+            setAvailableBalance(response.data.available);
+        } catch (error) {
+            console.error("Error fetching balance:", error);
+        } finally {
+            setLoadingBalance(false);
+        }
+    };
+
     useEffect(() => {
         if (isOpen) {
             // Get active currencies including USD base
@@ -73,19 +95,19 @@ const CashMovementModal = ({ isOpen, onClose, onSuccess }) => {
                                 type="button"
                                 onClick={() => setType('OUT')}
                                 className={`py-3 rounded-lg border-2 text-sm font-medium transition-all flex items-center justify-center ${type === 'OUT'
-                                        ? 'bg-red-50 border-red-500 text-red-700'
-                                        : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-gray-300'
+                                    ? 'bg-red-50 border-red-500 text-red-700'
+                                    : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-gray-300'
                                     }`}
                             >
                                 <TrendingDown size={18} className="mr-2" />
-                                Salida (Gasto/Retiro)
+                                Salida / Avance de Efectivo
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setType('IN')}
                                 className={`py-3 rounded-lg border-2 text-sm font-medium transition-all flex items-center justify-center ${type === 'IN'
-                                        ? 'bg-green-50 border-green-500 text-green-700'
-                                        : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-gray-300'
+                                    ? 'bg-green-50 border-green-500 text-green-700'
+                                    : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-gray-300'
                                     }`}
                             >
                                 <TrendingUp size={18} className="mr-2" />
@@ -127,6 +149,18 @@ const CashMovementModal = ({ isOpen, onClose, onSuccess }) => {
                                 required
                             />
                         </div>
+                        {/* Balance Display */}
+                        {type === 'OUT' && (
+                            <div className="mt-1 text-xs">
+                                {loadingBalance ? (
+                                    <span className="text-gray-400">Verificando saldo...</span>
+                                ) : (
+                                    <span className={`${availableBalance < parseFloat(amount || 0) ? 'text-red-600 font-bold' : 'text-gray-500'}`}>
+                                        Disponible en Caja: {currency} {availableBalance.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                                    </span>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     {/* Description */}
