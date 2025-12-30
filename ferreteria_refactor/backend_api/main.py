@@ -17,11 +17,13 @@ except ImportError as e:
 from .models import models
 from .database.db import engine
 from .routers import (
-    products, customers, quotes, cash, suppliers, 
-    inventory, returns, reports, purchases, users, 
-    config, auth, categories, websocket, audit, system, payment_methods,
-    sync, sync_local, cloud # Hybrid Routers + Cloud
+    auth, products, users, reports, customers, suppliers, 
+    purchases, cash, config, quotes, warehouses, transfers, 
+    inventory, returns, categories, websocket, audit, system, 
+    payment_methods, sync, sync_local, cloud
 )
+from .audit_utils import log_action
+from .models.models import UserRole
 from .routers.hardware_bridge import router as hardware_bridge_router  # WebSocket router
 from .middleware.license_guard import LicenseGuardMiddleware
 
@@ -84,6 +86,8 @@ app.include_router(payment_methods.router, prefix="/api/v1", tags=["Métodos de 
 app.include_router(hardware_bridge_router, prefix="/api/v1", tags=["Hardware Bridge"])
 app.include_router(sync.router, prefix="/api/v1", tags=["Sincronización Híbrida"]) # VPS Side
 app.include_router(sync_local.router, prefix="/api/v1", tags=["Sincronización Local"]) # Client Side
+app.include_router(warehouses.router, prefix="/api/v1", tags=["Almacenes"])
+app.include_router(transfers.router, prefix="/api/v1", tags=["Traslados"]) # New Transfer Router # New line for warehouses
 app.include_router(cloud.router, prefix="/api/v1", tags=["Cloud Configuration"]) # Cloud testing
 
 # DEBUG ENDPOINT - Remove after debugging

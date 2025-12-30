@@ -140,6 +140,9 @@ class Product(Base):
         foreign_keys="ComboItem.child_product_id",
         back_populates="child_product"
     )
+    
+    # NEW: Multi-Warehouse Stocks
+    stocks = relationship("ProductStock", back_populates="product", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Product(name='{self.name}', is_box={self.is_box}, is_combo={self.is_combo}, factor={self.conversion_factor})>"
@@ -241,11 +244,14 @@ class Sale(Base):
     unique_uuid = Column(String(36), nullable=True, unique=True, index=True)
     sync_status = Column(String(20), default="SYNCED") # SYNCED, PENDING
     is_offline_sale = Column(Boolean, default=False)
+    
+    warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=True) # Linked warehouse
 
     details = relationship("SaleDetail", back_populates="sale")
     customer = relationship("Customer", back_populates="sales")
     payments = relationship("SalePayment", back_populates="sale", lazy="joined")
     returns = relationship("Return", back_populates="sale")
+    warehouse = relationship("Warehouse")
 
     @property
     def status(self):
@@ -599,10 +605,36 @@ class AuditLog(Base):
     ip_address = Column(String, nullable=True)
     timestamp = Column(DateTime, default=datetime.datetime.now, index=True)
 
-    user = relationship("User")
+class Warehouse(Base):
+    __tablename__ = "warehouses"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, index=True, nullable=False)
+    address = Column(String, nullable=True)
+    is_active = Column(Boolean, default=True)
+    is_main = Column(Boolean, default=False) # To identify the primary/default warehouse
+
+    stocks = relationship("ProductStock", back_populates="warehouse")
 
     def __repr__(self):
-        return f"<AuditLog(action='{self.action}', table='{self.table_name}')>"
+        return f"<Warehouse(name='{self.name}', main={self.is_main})>"
+
+class ProductStock(Base):
+    __tablename__ = "product_stocks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
+    warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=False)
+    quantity = Column(Numeric(12, 3), default=0.000)
+    location = Column(String, nullable=True) # Specific shelf/bin in this warehouse
+
+    product = relationship("Product", back_populates="stocks")
+    warehouse = relationship("Warehouse", back_populates="stocks")
+
+    def __repr__(self):
+        return f"<ProductStock(product={self.product_id}, warehouse={self.warehouse_id}, qty={self.quantity})>"
+
+
 
 # ============================================
 # TABLA DE PRUEBA PARA AUTO-MIGRACION
@@ -616,6 +648,40 @@ class TestAutoMigration(Base):
     description = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.now)
     is_active = Column(Boolean, default=True)
+
+
+class InventoryTransfer(Base):
+    __tablename__ = "inventory_transfers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    source_warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=False)
+    target_warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=False)
+    date = Column(DateTime, default=datetime.datetime.now)
+    status = Column(String, default="PENDING") # PENDING, COMPLETED, CANCELLED
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.now)
+    updated_at = Column(DateTime, onupdate=datetime.datetime.now)
+
+    source_warehouse = relationship("Warehouse", foreign_keys=[source_warehouse_id])
+    target_warehouse = relationship("Warehouse", foreign_keys=[target_warehouse_id])
+    details = relationship("TransferDetail", back_populates="transfer", cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f"<InventoryTransfer(id={self.id}, s={self.source_warehouse_id}, t={self.target_warehouse_id}, status={self.status})>"
+
+class TransferDetail(Base):
+    __tablename__ = "transfer_details"
+
+    id = Column(Integer, primary_key=True, index=True)
+    transfer_id = Column(Integer, ForeignKey("inventory_transfers.id"), nullable=False)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
+    quantity = Column(Numeric(12, 3), nullable=False)
+
+    transfer = relationship("InventoryTransfer", back_populates="details")
+    product = relationship("Product")
+
+    def __repr__(self):
+        return f"<TransferDetail(t={self.transfer_id}, p={self.product_id}, q={self.quantity})>"
 
 
 

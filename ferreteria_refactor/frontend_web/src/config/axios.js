@@ -7,7 +7,7 @@ const isDevelopment = window.location.hostname === 'localhost' || window.locatio
 
 // In Electron, use absolute URL to localhost:8001
 // In web, use relative URL (proxy handles it)
-const baseURL = isElectron ? 'http://localhost:8001/api/v1' : '/api/v1';
+const baseURL = isElectron ? 'http://localhost:8000/api/v1' : '/api/v1';
 
 console.log('🔧 Axios config:', { isElectron, isDevelopment, baseURL, hostname: window.location.hostname, protocol: window.location.protocol });
 

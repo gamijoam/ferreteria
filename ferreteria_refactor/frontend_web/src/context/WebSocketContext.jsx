@@ -31,17 +31,17 @@ export const WebSocketProvider = ({ children }) => {
         let protocol, host;
 
         if (isElectron) {
-            // Electron: Always use localhost:8001
+            // Electron: Always use localhost:8000
             protocol = 'ws:';
-            host = 'localhost:8001';
+            host = 'localhost:8000';
         } else {
             // Web: Use current location
             protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             host = window.location.host;
 
-            // DEVELOPMENT OVERRIDE: If on localhost:5173, point to backend at 8001
+            // DEVELOPMENT OVERRIDE: If on localhost:5173, point to backend at 8000
             if (window.location.hostname === 'localhost' && window.location.port === '5173') {
-                host = 'localhost:8001';
+                host = 'localhost:8000';
             }
         }
 

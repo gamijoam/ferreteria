@@ -31,7 +31,7 @@ def run_broadcast(event: str, data: dict):
 @router.get("", response_model=List[schemas.ProductRead], include_in_schema=False)
 def read_products(skip: int = 0, limit: int = 5000, db: Session = Depends(get_db)):
     try:
-        products = db.query(models.Product).options(joinedload(models.Product.units)).filter(models.Product.is_active == True).offset(skip).limit(limit).all()
+        products = db.query(models.Product).options(joinedload(models.Product.units), joinedload(models.Product.stocks)).filter(models.Product.is_active == True).offset(skip).limit(limit).all()
         print(f"[OK] Loaded {len(products)} products successfully")
         return products
     except Exception as e:
@@ -44,7 +44,7 @@ def read_products(skip: int = 0, limit: int = 5000, db: Session = Depends(get_db
 @router.post("", response_model=schemas.ProductRead, dependencies=[Depends(has_role([UserRole.ADMIN, UserRole.WAREHOUSE]))], include_in_schema=False)
 def create_product(product: schemas.ProductCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     # 1. Operaciones DB (Síncronas en Threadpool)
-    product_data = product.dict(exclude={"units", "combo_items"})
+    product_data = product.dict(exclude={"units", "combo_items", "warehouse_stocks"})
     db_product = models.Product(**product_data)
     db.add(db_product)
     try:
@@ -85,6 +85,38 @@ def create_product(product: schemas.ProductCreate, background_tasks: BackgroundT
         db.commit()
         db.refresh(db_product)
         
+    # NEW: Process Warehouse Stocks
+    total_stock = 0
+    if product.warehouse_stocks:
+        for stock in product.warehouse_stocks:
+            db_stock = models.ProductStock(
+                product_id=db_product.id,
+                warehouse_id=stock.warehouse_id,
+                quantity=stock.quantity,
+                location=stock.location
+            )
+            db.add(db_stock)
+            total_stock += stock.quantity
+        
+        # Sync total stock
+        db_product.stock = total_stock
+        db.commit()
+        db.refresh(db_product)
+    else:
+        # If no stocks provided but total stock is > 0, assign to MAIN warehouse (ID 1 default)
+        if product.stock > 0:
+            main_wh = db.query(models.Warehouse).filter(models.Warehouse.is_main == True).first()
+            if main_wh:
+                db_stock = models.ProductStock(
+                    product_id=db_product.id,
+                    warehouse_id=main_wh.id,
+                    quantity=product.stock,
+                    location=product.location
+                )
+                db.add(db_stock)
+                db.commit()
+                db.refresh(db_product)
+
     # 2. WebSocket en Background
     payload = {
         "id": db_product.id,
@@ -132,6 +164,11 @@ def update_product(product_id: int, product_update: schemas.ProductUpdate, backg
     if "combo_items" in update_data:
         combo_items_data = update_data.pop("combo_items")
 
+    # NEW: Separate warehouse_stocks data if present
+    stocks_data = None
+    if "warehouse_stocks" in update_data:
+        stocks_data = update_data.pop("warehouse_stocks")
+
     # Capture Current State (Old)
     old_state = {c.name: getattr(db_product, c.name) for c in db_product.__table__.columns}
 
@@ -165,6 +202,30 @@ def update_product(product_id: int, product_update: schemas.ProductUpdate, backg
                 unit_id=combo_item.get("unit_id")  # NEW: Include unit_id
             )
             db.add(db_combo_item)
+            
+    # NEW: Handle Stocks Update (Snapshot Strategy)
+    if stocks_data is not None:
+        # Delete existing stocks
+        db.query(models.ProductStock).filter(models.ProductStock.product_id == product_id).delete()
+        
+        total_stock = 0
+        for stock in stocks_data:
+            # Pydantic model vs dict check
+            w_id = stock["warehouse_id"] if isinstance(stock, dict) else stock.warehouse_id
+            qty = stock["quantity"] if isinstance(stock, dict) else stock.quantity
+            loc = stock.get("location") if isinstance(stock, dict) else stock.location
+
+            db_stock = models.ProductStock(
+                product_id=product_id,
+                warehouse_id=w_id,
+                quantity=qty,
+                location=loc
+            )
+            db.add(db_stock)
+            total_stock += qty
+        
+        # Sync total
+        db_product.stock = total_stock
 
     db.commit()
     db.refresh(db_product)
@@ -338,7 +399,7 @@ def export_pdf(db: Session = Depends(get_db)):
 
 @router.get("/{product_id}", response_model=schemas.ProductRead)
 def read_product(product_id: int, db: Session = Depends(get_db)):
-    product = db.query(models.Product).options(joinedload(models.Product.units)).filter(models.Product.id == product_id).first()
+    product = db.query(models.Product).options(joinedload(models.Product.units), joinedload(models.Product.stocks)).filter(models.Product.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     return product

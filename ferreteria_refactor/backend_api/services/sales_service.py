@@ -66,6 +66,21 @@ class SalesService:
                         detail=f"Excede límite de crédito. Deuda actual: ${current_debt:.2f}, Límite: ${customer.credit_limit:.2f}, Disponible: ${(customer.credit_limit - current_debt):.2f}"
                     )
             
+            # 0.5. Determine Source Warehouse
+            warehouse_id = sale_data.warehouse_id
+            if not warehouse_id:
+                # Default to Main Warehouse
+                main_wh = db.query(models.Warehouse).filter(models.Warehouse.is_main == True).first()
+                if main_wh:
+                    warehouse_id = main_wh.id
+                else:
+                    # Fallback to first warehouse or error
+                    first_wh = db.query(models.Warehouse).filter(models.Warehouse.is_active == True).first()
+                    if first_wh:
+                        warehouse_id = first_wh.id
+                    else:
+                        raise HTTPException(status_code=500, detail="No active warehouse found to deduct stock")
+
             # 1. Create Sale Header
             total_bs = sale_data.total_amount * sale_data.exchange_rate
             
@@ -90,6 +105,7 @@ class SalesService:
                 notes=sale_data.notes,
                 due_date=due_date,
                 balance_pending=balance_pending,
+                warehouse_id=warehouse_id, # Link sale to warehouse
                 # user_id=user_id # TODO: Uncomment when user_id is added to Sale model
                 
                 # Hybrid / Offline Logic
@@ -112,7 +128,7 @@ class SalesService:
                 
                 # NEW: COMBO LOGIC - Check if product is a combo
                 if product.is_combo:
-                    # COMBO: Don't check/deduct stock from parent, process children instead
+                     # COMBO: Deduct stock from child components in specific warehouse
                     if not product.combo_items:
                         raise HTTPException(
                             status_code=400, 
@@ -123,50 +139,67 @@ class SalesService:
                     for combo_item in product.combo_items:
                         child_product = combo_item.child_product
                         
-                        # NEW: Calculate quantity considering unit presentation
                         if combo_item.unit_id and combo_item.unit:
-                            # If specific unit is defined, use its conversion factor
                             conversion_factor = combo_item.unit.conversion_factor
                             qty_needed = item.quantity * combo_item.quantity * conversion_factor
                         else:
-                            # No unit specified, use base quantity
                             qty_needed = item.quantity * combo_item.quantity
                         
-                        if child_product.stock < qty_needed:
-                            raise HTTPException(
+                        # CHECK WAREHOUSE STOCK
+                        child_stock = db.query(models.ProductStock).filter(
+                            models.ProductStock.product_id == child_product.id,
+                            models.ProductStock.warehouse_id == warehouse_id
+                        ).first()
+                        
+                        available_qty = child_stock.quantity if child_stock else 0
+                        
+                        if available_qty < qty_needed:
+                             wh_name = db.query(models.Warehouse.name).filter(models.Warehouse.id == warehouse_id).scalar()
+                             raise HTTPException(
                                 status_code=400,
-                                detail=f"Insufficient stock for combo component '{child_product.name}'. Needed: {qty_needed}, Available: {child_product.stock}"
+                                detail=f"Insufficient stock for combo component '{child_product.name}' in '{wh_name}'. Needed: {qty_needed}, Available: {available_qty}"
                             )
                     
-                    # All checks passed, now deduct stock from children
+                    # All checks passed, now deduct stock from buffer/children
                     for combo_item in product.combo_items:
                         child_product = combo_item.child_product
                         
-                        # NEW: Calculate quantity considering unit presentation
                         if combo_item.unit_id and combo_item.unit:
-                            # If specific unit is defined, use its conversion factor
                             conversion_factor = combo_item.unit.conversion_factor
                             qty_to_deduct = item.quantity * combo_item.quantity * conversion_factor
                             unit_description = f" ({combo_item.quantity}x {combo_item.unit.unit_name})"
                         else:
-                            # No unit specified, use base quantity
                             qty_to_deduct = item.quantity * combo_item.quantity
                             unit_description = ""
                         
-                        # Deduct stock from child
+                        # Deduct stock from WAREHOUSE STOCK
+                        child_stock = db.query(models.ProductStock).filter(
+                            models.ProductStock.product_id == child_product.id,
+                            models.ProductStock.warehouse_id == warehouse_id
+                        ).first()
+
+                        if not child_stock:
+                             # Should have been caught by check, but just in case
+                             child_stock = models.ProductStock(product_id=child_product.id, warehouse_id=warehouse_id, quantity=0)
+                             db.add(child_stock)
+
+                        child_stock.quantity -= qty_to_deduct
+                        
+                        # ALSO UPDATE TOTAL PRODUCT STOCK (Legacy Support)
                         child_product.stock -= qty_to_deduct
                         
-                        # Create Kardex entry for child product
+                        # Create Kardex entry
                         kardex_entry = models.Kardex(
                             product_id=child_product.id,
                             movement_type="SALE",
                             quantity=-qty_to_deduct,
-                            balance_after=child_product.stock,
-                            description=f"Sale via combo: {product.name}{unit_description} (Sale #{new_sale.id})"
+                            balance_after=child_product.stock, # Legacy balance
+                            description=f"Sale via combo: {product.name}{unit_description} (Sale #{new_sale.id})",
+                            # warehouse_id=warehouse_id # TODO: Add warehouse_id to Kardex
                         )
                         db.add(kardex_entry)
                         
-                        # Collect child product info for broadcast
+                        # Collect info
                         updated_products_info.append({
                             "id": child_product.id,
                             "name": child_product.name,
@@ -175,11 +208,22 @@ class SalesService:
                             "exchange_rate_id": child_product.exchange_rate_id
                         })
                 else:
-                    # NORMAL PRODUCT: Check and deduct stock as usual
-                    if product.stock < units_to_deduct:
-                        raise HTTPException(status_code=400, detail=f"Insufficient stock for {product.name}")
+                    # NORMAL PRODUCT: Check and deduct stock from WAREHOUSE
+                    product_stock = db.query(models.ProductStock).filter(
+                        models.ProductStock.product_id == product.id,
+                        models.ProductStock.warehouse_id == warehouse_id
+                    ).first()
+                    
+                    available_qty = product_stock.quantity if product_stock else 0
+
+                    if available_qty < units_to_deduct:
+                        wh_name = db.query(models.Warehouse.name).filter(models.Warehouse.id == warehouse_id).scalar()
+                        raise HTTPException(status_code=400, detail=f"Insufficient stock for product '{product.name}' in warehouse '{wh_name or 'Unknown'}'. Available: {available_qty}")
                     
                     # Update Stock
+                    product_stock.quantity -= units_to_deduct
+                    
+                    # Update Total Legacy Stock
                     product.stock -= units_to_deduct
                     
                     # Collect info for broadcast
@@ -197,7 +241,7 @@ class SalesService:
                         movement_type="SALE",
                         quantity=-units_to_deduct,
                         balance_after=product.stock,
-                        description=f"Sale #{new_sale.id}: Sold {item.quantity} units at ${item.unit_price} each"
+                        description=f"Sale #{new_sale.id} from Warehouse #{warehouse_id}"
                     )
                     db.add(kardex_entry)
                 

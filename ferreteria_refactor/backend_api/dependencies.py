@@ -21,9 +21,12 @@ def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], db: Session 
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         username: str = payload.get("sub")
         if username is None:
+            print("⛔ Auth Failed: Token payload missing 'sub'")
             raise credentials_exception
     except JWTError as e:
-        print(f"JWT Validation Error: {e}")
+        print(f"⛔ JWT Validation Error: {e}")
+        print(f"   - Expected Key: {settings.SECRET_KEY[:5]}...")
+        print(f"   - Algorithm: {settings.ALGORITHM}")
         raise credentials_exception
         
     user = db.query(User).filter(User.username == username).first()
@@ -44,7 +47,9 @@ class RoleChecker:
         self.allowed_roles = allowed_roles
 
     def __call__(self, user: Annotated[User, Depends(get_current_active_user)]):
+        print(f"🕵️ RoleChecker: User '{user.username}' (Role: {user.role}) vs Allowed: {self.allowed_roles}")
         if user.role not in self.allowed_roles:
+            print(f"⛔ RoleChecker: Access DENIED. User role {user.role} not in {self.allowed_roles}")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, 
                 detail="Operation not permitted"

@@ -13,6 +13,7 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
     const [activeTab, setActiveTab] = useState('general');
     const [categories, setCategories] = useState([]);
     const [exchangeRates, setExchangeRates] = useState([]);
+    const [warehouses, setWarehouses] = useState([]); // NEW: Warehouses state
     const [formData, setFormData] = useState({
         name: '',
         sku: '',
@@ -33,7 +34,8 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
         is_discount_active: false,
         tax_rate: 0, // NEW: Tax Rate
         units: [],
-        combo_items: []
+        combo_items: [],
+        warehouse_stocks: [] // NEW: Stocks per warehouse
     });
 
     // Calculated values for display
@@ -51,6 +53,8 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
             fetchExchangeRates();
             // Fetch default tax rate
             fetchDefaultTaxRate();
+            // Fetch warehouses for stock management
+            fetchWarehouses();
 
             if (initialData) {
                 // Map backend units to frontend format
@@ -103,7 +107,8 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
                     is_discount_active: initialData.is_discount_active || false,
                     tax_rate: initialData.tax_rate !== undefined ? initialData.tax_rate : 0, // Load tax rate
                     units: mappedUnits,
-                    combo_items: initialData.combo_items || []  // NEW
+                    combo_items: initialData.combo_items || [], // NEW
+                    warehouse_stocks: initialData.stocks || [] // NEW: Load existing stocks
                 });
             } else {
                 // Reset for new product
@@ -112,7 +117,8 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
                     cost: 0, price: 0, stock: 0, min_stock: 5, location: '',
                     margin: 0, unit_type: 'UNID', exchange_rate_id: null,
                     is_combo: false, units: [], combo_items: [],
-                    tax_rate: 0 // Reset tax
+                    tax_rate: 0, // Reset tax
+                    warehouse_stocks: [] // NEW: Empty stocks
                 });
             }
             setActiveTab('general');
@@ -212,6 +218,15 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
         }
     };
 
+    const fetchWarehouses = async () => {
+        try {
+            const { data } = await apiClient.get('/warehouses');
+            setWarehouses(data);
+        } catch (error) {
+            console.error('Error fetching warehouses:', error);
+        }
+    };
+
     const fetchExchangeRates = async () => {
         try {
             const response = await apiClient.get('/config/exchange-rates', {
@@ -306,7 +321,8 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
             combo_items: formData.is_combo ? formData.combo_items.map(ci => ({
                 child_product_id: ci.child_product_id,
                 quantity: parseFloat(ci.quantity)
-            })) : []
+            })) : [],
+            warehouse_stocks: formData.warehouse_stocks // NEW: Send stocks
         };
         onSubmit(payload);
     };
@@ -553,22 +569,84 @@ const ProductForm = ({ isOpen, onClose, onSubmit, initialData = null }) => {
                                 {/* SECTION 2: INVENTORY */}
                                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 h-full">
                                     <h4 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
-                                        <Package className="mr-2 text-blue-600" size={20} /> Inventario
+                                        <Package className="mr-2 text-blue-600" size={20} /> Inventario por Almacén
                                     </h4>
                                     <div className="space-y-4">
+                                        {/* Total Stock (Auto-calculated) */}
                                         <div>
-                                            <label className="block text-sm font-semibold text-gray-700 mb-1">Stock Actual (Físico)</label>
+                                            <label className="block text-sm font-semibold text-gray-700 mb-1">Stock Total (Suma Automática)</label>
                                             <input
                                                 type="number"
                                                 name="stock"
                                                 value={formData.stock}
-                                                onChange={handleInputChange}
-                                                className="w-full border-blue-100 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 py-3 text-lg font-bold bg-blue-50/30 text-gray-800"
+                                                readOnly
+                                                className="w-full border-gray-200 rounded-lg shadow-sm bg-gray-100 text-gray-500 py-3 text-lg font-bold cursor-not-allowed"
                                                 placeholder="0"
                                             />
                                         </div>
+
+                                        {/* Warehouses Table */}
+                                        <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-lg">
+                                            <table className="min-w-full divide-y divide-gray-200">
+                                                <thead className="bg-gray-50 sticky top-0">
+                                                    <tr>
+                                                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Almacén</th>
+                                                        <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="bg-white divide-y divide-gray-200">
+                                                    {warehouses.map(wh => {
+                                                        const stockEntry = formData.warehouse_stocks.find(s => s.warehouse_id === wh.id);
+                                                        const qty = stockEntry ? stockEntry.quantity : 0;
+                                                        return (
+                                                            <tr key={wh.id}>
+                                                                <td className="px-3 py-2 text-sm text-gray-900">
+                                                                    <div className="font-medium">{wh.name}</div>
+                                                                    <div className="text-xs text-gray-500">{wh.is_main ? 'Principal' : 'Sucursal'}</div>
+                                                                </td>
+                                                                <td className="px-3 py-2">
+                                                                    <input
+                                                                        type="number"
+                                                                        min="0"
+                                                                        className="w-24 text-right border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                                                        value={qty}
+                                                                        onChange={(e) => {
+                                                                            const val = parseFloat(e.target.value) || 0;
+                                                                            const newStocks = [...formData.warehouse_stocks];
+                                                                            const idx = newStocks.findIndex(s => s.warehouse_id === wh.id);
+                                                                            if (idx >= 0) {
+                                                                                newStocks[idx].quantity = val;
+                                                                            } else {
+                                                                                newStocks.push({ warehouse_id: wh.id, quantity: val });
+                                                                            }
+                                                                            // Update stocks array
+                                                                            setFormData(prev => {
+                                                                                const total = newStocks.reduce((sum, s) => sum + s.quantity, 0);
+                                                                                return {
+                                                                                    ...prev,
+                                                                                    warehouse_stocks: newStocks,
+                                                                                    stock: total // Auto-update total stock
+                                                                                };
+                                                                            });
+                                                                        }}
+                                                                    />
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                    {warehouses.length === 0 && (
+                                                        <tr>
+                                                            <td colSpan="2" className="px-3 py-4 text-center text-sm text-gray-500">
+                                                                No hay almacenes registrados.
+                                                            </td>
+                                                        </tr>
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
+
                                         <div>
-                                            <label className="block text-sm font-semibold text-gray-700 mb-1">Stock Mínimo (Alerta)</label>
+                                            <label className="block text-sm font-semibold text-gray-700 mb-1">Stock Mínimo Global (Alerta)</label>
                                             <input
                                                 type="number"
                                                 name="min_stock"

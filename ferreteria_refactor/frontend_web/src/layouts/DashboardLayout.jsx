@@ -14,7 +14,7 @@ import {
     FolderTree,
     ShoppingBag,
     DollarSign,
-    Truck,
+
     Wallet,
     RotateCcw,
     Archive,
@@ -28,7 +28,9 @@ import {
     Menu,
     X,
     HelpCircle,
-    ArrowLeft
+    ArrowLeft,
+    MapPin,
+    Truck
 } from 'lucide-react';
 
 const DashboardLayout = () => {
@@ -116,6 +118,14 @@ const DashboardLayout = () => {
                                 <Link to="/inventory" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center space-x-3 p-2 pl-4 rounded text-sm transition-colors ${isActive('/inventory') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
                                     <Archive size={16} />
                                     <span>Kardex</span>
+                                </Link>
+                                <Link to="/warehouses" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center space-x-3 p-2 pl-4 rounded text-sm transition-colors ${isActive('/warehouses') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
+                                    <MapPin size={16} />
+                                    <span>Almacenes</span>
+                                </Link>
+                                <Link to="/transfers" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center space-x-3 p-2 pl-4 rounded text-sm transition-colors ${isActive('/transfers') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
+                                    <Truck size={16} />
+                                    <span>Traslados</span>
                                 </Link>
                             </div>
                         )}

@@ -21,6 +21,8 @@ import ReturnsManager from './pages/Returns/ReturnsManager';
 import SalesHistory from './pages/SalesHistory';
 import CustomerManager from './pages/Customers/CustomerManager';
 import QuotesManager from './pages/Quotes/QuotesManager';
+import WarehouseManager from './pages/Warehouses/WarehouseManager';
+import InventoryTransfers from './pages/Warehouses/InventoryTransfers';
 import AccountsReceivable from './pages/Credit/AccountsReceivable';
 import UsersManager from './pages/Users/UsersManager';
 import CashHistory from './pages/CashHistory';
@@ -84,6 +86,16 @@ function App() {
                             <Route path="/inventory" element={
                               <ProtectedRoute roles={['ADMIN', 'WAREHOUSE']}>
                                 <Inventory />
+                              </ProtectedRoute>
+                            } />
+                            <Route path="/warehouses" element={
+                              <ProtectedRoute roles={['ADMIN']}>
+                                <WarehouseManager />
+                              </ProtectedRoute>
+                            } />
+                            <Route path="/transfers" element={
+                              <ProtectedRoute roles={['ADMIN', 'WAREHOUSE']}>
+                                <InventoryTransfers />
                               </ProtectedRoute>
                             } />
 

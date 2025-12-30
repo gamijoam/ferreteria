@@ -25,11 +25,10 @@ class Settings:
     
     # Security
     SECRET_KEY: str = os.getenv("SECRET_KEY")
-    # Generate a key if not set - safer than hardcoded default
+    # USE STABLE KEY FOR DEV if not set, instead of random (avoids logout on restart)
     if not SECRET_KEY:
-        import secrets
-        SECRET_KEY = secrets.token_urlsafe(32)
-        print("WARNING: SECRET_KEY not set in .env. Using temporary generated key.")
+        SECRET_KEY = "dev_secret_key_stable_12345" 
+        print("WARNING: SECRET_KEY not set in .env. Using stable dev key.")
     ALGORITHM: str = os.getenv("ALGORITHM", "HS256")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 

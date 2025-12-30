@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
-import { Search, ShoppingCart, Trash2, Plus, Minus, CreditCard, RotateCcw, Package, Receipt, AlertTriangle, Layers, ArrowLeft } from 'lucide-react';
+import { Search, ShoppingCart, Trash2, Plus, Minus, CreditCard, RotateCcw, Package, Receipt, AlertTriangle, Layers, ArrowLeft, MapPin } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useCash } from '../context/CashContext';
 import { useConfig } from '../context/ConfigContext';
@@ -45,6 +45,8 @@ const POS = () => {
     // Data State
     const [catalog, setCatalog] = useState([]);
     const [categories, setCategories] = useState([]);
+    const [warehouses, setWarehouses] = useState([]); // NEW
+    const [selectedWarehouseId, setSelectedWarehouseId] = useState(''); // NEW
     const [isLoading, setIsLoading] = useState(true);
 
     // Refs
@@ -228,18 +230,27 @@ const POS = () => {
         ignoreIfFocused: false  // Capturar incluso si hay un input enfocado
     });
 
-
     // Fetch Catalog and Categories on Mount
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [productsRes, categoriesRes] = await Promise.all([
+                const [productsRes, categoriesRes, warehousesRes] = await Promise.all([
                     apiClient.get('/products/'),
-                    apiClient.get('/categories')
+                    apiClient.get('/categories'),
+                    apiClient.get('/warehouses')
                 ]);
                 console.log('POS Catalog loaded:', productsRes.data);
-                setCatalog(productsRes.data);
-                setCategories(categoriesRes.data);
+                console.log('Warehouses loaded:', warehousesRes.data);
+
+                setCatalog(Array.isArray(productsRes.data) ? productsRes.data : []);
+                setCategories(Array.isArray(categoriesRes.data) ? categoriesRes.data : []);
+
+                const validWarehouses = Array.isArray(warehousesRes.data) ? warehousesRes.data : [];
+                setWarehouses(validWarehouses);
+
+                // Set default warehouse (Main or first)
+                const mainWh = validWarehouses.find(w => w.is_main) || validWarehouses[0];
+                if (mainWh) setSelectedWarehouseId(mainWh.id);
             } catch (error) {
                 console.error("Error fetching data:", error);
             } finally {
@@ -536,6 +547,28 @@ const POS = () => {
                         />
                     </div>
 
+
+                    {/* Warehouse Selector - Always Visible */}
+                    <div className="flex items-center gap-2 mx-2 bg-blue-50 rounded-full px-4 py-2 border border-blue-200 hover:bg-blue-100 hover:shadow-md transition-all group/wh cursor-pointer">
+                        <MapPin size={18} className="text-blue-600 group-hover/wh:text-blue-700 transition-colors" />
+                        <div className="flex flex-col">
+                            <span className="text-[10px] uppercase font-bold text-blue-400 leading-none">Bodega</span>
+                            <select
+                                value={selectedWarehouseId}
+                                onChange={(e) => setSelectedWarehouseId(Number(e.target.value))}
+                                className="bg-transparent border-none text-sm font-black text-blue-900 focus:ring-0 p-0 pr-6 cursor-pointer w-full max-w-[140px] truncate leading-none"
+                                title="Seleccionar Bodega de Salida"
+                                disabled={!Array.isArray(warehouses) || warehouses.length <= 1}
+                            >
+                                {(Array.isArray(warehouses) ? warehouses : []).map(w => (
+                                    <option key={w.id} value={w.id}>
+                                        {w.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
                     {/* Status/User Info */}
                     <div className="flex items-center gap-3">
                         <div className="text-right hidden lg:block">
@@ -582,82 +615,94 @@ const POS = () => {
                 {/* Catalog Grid */}
                 <div className="flex-1 overflow-y-auto px-6 pb-20 pt-2">
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
-                        {filteredCatalog.map((product, index) => (
-                            <div
-                                key={product.id}
-                                onClick={() => handleProductClick(product)}
-                                className={`
+                        {filteredCatalog.map((product, index) => {
+                            // Calculate stock for selected warehouse
+                            let currentStock = 0;
+                            if (product.stocks && product.stocks.length > 0) {
+                                const stockEntry = product.stocks.find(s => s.warehouse_id === selectedWarehouseId);
+                                currentStock = stockEntry ? stockEntry.quantity : 0;
+                            } else {
+                                // Fallback for products without Multi-Warehouse data (Legacy)
+                                currentStock = product.stock || 0;
+                            }
+
+                            return (
+                                <div
+                                    key={product.id}
+                                    onClick={() => handleProductClick(product)}
+                                    className={`
                                     group relative flex flex-col justify-between bg-white rounded-2xl cursor-pointer transition-all duration-300
                                     border border-transparent h-full min-h-[180px]
                                     ${index === selectedProductIndex
-                                        ? 'ring-4 ring-blue-500/30 shadow-xl'
-                                        : 'shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-blue-100'
-                                    }
+                                            ? 'ring-4 ring-blue-500/30 shadow-xl'
+                                            : 'shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-blue-100'
+                                        }
                                 `}
-                            >
-                                {/* Product Image */}
-                                <div className="p-3 border-b border-slate-100">
-                                    <ProductThumbnail
-                                        imageUrl={product.image_url}
-                                        productName={product.name}
-                                        updatedAt={product.updated_at}
-                                        size="lg"
-                                    />
-                                </div>
-
-                                <div className="p-4 flex-1 flex flex-col">
-                                    <div className="flex justify-between items-start mb-2">
-                                        <span className="text-[10px] font-mono text-slate-400 bg-slate-50 px-1.5 rounded tracking-tighter">
-                                            {product.sku || '---'}
-                                        </span>
-                                        {product.stock <= (product.min_stock || 5) && (
-                                            <span className="flex items-center gap-1 text-[10px] font-bold text-red-600 bg-red-50 px-1.5 rounded-full animate-pulse">
-                                                <AlertTriangle size={10} /> Stock
-                                            </span>
-                                        )}
+                                >
+                                    {/* Product Image */}
+                                    <div className="p-3 border-b border-slate-100">
+                                        <ProductThumbnail
+                                            imageUrl={product.image_url}
+                                            productName={product.name}
+                                            updatedAt={product.updated_at}
+                                            size="lg"
+                                        />
                                     </div>
 
-                                    <h3 className="font-bold text-slate-700 text-sm md:text-base leading-snug line-clamp-3 mb-3 group-hover:text-blue-600 transition-colors">
-                                        {product.name}
-                                    </h3>
-
-                                    {/* Stock Bar Visualization (Optional aesthetic touch) */}
-                                    {product.stock > 0 && (
-                                        <div className="w-full bg-slate-100 h-1 rounded-full mb-1 overflow-hidden">
-                                            <div
-                                                className={`h-full rounded-full ${product.stock < 10 ? 'bg-red-400' : 'bg-green-400'}`}
-                                                style={{ width: `${Math.min((product.stock / 50) * 100, 100)}%` }}
-                                            />
-                                        </div>
-                                    )}
-
-                                    <div className="mt-auto flex justify-between items-end border-t border-slate-50 pt-3">
-                                        <div className="flex flex-col gap-1">
-                                            <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Precio</span>
-                                            <span className="text-lg font-black text-slate-800 leading-none">
-                                                ${Number(product.price).toFixed(2)}
+                                    <div className="p-4 flex-1 flex flex-col">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <span className="text-[10px] font-mono text-slate-400 bg-slate-50 px-1.5 rounded tracking-tighter">
+                                                {product.sku || '---'}
                                             </span>
-                                            {/* Stock Display */}
-                                            <span className="text-[9px] font-semibold text-slate-500 uppercase tracking-tight">
-                                                Stock: {Number(product.stock).toFixed(0)}
-                                            </span>
-                                            {/* Presentations Indicator */}
-                                            {product.units?.length > 0 && (
-                                                <div className="flex items-center gap-1">
-                                                    <Layers size={10} className="text-orange-500" />
-                                                    <span className="text-[9px] font-bold text-orange-600 uppercase tracking-tight">
-                                                        +{product.units.length} Opciones
-                                                    </span>
-                                                </div>
+                                            {currentStock <= (product.min_stock || 5) && (
+                                                <span className="flex items-center gap-1 text-[10px] font-bold text-red-600 bg-red-50 px-1.5 rounded-full animate-pulse">
+                                                    <AlertTriangle size={10} /> Stock
+                                                </span>
                                             )}
                                         </div>
-                                        <div className="w-8 h-8 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity transform group-hover:scale-110">
-                                            <Plus size={18} />
+
+                                        <h3 className="font-bold text-slate-700 text-sm md:text-base leading-snug line-clamp-3 mb-3 group-hover:text-blue-600 transition-colors">
+                                            {product.name}
+                                        </h3>
+
+                                        {/* Stock Bar Visualization (Optional aesthetic touch) */}
+                                        {currentStock > 0 && (
+                                            <div className="w-full bg-slate-100 h-1 rounded-full mb-1 overflow-hidden">
+                                                <div
+                                                    className={`h-full rounded-full ${currentStock < 10 ? 'bg-red-400' : 'bg-green-400'}`}
+                                                    style={{ width: `${Math.min((currentStock / 50) * 100, 100)}%` }}
+                                                />
+                                            </div>
+                                        )}
+
+                                        <div className="mt-auto flex justify-between items-end border-t border-slate-50 pt-3">
+                                            <div className="flex flex-col gap-1">
+                                                <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Precio</span>
+                                                <span className="text-lg font-black text-slate-800 leading-none">
+                                                    ${Number(product.price).toFixed(2)}
+                                                </span>
+                                                {/* Stock Display */}
+                                                <span className={`text-[9px] font-semibold uppercase tracking-tight ${currentStock <= 0 ? 'text-red-500' : 'text-slate-500'}`}>
+                                                    Stock: {Number(currentStock).toFixed(0)}
+                                                </span>
+                                                {/* Presentations Indicator */}
+                                                {product.units?.length > 0 && (
+                                                    <div className="flex items-center gap-1">
+                                                        <Layers size={10} className="text-orange-500" />
+                                                        <span className="text-[9px] font-bold text-orange-600 uppercase tracking-tight">
+                                                            +{product.units.length} Opciones
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="w-8 h-8 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity transform group-hover:scale-110">
+                                                <Plus size={18} />
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
             </div>
@@ -865,6 +910,7 @@ const POS = () => {
                 cart={cart}
                 onClose={() => setIsPaymentOpen(false)}
                 onConfirm={handleCheckout}
+                warehouseId={selectedWarehouseId}
             />
 
             <CashMovementModal

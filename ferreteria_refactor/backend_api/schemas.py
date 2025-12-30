@@ -109,9 +109,25 @@ class ComboItemRead(ComboItemBase):
     class Config:
         from_attributes = True
 
+class ProductStockRead(BaseModel):
+    id: int
+    product_id: int
+    warehouse_id: int
+    quantity: Decimal
+    location: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
+class ProductStockCreate(BaseModel):
+    warehouse_id: int
+    quantity: Decimal
+    location: Optional[str] = None
+
 class ProductCreate(ProductBase):
     units: List[ProductUnitCreate] = Field([], description="Lista de unidades alternativas (cajas, bultos)")
     combo_items: List[ComboItemCreate] = Field([], description="Lista de componentes si es un combo")
+    warehouse_stocks: List[ProductStockCreate] = Field([], description="Distribución de stock por almacén")
 
 class ProductUpdate(BaseModel):
     name: Optional[str] = None
@@ -140,6 +156,7 @@ class ProductUpdate(BaseModel):
     
     units: Optional[List[ProductUnitCreate]] = None
     combo_items: Optional[List[ComboItemCreate]] = None  # NEW: Allow updating combo items
+    warehouse_stocks: Optional[List[ProductStockCreate]] = None  # NEW: Allow updating stocks per warehouse
 
     class Config:
         from_attributes = True
@@ -163,6 +180,7 @@ class ProductRead(ProductBase):
     price_rules: List[PriceRuleRead] = []
     units: List[ProductUnitRead] = []
     combo_items: List[ComboItemRead] = []  # NEW: Include combo items
+    stocks: List[ProductStockRead] = [] # NEW: Include warehouse stocks
     
     class Config:
         from_attributes = True
@@ -204,6 +222,7 @@ class SaleCreate(BaseModel):
     # Hybrid/Sync Fields (Optional, for offline sales)
     unique_uuid: Optional[str] = Field(None, description="UUID único generado offline")
     is_offline_sale: bool = Field(False, description="Flag si la venta vino de sync")
+    warehouse_id: Optional[int] = Field(None, description="ID del almacén de salida") # NEW: Multi-warehouse support
 
     class Config:
         from_attributes = True
@@ -718,3 +737,85 @@ class RemotePrintRequest(BaseModel):
     """Request body for remote printing via WebSocket"""
     client_id: str = Field(..., description="Hardware Bridge client ID", example="escritorio-caja-1")
     sale_id: int = Field(..., description="Sale ID to print", example=123)
+
+# ========================
+# Warehouse Schemas
+# ========================
+
+class WarehouseBase(BaseModel):
+    name: str
+    address: Optional[str] = None
+    is_main: bool = False
+    is_active: bool = True
+
+class WarehouseCreate(WarehouseBase):
+    pass
+
+class WarehouseUpdate(BaseModel):
+    name: Optional[str] = None
+    address: Optional[str] = None
+    is_main: Optional[bool] = None
+    is_active: Optional[bool] = None
+
+
+
+class WarehouseRead(WarehouseBase):
+    id: int
+    stocks_count: Optional[int] = 0 # To show how many products it has
+    
+    class Config:
+        from_attributes = True
+
+class WarehouseWithStocks(WarehouseRead):
+    stocks: List[ProductStockRead] = []
+
+# ========================
+# Inventory Transfer Schemas
+# ========================
+
+class TransferDetailBase(BaseModel):
+    product_id: int
+    quantity: Decimal
+
+class TransferDetailCreate(TransferDetailBase):
+    pass
+
+class TransferDetailRead(TransferDetailBase):
+    id: int
+    transfer_id: int
+    product: Optional[ProductRead] = None
+    
+    class Config:
+        from_attributes = True
+
+class InventoryTransferBase(BaseModel):
+    source_warehouse_id: int
+    target_warehouse_id: int
+    notes: Optional[str] = None
+    date: datetime = Field(default_factory=datetime.now)
+
+class InventoryTransferCreate(InventoryTransferBase):
+    items: List[TransferDetailCreate]
+
+class InventoryTransferRead(InventoryTransferBase):
+    id: int
+    status: str
+    created_at: datetime
+    source_warehouse: Optional[WarehouseRead] = None
+    target_warehouse: Optional[WarehouseRead] = None
+    details: List[TransferDetailRead] = []
+
+    class Config:
+        from_attributes = True
+
+
+
+class WarehouseInventoryItem(BaseModel):
+    product_id: int
+    product_name: str
+    sku: Optional[str] = None
+    quantity: Decimal
+    location: Optional[str] = None
+    
+    class Config:
+        from_attributes = True

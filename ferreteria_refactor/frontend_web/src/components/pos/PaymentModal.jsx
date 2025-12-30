@@ -21,7 +21,7 @@ const formatCurrency = (amount, currencySymbol) => {
     });
 };
 
-const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onConfirm }) => {
+const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onConfirm, warehouseId }) => {
     const { getActiveCurrencies, convertPrice, getExchangeRate, paymentMethods } = useConfig();
     const { subscribe } = useWebSocket();
     const allCurrencies = [{ id: 'base', symbol: 'USD', name: 'Dólar', rate: 1, is_anchor: true }, ...getActiveCurrencies()];
@@ -162,6 +162,7 @@ const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onCon
                 })),
                 is_credit: isCreditSale,
                 customer_id: selectedCustomer ? selectedCustomer.id : null,
+                warehouse_id: warehouseId, // NEW
                 notes: ""
             };
 
