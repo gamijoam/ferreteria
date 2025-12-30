@@ -21,20 +21,19 @@ def upgrade() -> None:
     
     # 1. Add unique_uuid column to sales
     # Using String(36) for UUID storage to be database agnostic (SQLite/Postgres)
-    conn.execute(text("ALTER TABLE sales ADD COLUMN IF NOT EXISTS unique_uuid VARCHAR(36)"))
+    op.add_column('sales', sa.Column('unique_uuid', sa.String(36), nullable=True))
     
     # Update existing rows to have a UUID (optional but good practice for unique constraints)
     # For now, we leave it nullable, but future offline sales MUST have it.
     
     # 2. Add sync status columns
-    conn.execute(text("ALTER TABLE sales ADD COLUMN IF NOT EXISTS sync_status VARCHAR(20) DEFAULT 'SYNCED'")) 
     # Values: 'SYNCED' (created online), 'PENDING' (created offline, waiting to upload), 'CONFLICT'
-    
-    conn.execute(text("ALTER TABLE sales ADD COLUMN IF NOT EXISTS is_offline_sale BOOLEAN DEFAULT FALSE"))
+    op.add_column('sales', sa.Column('sync_status', sa.String(20), server_default='SYNCED', nullable=True))
+    op.add_column('sales', sa.Column('is_offline_sale', sa.Boolean(), server_default='FALSE', nullable=True))
     
     # 3. Add same tracking for Customers (if created offline)
-    conn.execute(text("ALTER TABLE customers ADD COLUMN IF NOT EXISTS unique_uuid VARCHAR(36)"))
-    conn.execute(text("ALTER TABLE customers ADD COLUMN IF NOT EXISTS sync_status VARCHAR(20) DEFAULT 'SYNCED'"))
+    op.add_column('customers', sa.Column('unique_uuid', sa.String(36), nullable=True))
+    op.add_column('customers', sa.Column('sync_status', sa.String(20), server_default='SYNCED', nullable=True))
 
     # Create index for faster lookups during sync
     # conn.execute(text("CREATE INDEX IF NOT EXISTS idx_sales_uuid ON sales(unique_uuid)"))

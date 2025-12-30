@@ -19,15 +19,15 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     conn = op.get_bind()
     # Suppliers
-    conn.execute(text("ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS current_balance NUMERIC(12, 2) DEFAULT 0.00"))
-    conn.execute(text("ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS credit_limit NUMERIC(12, 2)"))
-    conn.execute(text("ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS payment_terms INTEGER DEFAULT 30"))
+    op.add_column('suppliers', sa.Column('current_balance', sa.Numeric(12, 2), server_default='0.00', nullable=True))
+    op.add_column('suppliers', sa.Column('credit_limit', sa.Numeric(12, 2), nullable=True))
+    op.add_column('suppliers', sa.Column('payment_terms', sa.Integer(), server_default='30', nullable=True))
     
     # Returns
-    conn.execute(text("ALTER TABLE return_details ADD COLUMN IF NOT EXISTS unit_price NUMERIC(12, 2) DEFAULT 0.00"))
+    op.add_column('return_details', sa.Column('unit_price', sa.Numeric(12, 2), server_default='0.00', nullable=True))
     
     # Sale Payments
-    conn.execute(text("ALTER TABLE sale_payments ADD COLUMN IF NOT EXISTS exchange_rate NUMERIC(14, 4) DEFAULT 1.0000"))
+    op.add_column('sale_payments', sa.Column('exchange_rate', sa.Numeric(14, 4), server_default='1.0000', nullable=True))
 
 def downgrade() -> None:
     pass

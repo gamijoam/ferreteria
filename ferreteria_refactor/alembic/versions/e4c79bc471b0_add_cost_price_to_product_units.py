@@ -21,7 +21,9 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     """Add cost_price column to product_units table."""
     # Safe add column
-    op.execute("ALTER TABLE product_units ADD COLUMN IF NOT EXISTS cost_price NUMERIC(14, 4)")
+    # Not using IF NOT EXISTS because SQLite doesn't support it in ALTER TABLE
+    # If the column exists, this will fail, which is fine (we'll manually stamp or it's a real issue)
+    op.add_column('product_units', sa.Column('cost_price', sa.Numeric(14, 4), nullable=True))
 
 
 def downgrade() -> None:

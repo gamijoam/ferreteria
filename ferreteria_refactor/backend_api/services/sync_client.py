@@ -21,9 +21,16 @@ async def pull_catalog_from_cloud(db: Session, vps_url: str = None):
     """
     target_url = vps_url or VPS_BASE_URL  # Use environment variable
     
+    # Remove frontend hash if present (e.g., https://site.com/#/dashboard -> https://site.com)
+    if "/#" in target_url:
+        target_url = target_url.split("/#")[0]
+
     # Ensure /api/v1 is present
+    # Remove trailing slash first to avoid double slash
+    target_url = target_url.rstrip('/')
+    
     if not target_url.endswith("/api/v1"):
-         target_url = f"{target_url.rstrip('/')}/api/v1"
+         target_url = f"{target_url}/api/v1"
 
     # Use a hardcoded token or a specific 'sync' user token for now
     # In production, we'd do a proper handshake

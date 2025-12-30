@@ -32,9 +32,23 @@ if DB_TYPE == "sqlite" or "sqlite" in str(DATABASE_URL):
             os.makedirs(base_path, exist_ok=True)
             print(f"[DB] Modo Congelado detectado. Usando BD en: {db_path}")
         else:
-             # DEV: Relative to execution
-            DATABASE_URL = f"sqlite:///./{db_name}"
-            print(f"[DB] Modo Desarrollo. Usando BD relativa: {db_name}")
+            # DEV MODE:
+            # Resolve relative to this file to ensure consistency regardless of CWD.
+            # This file is in .../ferreteria_refactor/backend_api/database/db.py
+            # We want to access the DB in the project root: .../ferreteria/ferreteria.db
+            
+            # current_dir = .../backend_api/database
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            
+            # Up 3 levels to reach 'ferreteria' (root)
+            # 1. backend_api
+            # 2. ferreteria_refactor
+            # 3. ferreteria (ROOT)
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
+            
+            db_path = os.path.join(project_root, db_name)
+            DATABASE_URL = f"sqlite:///{db_path}"
+            print(f"[DB] Modo Desarrollo. Usando BD absoluta: {db_path}")
         
     connect_args = {"check_same_thread": False, "timeout": 30}
     pool_config = {} # SQLite doesn't use the same pool config as Postgres

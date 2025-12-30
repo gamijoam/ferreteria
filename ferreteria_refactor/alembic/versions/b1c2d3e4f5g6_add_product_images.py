@@ -18,35 +18,34 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     """Add image_url and updated_at columns to products table."""
     # Add image_url column
-    op.execute("ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url VARCHAR(255)")
+    op.add_column('products', sa.Column('image_url', sa.String(255), nullable=True))
     
     # Add updated_at column with default value
-    op.execute("""
-        ALTER TABLE products 
-        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    """)
+    op.add_column('products', sa.Column('updated_at', sa.TIMESTAMP(), server_default=sa.func.now(), nullable=True))
     
-    # Create trigger to auto-update updated_at on row modification
-    op.execute("""
-        CREATE OR REPLACE FUNCTION update_updated_at_column()
-        RETURNS TRIGGER AS $$
-        BEGIN
-            NEW.updated_at = CURRENT_TIMESTAMP;
-            RETURN NEW;
-        END;
-        $$ language 'plpgsql'
-    """)
-    
-    op.execute("""
-        DROP TRIGGER IF EXISTS update_products_updated_at ON products
-    """)
-    
-    op.execute("""
-        CREATE TRIGGER update_products_updated_at
-        BEFORE UPDATE ON products
-        FOR EACH ROW
-        EXECUTE FUNCTION update_updated_at_column()
-    """)
+    # Create trigger only for Postgres
+    bind = op.get_bind()
+    if bind.engine.name == 'postgresql':
+        op.execute("""
+            CREATE OR REPLACE FUNCTION update_updated_at_column()
+            RETURNS TRIGGER AS $$
+            BEGIN
+                NEW.updated_at = CURRENT_TIMESTAMP;
+                RETURN NEW;
+            END;
+            $$ language 'plpgsql'
+        """)
+        
+        op.execute("""
+            DROP TRIGGER IF EXISTS update_products_updated_at ON products
+        """)
+        
+        op.execute("""
+            CREATE TRIGGER update_products_updated_at
+            BEFORE UPDATE ON products
+            FOR EACH ROW
+            EXECUTE FUNCTION update_updated_at_column()
+        """)
 
 def downgrade() -> None:
     """Remove image support from products table."""
