@@ -21,7 +21,7 @@ const formatCurrency = (amount, currencySymbol) => {
     });
 };
 
-const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onConfirm, warehouseId }) => {
+const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onConfirm, warehouseId, initialCustomer, quoteId }) => {
     const { getActiveCurrencies, convertPrice, getExchangeRate, paymentMethods } = useConfig();
     const { subscribe } = useWebSocket();
     const allCurrencies = [{ id: 'base', symbol: 'USD', name: 'Dólar', rate: 1, is_anchor: true }, ...getActiveCurrencies()];
@@ -47,10 +47,18 @@ const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onCon
         if (isOpen) {
             setPayments([{ amount: '', currency: 'USD', method: 'Efectivo' }]);
             setIsCreditSale(false);
-            setSelectedCustomer(null);
+
+            // Priority: Initial Customer > Null
+            if (initialCustomer) {
+                console.log("Setting initial customer:", initialCustomer);
+                setSelectedCustomer(initialCustomer);
+            } else {
+                setSelectedCustomer(null);
+            }
+
             fetchCustomers();
         }
-    }, [isOpen]);
+    }, [isOpen, initialCustomer]);
 
     // WebSocket subscriptions for real-time customer updates
     useEffect(() => {
@@ -162,7 +170,8 @@ const PaymentModal = ({ isOpen, onClose, totalUSD, totalsByCurrency, cart, onCon
                 })),
                 is_credit: isCreditSale,
                 customer_id: selectedCustomer ? selectedCustomer.id : null,
-                warehouse_id: warehouseId, // NEW
+                warehouse_id: (!warehouseId || warehouseId === 'all') ? null : warehouseId,
+                quote_id: quoteId || null, // Pass quote ID if present (we'll attach it to customer obj in POS.jsx for convenience or pass as separate prop)
                 notes: ""
             };
 

@@ -115,7 +115,13 @@ class SalesService:
             )
             db.add(new_sale)
             db.flush() # Get ID
-        
+            
+            # Update Quote Status if this sale comes from a quote
+            if sale_data.quote_id:
+                quote = db.query(models.Quote).filter(models.Quote.id == sale_data.quote_id).first()
+                if quote:
+                    quote.status = "CONVERTED" # Mark as Sold/Converted
+                    db.add(quote) # Ensure update is tracked       
             # 2. Process Items
             for item in sale_data.items:
                 # Fetch Product with Pessimistic Lock

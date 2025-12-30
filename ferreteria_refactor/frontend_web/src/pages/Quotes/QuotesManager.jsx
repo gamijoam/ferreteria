@@ -61,7 +61,7 @@ const QuotesManager = () => {
             {/* Content Area */}
             <div className="flex-1 overflow-hidden relative">
                 {view === 'list' ? (
-                    <QuoteList onCreateNew={handleCreateNew} />
+                    <QuoteList onCreateNew={handleCreateNew} onEdit={(id) => { setSelectedQuoteId(id); setView('editor'); }} />
                 ) : (
                     <QuoteEditor
                         quoteId={selectedQuoteId}

@@ -7,7 +7,7 @@ import apiClient from '../../config/axios';
 import { toast } from 'react-hot-toast';
 import { useConfig } from '../../context/ConfigContext';
 
-const QuoteList = ({ onCreateNew }) => {
+const QuoteList = ({ onCreateNew, onEdit }) => {
     const [quotes, setQuotes] = useState([]);
     const [filteredQuotes, setFilteredQuotes] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -252,7 +252,7 @@ const QuoteList = ({ onCreateNew }) => {
                                     </div>
                                     <div className="flex items-center gap-2 text-sm text-gray-600">
                                         <span className="bg-gray-100 text-gray-500 text-xs px-2 py-0.5 rounded">
-                                            {quote.items?.length || 0} items
+                                            {(quote.details?.length || quote.items?.length || 0)} items
                                         </span>
                                     </div>
                                 </div>
@@ -279,6 +279,14 @@ const QuoteList = ({ onCreateNew }) => {
                                         title="Imprimir"
                                     >
                                         <Printer size={18} />
+                                    </button>
+                                    {/* Edit Button */}
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); onEdit && onEdit(quote.id); }}
+                                        className="p-2 text-gray-400 hover:text-orange-500 hover:bg-orange-50 rounded-lg transition-colors"
+                                        title="Editar"
+                                    >
+                                        <FileText size={18} />
                                     </button>
                                 </div>
 

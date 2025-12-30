@@ -44,7 +44,10 @@ def create_quote(quote_data: schemas.QuoteCreate, db: Session = Depends(get_db))
 def read_quotes(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     # Optimize query to load customer
     return db.query(models.Quote)\
-        .options(joinedload(models.Quote.customer))\
+        .options(
+            joinedload(models.Quote.customer),
+            joinedload(models.Quote.details)
+        )\
         .order_by(models.Quote.date.desc())\
         .offset(skip).limit(limit).all()
 

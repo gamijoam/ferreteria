@@ -223,6 +223,7 @@ class SaleCreate(BaseModel):
     unique_uuid: Optional[str] = Field(None, description="UUID único generado offline")
     is_offline_sale: bool = Field(False, description="Flag si la venta vino de sync")
     warehouse_id: Optional[int] = Field(None, description="ID del almacén de salida") # NEW: Multi-warehouse support
+    quote_id: Optional[int] = Field(None, description="ID de la cotización origen (si aplica)") # NEW: Quote Link
 
     class Config:
         from_attributes = True
@@ -335,6 +336,7 @@ class QuoteRead(BaseModel):
     status: str = "PENDING"
     notes: Optional[str]
     customer: Optional[CustomerRead] = None
+    details: List[QuoteDetailRead] = [] # Include details for counts in list view
 
     class Config:
         from_attributes = True

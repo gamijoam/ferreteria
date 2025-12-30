@@ -13,6 +13,7 @@ import CashOpeningModal from '../components/cash/CashOpeningModal';
 import CashMovementModal from '../components/cash/CashMovementModal';
 import SaleSuccessModal from '../components/pos/SaleSuccessModal';
 import ProductThumbnail from '../components/products/ProductThumbnail';
+import CartItemQuantityInput from '../components/pos/CartItemQuantityInput';
 import useBarcodeScanner from '../hooks/useBarcodeScanner';
 
 import apiClient from '../config/axios';
@@ -42,6 +43,8 @@ const POS = () => {
     const [isMovementOpen, setIsMovementOpen] = useState(false);
     const [lastSaleData, setLastSaleData] = useState(null); // { cart, totalUSD, paymentData }
     const [selectedProductIndex, setSelectedProductIndex] = useState(-1); // For keyboard navigation
+    const [quoteCustomer, setQuoteCustomer] = useState(null); // Customer loaded from quote
+    const [activeQuoteId, setActiveQuoteId] = useState(null); // ID of the quote currently loaded
 
     // Data State
     const [catalog, setCatalog] = useState([]);
@@ -109,6 +112,9 @@ const POS = () => {
         if (cart.length > 0) {
             if (window.confirm('¿Desea iniciar una nueva venta? Se perderá el carrito actual.')) {
                 clearCart();
+                clearCart();
+                setQuoteCustomer(null); // Clear quote customer
+                setActiveQuoteId(null); // Clear quote ID
                 setSearchTerm('');
                 if (searchInputRef.current) {
                     searchInputRef.current.focus();
@@ -250,8 +256,8 @@ const POS = () => {
                 setWarehouses(validWarehouses);
 
                 // Set default warehouse (Main or first)
-                const mainWh = validWarehouses.find(w => w.is_main) || validWarehouses[0];
-                if (mainWh) setSelectedWarehouseId(mainWh.id);
+                // Use 'all' by default to show all stock
+                setSelectedWarehouseId('all');
             } catch (error) {
                 console.error("Error fetching data:", error);
                 toast.error("Error cargando datos del POS");
@@ -285,6 +291,9 @@ const POS = () => {
 
                     const { data: quote } = await apiClient.get(`/quotes/${quoteId}`);
                     console.log("Loading quote:", quote);
+
+                    setQuoteCustomer(quote.customer || null); // Set customer from quote
+                    setActiveQuoteId(quote.id); // Set active quote ID
 
                     let itemsAdded = 0;
 
@@ -637,11 +646,15 @@ const POS = () => {
                             <span className="text-[10px] uppercase font-bold text-blue-400 leading-none">Bodega</span>
                             <select
                                 value={selectedWarehouseId}
-                                onChange={(e) => setSelectedWarehouseId(Number(e.target.value))}
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    setSelectedWarehouseId(val === 'all' ? 'all' : Number(val));
+                                }}
                                 className="bg-transparent border-none text-sm font-black text-blue-900 focus:ring-0 p-0 pr-6 cursor-pointer w-full max-w-[140px] truncate leading-none"
                                 title="Seleccionar Bodega de Salida"
-                                disabled={!Array.isArray(warehouses) || warehouses.length <= 1}
+                                disabled={!Array.isArray(warehouses) || warehouses.length === 0}
                             >
+                                <option value="all">Todas</option>
                                 {(Array.isArray(warehouses) ? warehouses : []).map(w => (
                                     <option key={w.id} value={w.id}>
                                         {w.name}
@@ -698,13 +711,21 @@ const POS = () => {
                 <div className="flex-1 overflow-y-auto px-6 pb-20 pt-2">
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
                         {filteredCatalog.map((product, index) => {
-                            // Calculate stock for selected warehouse
+                            // Calculate stock based on selection
                             let currentStock = 0;
+                            let stockDetails = [];
+
                             if (product.stocks && product.stocks.length > 0) {
-                                const stockEntry = product.stocks.find(s => s.warehouse_id === selectedWarehouseId);
-                                currentStock = stockEntry ? stockEntry.quantity : 0;
+                                if (selectedWarehouseId === 'all') {
+                                    // Sum all warehouses
+                                    currentStock = product.stocks.reduce((sum, s) => sum + Number(s.quantity), 0);
+                                    stockDetails = product.stocks.filter(s => s.quantity > 0);
+                                } else {
+                                    const stockEntry = product.stocks.find(s => s.warehouse_id === selectedWarehouseId);
+                                    currentStock = stockEntry ? stockEntry.quantity : 0;
+                                }
                             } else {
-                                // Fallback for products without Multi-Warehouse data (Legacy)
+                                // Fallback for products without Multi-Warehouse data
                                 currentStock = product.stock || 0;
                             }
 
@@ -742,6 +763,26 @@ const POS = () => {
                                                 </span>
                                             )}
                                         </div>
+
+                                        {/* Warehouse Indicators (Only when viewing "All") */}
+                                        {selectedWarehouseId === 'all' && stockDetails.length > 0 && (
+                                            <div className="flex flex-wrap gap-1 mb-2">
+                                                {stockDetails.slice(0, 3).map(s => { // Show max 3 badges
+                                                    const wName = warehouses.find(w => w.id === s.warehouse_id)?.name;
+                                                    if (!wName) return null;
+                                                    // Shorten name: "Principal" -> "Prin", "Bodega Norte" -> "Norte"
+                                                    const shortName = wName.split(' ')[0].substring(0, 4);
+                                                    return (
+                                                        <span key={s.id} className="text-[9px] bg-slate-100 text-slate-500 px-1 py-0.5 rounded border border-slate-200" title={`${wName}: ${formatStock(s.quantity)}`}>
+                                                            {shortName}: {formatStock(s.quantity)}
+                                                        </span>
+                                                    );
+                                                })}
+                                                {stockDetails.length > 3 && (
+                                                    <span className="text-[9px] text-slate-400">+{stockDetails.length - 3}</span>
+                                                )}
+                                            </div>
+                                        )}
 
                                         <h3 className="font-bold text-slate-700 text-sm md:text-base leading-snug line-clamp-3 mb-3 group-hover:text-blue-600 transition-colors">
                                             {product.name}
@@ -864,11 +905,15 @@ const POS = () => {
                                     </div>
 
                                     <div className="flex justify-between items-end mt-2 pt-2 border-t border-slate-50">
-                                        <div className="text-xs text-slate-600 flex items-center gap-1">
-                                            <span className="font-bold bg-blue-50 text-blue-700 px-1.5 rounded">{parseFloat(Number(item.quantity).toFixed(3))}</span>
-                                            <span className="lowercase font-semibold text-slate-500 italic">{item.unit_name}</span>
-                                            <span className="text-slate-400">x</span>
-                                            <span className="font-medium">${Number(item.unit_price_usd).toFixed(2)}</span>
+                                        <div className="flex items-center gap-2">
+                                            {/* Quantity Controls */}
+                                            <CartItemQuantityInput
+                                                quantity={item.quantity}
+                                                onUpdate={(newQty) => updateQuantity(item.id, newQty)} // FIX: Use item.id
+                                                unitName={item.unit_name}
+                                                min={0} // Allow 0 to remove
+                                            />
+                                            <span className="lowercase font-semibold text-slate-500 italic text-[10px]">{item.unit_name}</span>
                                         </div>
                                         <span className="text-[10px] text-slate-400 font-medium font-mono">
                                             Bs. {Number(item.subtotal_bs || 0).toLocaleString('es-VE', { maximumFractionDigits: 2 })}
@@ -993,6 +1038,8 @@ const POS = () => {
                 onClose={() => setIsPaymentOpen(false)}
                 onConfirm={handleCheckout}
                 warehouseId={selectedWarehouseId}
+                initialCustomer={quoteCustomer}
+                quoteId={activeQuoteId}
             />
 
             <CashMovementModal
