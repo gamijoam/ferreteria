@@ -16,6 +16,7 @@ import ProductThumbnail from '../components/products/ProductThumbnail';
 import useBarcodeScanner from '../hooks/useBarcodeScanner';
 
 import apiClient from '../config/axios';
+import { toast } from 'react-hot-toast';
 
 // Helper to format stock: show as integer if whole number, otherwise show decimals
 const formatStock = (stock) => {
@@ -253,12 +254,93 @@ const POS = () => {
                 if (mainWh) setSelectedWarehouseId(mainWh.id);
             } catch (error) {
                 console.error("Error fetching data:", error);
+                toast.error("Error cargando datos del POS");
             } finally {
                 setIsLoading(false);
             }
         };
         fetchData();
     }, []);
+
+    // Load Quote from URL if present
+    useEffect(() => {
+        const loadQuoteToCart = async () => {
+            const params = new URLSearchParams(window.location.search);
+            const quoteId = params.get('quote_id');
+
+            if (quoteId && catalog.length > 0 && !isLoading) {
+                try {
+                    // Clear URL to prevent re-runs
+                    window.history.replaceState({}, document.title, window.location.pathname);
+
+                    // Confirm overwrite if cart is not empty
+                    if (cart.length > 0) {
+                        if (!window.confirm('¿Desea reemplazar el carrito actual con los ítems de la cotización?')) {
+                            return;
+                        }
+                    }
+
+                    clearCart();
+                    const loadingToast = toast.loading('Cargando cotización...');
+
+                    const { data: quote } = await apiClient.get(`/quotes/${quoteId}`);
+                    console.log("Loading quote:", quote);
+
+                    let itemsAdded = 0;
+
+                    // Backend returns 'details', but we might expect 'items'
+                    const quoteItems = quote.details || quote.items;
+
+                    if (quote && Array.isArray(quoteItems)) {
+                        quoteItems.forEach(item => {
+                            const product = catalog.find(p => p.id === item.product_id);
+                            if (product) {
+                                // Find appropriate unit (default to base)
+                                const baseUnit = product.units?.find(u => u.is_base) || product.units?.[0] || { name: 'Unidad', factor: 1 };
+
+                                // Construct unit with price from quote
+                                const unitToUse = {
+                                    ...baseUnit,
+                                    price_usd: item.unit_price, // Override price with quote price
+                                };
+
+                                // Add item
+                                addToCart(product, unitToUse);
+
+                                // Update quantity immediately after
+                                // Calculate ID exactly as CartContext does
+                                const itemId = `${product.id}_${unitToUse.name.replace(/\s+/g, '_')}`;
+                                updateQuantity(itemId, item.quantity);
+                                itemsAdded++;
+                            }
+                        });
+                    } else {
+                        console.error("Quote items missing or invalid format:", quote);
+                        toast.error("La cotización no contiene items válidos.");
+                    }
+
+                    toast.dismiss(loadingToast);
+                    if (itemsAdded > 0) {
+                        toast.success(`Cotización #${quoteId} cargada con éxito`);
+                    } else {
+                        // only show error if we didn't show the "invalid format" error above?
+                        // actually itemsAdded would be 0 if format invalid.
+                        if (quote && Array.isArray(quoteItems)) {
+                            toast.error("No se pudieron cargar los productos (¿IDs cambiaron?)");
+                        }
+                    }
+
+                } catch (err) {
+                    console.error(err);
+                    toast.error("Error al cargar la cotización");
+                }
+            }
+        };
+
+        if (!isLoading && catalog.length > 0) {
+            loadQuoteToCart();
+        }
+    }, [catalog, isLoading]);
 
     // WebSocket Subscriptions for Products
     useEffect(() => {

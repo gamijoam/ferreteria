@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, Save, Trash2, Plus, Minus, User, MapPin, Layers } from 'lucide-react';
+import { Search, Save, Trash2, Plus, Minus, User, MapPin, Layers, UserPlus } from 'lucide-react';
 import apiClient from '../../config/axios';
 import { toast } from 'react-hot-toast';
 import ProductThumbnail from '../../components/products/ProductThumbnail';
 import QuickCustomerModal from '../../components/pos/QuickCustomerModal';
+import CustomerSearch from '../../components/pos/CustomerSearch'; // Import
 import { useConfig } from '../../context/ConfigContext';
 
 const QuoteEditor = ({ quoteId, onBack }) => {
@@ -15,6 +16,7 @@ const QuoteEditor = ({ quoteId, onBack }) => {
     const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
     const [notes, setNotes] = useState('');
     const [saving, setSaving] = useState(false);
+    const [customers, setCustomers] = useState([]); // New state for customers
 
     // Refs
     const searchRef = useRef(null);
@@ -26,6 +28,7 @@ const QuoteEditor = ({ quoteId, onBack }) => {
     // Load initial data (Catalog + Quote if editing)
     useEffect(() => {
         fetchCatalog();
+        fetchCustomers(); // Fetch customers
         if (quoteId) {
             loadQuote(quoteId);
         }
@@ -41,10 +44,43 @@ const QuoteEditor = ({ quoteId, onBack }) => {
         }
     };
 
+    const fetchCustomers = async () => {
+        try {
+            const { data } = await apiClient.get('/customers');
+            setCustomers(data);
+        } catch (error) {
+            console.error("Error fetching customers:", error);
+        }
+    };
+
     const loadQuote = async (id) => {
-        // TODO: Implement load logic for editing
-        // const { data } = await apiClient.get(`/quotes/${id}`);
-        // setCart(data.items... transformation needed);
+        try {
+            const { data } = await apiClient.get(`/quotes/${id}`);
+            // Restore Items
+            // Note: Mapping might depend on how backend returns items.
+            // Assuming simplified mapping for now.
+            const mappedItems = data.items.map(item => ({
+                id: item.product_id,
+                name: item.product?.name || "Producto Desconocido",
+                quantity: item.quantity,
+                unit_price: item.unit_price,
+                subtotal: item.subtotal,
+                image_url: item.product?.image_url,
+                price: item.unit_price // Fallback
+            }));
+            setCart(mappedItems);
+            
+            // Restore Customer
+            if (data.customer) {
+                setSelectedCustomer(data.customer);
+            }
+            
+            // Restore Notes
+            setNotes(data.notes || '');
+        } catch (error) {
+            console.error("Error loading quote:", error);
+            toast.error("Error cargando cotización");
+        }
     };
 
     // Filter Logic
@@ -118,6 +154,12 @@ const QuoteEditor = ({ quoteId, onBack }) => {
     };
 
     const totalAmount = cart.reduce((sum, item) => sum + Number(item.subtotal), 0);
+    
+    // Handle new customer creation from modal
+    const handleCustomerCreated = (newCustomer) => {
+        setCustomers(prev => [...prev, newCustomer]);
+        setSelectedCustomer(newCustomer);
+    };
 
     return (
         <div className="h-full flex flex-col md:flex-row">
@@ -180,18 +222,23 @@ const QuoteEditor = ({ quoteId, onBack }) => {
             <div className="w-full md:w-[400px] xl:w-[450px] bg-white flex flex-col shadow-xl z-20">
                 {/* Customer Section */}
                 <div className="p-4 bg-slate-50 border-b border-gray-200">
-                    <button
-                        onClick={() => setIsCustomerModalOpen(true)}
-                        className="w-full bg-white border border-gray-300 rounded-lg p-3 flex items-center justify-center gap-2 hover:bg-blue-50 hover:border-blue-300 transition-all text-sm font-medium text-gray-700"
-                    >
-                        <User size={18} className="text-blue-500" />
-                        {selectedCustomer ? selectedCustomer.name : 'Seleccionar Cliente (Opcional)'}
-                    </button>
-                    {selectedCustomer && (
-                        <div className="text-xs text-center mt-1 text-gray-500 cursor-pointer hover:underline" onClick={() => setSelectedCustomer(null)}>
-                            Remover cliente
+                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Cliente</label>
+                     <div className="flex gap-2">
+                        <div className="flex-1">
+                            <CustomerSearch 
+                                customers={customers}
+                                selectedCustomer={selectedCustomer}
+                                onSelect={setSelectedCustomer}
+                            />
                         </div>
-                    )}
+                        <button
+                            onClick={() => setIsCustomerModalOpen(true)}
+                            className="bg-blue-100 text-blue-600 p-3 rounded-lg hover:bg-blue-200 transition-colors"
+                            title="Crear Nuevo Cliente"
+                        >
+                            <UserPlus size={20} />
+                        </button>
+                     </div>
                 </div>
 
                 {/* Items List */}
@@ -266,10 +313,7 @@ const QuoteEditor = ({ quoteId, onBack }) => {
             <QuickCustomerModal
                 isOpen={isCustomerModalOpen}
                 onClose={() => setIsCustomerModalOpen(false)}
-                onSelect={(customer) => {
-                    setSelectedCustomer(customer);
-                    setIsCustomerModalOpen(false);
-                }}
+                onSuccess={handleCustomerCreated}
             />
         </div>
     );
