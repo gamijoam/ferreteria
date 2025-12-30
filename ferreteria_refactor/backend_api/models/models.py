@@ -355,7 +355,7 @@ class CashMovement(Base):
     def __repr__(self):
         return f"<CashMovement(type='{self.type}', amount={self.amount})>"
 
-class UserRole(enum.Enum):
+class UserRole(str, enum.Enum):
     ADMIN = "ADMIN"
     CASHIER = "CASHIER"
     WAREHOUSE = "WAREHOUSE"

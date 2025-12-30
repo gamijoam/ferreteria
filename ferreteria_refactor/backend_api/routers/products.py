@@ -9,7 +9,7 @@ from ..database.db import get_db
 from ..models import models
 from ..models.models import UserRole
 from .. import schemas
-from ..dependencies import has_role
+from ..dependencies import has_role, cashier_or_admin
 from ..websocket.manager import manager
 from ..websocket.events import WebSocketEvents
 from ..audit_utils import log_action
@@ -500,7 +500,7 @@ def delete_price_rule(rule_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"status": "success"}
 
-@router.post("/sales/")
+@router.post("/sales/", dependencies=[Depends(cashier_or_admin)])
 def create_sale(sale_data: schemas.SaleCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     from ..services.sales_service import SalesService
     
@@ -509,7 +509,7 @@ def create_sale(sale_data: schemas.SaleCreate, background_tasks: BackgroundTasks
     return SalesService.create_sale(db, sale_data, user_id=1, background_tasks=background_tasks)
 
 # NEW: Get sale detail with items (for invoice detail view)
-@router.get("/sales/{sale_id}", response_model=schemas.SaleRead)
+@router.get("/sales/{sale_id}", response_model=schemas.SaleRead, dependencies=[Depends(cashier_or_admin)])
 def get_sale_detail(sale_id: int, db: Session = Depends(get_db)):
     """Get sale with details (items/products) for invoice view"""
     sale = db.query(models.Sale).options(
@@ -524,7 +524,7 @@ def get_sale_detail(sale_id: int, db: Session = Depends(get_db)):
     
     return sale
 
-@router.post("/sales/{sale_id}/print")
+@router.post("/sales/{sale_id}/print", dependencies=[Depends(cashier_or_admin)])
 def print_sale_endpoint(sale_id: int, db: Session = Depends(get_db)):
     """
     Get print payload for client-side printing.
@@ -535,7 +535,7 @@ def print_sale_endpoint(sale_id: int, db: Session = Depends(get_db)):
     # Now returns JSON { template, context, status }
     return SalesService.get_sale_print_payload(db, sale_id)
 
-@router.post("/print/remote")
+@router.post("/print/remote", dependencies=[Depends(cashier_or_admin)])
 async def print_remote(
     request: schemas.RemotePrintRequest,
     db: Session = Depends(get_db)
@@ -586,7 +586,7 @@ async def print_remote(
         "sale_id": request.sale_id
     }
 
-@router.post("/sales/payments")
+@router.post("/sales/payments", dependencies=[Depends(cashier_or_admin)])
 def register_sale_payment(
     payment_data: schemas.SalePaymentCreate,
     db: Session = Depends(get_db)
@@ -610,7 +610,7 @@ def register_sale_payment(
     
     return {"status": "success", "payment_id": payment.id}
 
-@router.put("/sales/{sale_id}")
+@router.put("/sales/{sale_id}", dependencies=[Depends(cashier_or_admin)])
 def update_sale(
     sale_id: int,
     balance_pending: float = None,

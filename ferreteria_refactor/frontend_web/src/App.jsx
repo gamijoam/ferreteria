@@ -62,7 +62,7 @@ function App() {
                         } />
 
                         {/* Standalone POS Routes (No Dashboard Layout) */}
-                        <Route element={<ProtectedRoute roles={['ADMIN', 'SELLER']} />}>
+                        <Route element={<ProtectedRoute roles={['ADMIN', 'CASHIER']} />}>
                           <Route path="/pos" element={<POS />} />
                           <Route path="/cash-close" element={<CashClose />} />
                         </Route>
@@ -99,29 +99,29 @@ function App() {
                               </ProtectedRoute>
                             } />
 
-                            {/* Sales - ADMIN or SELLER */}
+                            {/* Sales - ADMIN or CASHIER */}
                             <Route path="/sales-history" element={
-                              <ProtectedRoute roles={['ADMIN', 'SELLER']}>
+                              <ProtectedRoute roles={['ADMIN', 'CASHIER']}>
                                 <SalesHistory />
                               </ProtectedRoute>
                             } />
                             <Route path="/cash-history" element={
-                              <ProtectedRoute roles={['ADMIN', 'SELLER']}>
+                              <ProtectedRoute roles={['ADMIN', 'CASHIER']}>
                                 <CashHistory />
                               </ProtectedRoute>
                             } />
                             <Route path="/customers" element={
-                              <ProtectedRoute roles={['ADMIN', 'SELLER']}>
+                              <ProtectedRoute roles={['ADMIN', 'CASHIER']}>
                                 <CustomerManager />
                               </ProtectedRoute>
                             } />
                             <Route path="/quotes" element={
-                              <ProtectedRoute roles={['ADMIN', 'SELLER']}>
+                              <ProtectedRoute roles={['ADMIN', 'CASHIER']}>
                                 <QuotesManager />
                               </ProtectedRoute>
                             } />
                             <Route path="/accounts-receivable" element={
-                              <ProtectedRoute roles={['ADMIN', 'SELLER']}>
+                              <ProtectedRoute roles={['ADMIN', 'CASHIER']}>
                                 <AccountsReceivable />
                               </ProtectedRoute>
                             } />
