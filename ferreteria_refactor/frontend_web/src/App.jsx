@@ -89,7 +89,7 @@ function App() {
                               </ProtectedRoute>
                             } />
                             <Route path="/warehouses" element={
-                              <ProtectedRoute roles={['ADMIN']}>
+                              <ProtectedRoute roles={['ADMIN', 'WAREHOUSE']}>
                                 <WarehouseManager />
                               </ProtectedRoute>
                             } />

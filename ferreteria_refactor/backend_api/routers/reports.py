@@ -666,23 +666,6 @@ def get_month_profitability(db: Session = Depends(get_db)):
 
 # ===== EXCEL EXPORT ENDPOINT =====
 
-@router.get("/credits/pending")
-def get_pending_credit_sales(db: Session = Depends(get_db)):
-    """
-    Get all pending credit sales (invoices) for Accounts Receivable.
-    Used by the CxC module.
-    """
-    query = db.query(models.Sale).filter(
-        models.Sale.is_credit == True,
-        models.Sale.paid == False
-    ).options(
-        joinedload(models.Sale.customer),
-        joinedload(models.Sale.payments),
-        joinedload(models.Sale.details).joinedload(models.SaleDetail.product),
-        joinedload(models.Sale.returns)
-    ).order_by(models.Sale.due_date.asc())
-    
-    return query.all()
 
 
 

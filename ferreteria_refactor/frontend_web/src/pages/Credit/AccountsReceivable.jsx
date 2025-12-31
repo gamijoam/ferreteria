@@ -5,7 +5,7 @@ import { useConfig } from '../../context/ConfigContext';
 import InvoiceDetailModal from '../../components/credit/InvoiceDetailModal';
 
 const AccountsReceivable = () => {
-    const { getExchangeRate, currencies, getActiveCurrencies } = useConfig();
+    const { getExchangeRate, currencies, getActiveCurrencies, paymentMethods } = useConfig();
 
     // Get all active currencies including USD (anchor)
     const availableCurrencies = [
@@ -32,6 +32,10 @@ const AccountsReceivable = () => {
     const [detailSale, setDetailSale] = useState(null);
     const [loadingDetail, setLoadingDetail] = useState(false);
 
+    // BULK PAYMENT STATE
+    const [selectedInvoices, setSelectedInvoices] = useState([]); // Array of IDs
+    const [isBulkPay, setIsBulkPay] = useState(false);
+
     useEffect(() => {
         fetchInvoices();
     }, []);
@@ -44,7 +48,7 @@ const AccountsReceivable = () => {
         setLoading(true);
         try {
             // Get pending credit sales (invoices) from dedicated endpoint
-            const response = await apiClient.get('/reports/credits/pending');
+            const response = await apiClient.get('/products/credits/pending');
 
             console.log('📊 Credit sales fetched:', response.data.length);
 
@@ -97,7 +101,39 @@ const AccountsReceivable = () => {
         setPaymentAmount(invoice.balance_pending || invoice.total_amount);
         setPaymentMethod('Efectivo');
         setPaymentCurrency('USD');
+        setIsBulkPay(false);
         setShowPaymentModal(true);
+    };
+
+    const handleBulkPayment = () => {
+        if (selectedInvoices.length === 0) return;
+
+        // Calculate total amount to pay
+        const totalToPay = invoices
+            .filter(inv => selectedInvoices.includes(inv.id))
+            .reduce((sum, inv) => sum + (inv.balance_pending || inv.total_amount), 0);
+
+        setSelectedInvoice(null); // Indicates bulk
+        setPaymentAmount(Number(totalToPay.toFixed(2))); // Fix precision
+        setPaymentMethod('Efectivo');
+        setPaymentCurrency('USD');
+        setIsBulkPay(true);
+        setShowPaymentModal(true);
+    };
+
+    const handleSelectInvoice = (id) => {
+        setSelectedInvoices(prev => {
+            if (prev.includes(id)) return prev.filter(item => item !== id);
+            return [...prev, id];
+        });
+    };
+
+    const handleSelectAll = (e) => {
+        if (e.target.checked) {
+            setSelectedInvoices(filteredInvoices.map(inv => inv.id));
+        } else {
+            setSelectedInvoices([]);
+        }
     };
 
     // NEW: Handle view invoice detail
@@ -117,35 +153,94 @@ const AccountsReceivable = () => {
     };
 
     const handleSavePayment = async () => {
-        if (!selectedInvoice || paymentAmount <= 0) {
+        if (paymentAmount <= 0) {
             alert('Ingrese un monto válido');
             return;
         }
 
-        const balancePending = selectedInvoice.balance_pending || selectedInvoice.total_amount;
         const currentExchangeRate = getExchangeRate(paymentCurrency);
-
-        // Convert the payment amount (e.g. Bs) to Anchor (USD)
-        // If paymentCurrency is USD, rate is 1, so conversion is 1:1
-        // If paymentCurrency is Bs (Rate 50), 100 Bs -> 2 USD
         const amountInAnchor = paymentAmount / (currentExchangeRate || 1);
 
-        if (amountInAnchor > balancePending + 0.01) { // 0.01 tolerance
+        // BULK PAYMENT LOGIC
+        if (isBulkPay) {
+            const invoicesToPay = invoices.filter(inv => selectedInvoices.includes(inv.id));
+            const totalBalance = invoicesToPay.reduce((sum, inv) => sum + (inv.balance_pending || inv.total_amount), 0);
+
+            if (amountInAnchor > totalBalance + 0.01) {
+                alert(`El monto ingresado excede el total de las facturas seleccionadas ($${totalBalance.toFixed(2)})`);
+                return;
+            }
+
+            try {
+                // Distribute payment proportionally or sequentially
+                // Ideally backend should handle this, but client-side loop is requested for quick fix
+
+                // We will pay fully each invoice until amount is exhausted, or pay fully if amount matches total
+                // For simplicity in this "Pay Selected" feature, we assume FULL PAYMENT of selected items usually.
+                // But user might edit the amount. If amount < total, we distribute.
+
+                let remainingPayment = amountInAnchor;
+
+                for (const invoice of invoicesToPay) {
+                    if (remainingPayment <= 0.001) break;
+
+                    const invBalance = invoice.balance_pending || invoice.total_amount;
+                    const payAmount = Math.min(invBalance, remainingPayment);
+
+                    // Convert back to payment currency for the record
+                    const payAmountInCurrency = payAmount * (currentExchangeRate || 1);
+
+                    // 1. Create SalePayment
+                    await apiClient.post('/products/sales/payments', {
+                        sale_id: invoice.id,
+                        amount: payAmountInCurrency,
+                        currency: paymentCurrency,
+                        payment_method: paymentMethod,
+                        exchange_rate: currentExchangeRate
+                    });
+
+                    // 2. Update sale
+                    const newBalance = Math.max(0, invBalance - payAmount);
+                    const isPaid = newBalance <= 0.01;
+
+                    await apiClient.put(`/products/sales/${invoice.id}`, null, {
+                        params: { balance_pending: isPaid ? 0 : newBalance, paid: isPaid }
+                    });
+
+                    remainingPayment -= payAmount;
+                }
+
+                alert('✅ Pagos registrados correctamente para las facturas seleccionadas.');
+                setSelectedInvoices([]);
+                setShowPaymentModal(false);
+                await fetchInvoices();
+
+            } catch (error) {
+                console.error('Error in bulk payment:', error);
+                alert('Error al registrar pagos masivos: ' + (error.response?.data?.detail || error.message));
+            }
+            return;
+        }
+
+        // SINGLE INVOICE LOGIC (Existing)
+        if (!selectedInvoice) return;
+
+        const balancePending = selectedInvoice.balance_pending || selectedInvoice.total_amount;
+
+        if (amountInAnchor > balancePending + 0.01) {
             alert(`El monto ingresado ($${amountInAnchor.toFixed(2)}) excede el saldo pendiente ($${balancePending.toFixed(2)})`);
             return;
         }
 
         try {
-            // 1. Create SalePayment
             await apiClient.post('/products/sales/payments', {
                 sale_id: selectedInvoice.id,
-                amount: paymentAmount, // Record original amount (e.g. 100 Bs)
+                amount: paymentAmount,
                 currency: paymentCurrency,
                 payment_method: paymentMethod,
                 exchange_rate: currentExchangeRate
             });
 
-            // 2. Update sale balance_pending using the Anchor equivalent
             const newBalance = Math.max(0, balancePending - amountInAnchor);
             const isPaid = newBalance <= 0.01;
 
@@ -156,7 +251,6 @@ const AccountsReceivable = () => {
                 }
             });
 
-            // 3. Register cash movement (if cash session is open)
             try {
                 await apiClient.post('/cash/movements', {
                     type: 'DEPOSIT',
@@ -166,13 +260,11 @@ const AccountsReceivable = () => {
                     description: `Abono CxC - Factura #${selectedInvoice.id} - ${selectedInvoice.customer?.name || 'Cliente'}`
                 });
             } catch (cashError) {
-                console.warn('No open cash session, payment recorded but not in cash register');
+                console.warn('No open cash session');
             }
 
             alert(`✅ Pago registrado correctamente. ${isPaid ? 'Factura pagada completamente.' : `Saldo restante: $${newBalance.toFixed(2)}`}`);
             setShowPaymentModal(false);
-
-            // Refresh invoices to update the list
             await fetchInvoices();
         } catch (error) {
             console.error('Error registering payment:', error);
@@ -256,6 +348,9 @@ const AccountsReceivable = () => {
                 <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-lg shadow-lg p-6">
                     <p className="text-blue-100 text-sm mb-2">Total por Cobrar</p>
                     <p className="text-4xl font-bold">${stats.pending.toLocaleString('es-ES', { minimumFractionDigits: 2 })}</p>
+                    <p className="text-blue-100 text-sm opacity-90 mt-1 font-mono">
+                        ~Bs {(stats.pending * getExchangeRate('VES')).toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                    </p>
                     <p className="text-blue-100 text-sm mt-2">{invoices.filter(i => !i.paid).length} facturas pendientes</p>
                 </div>
 
@@ -323,12 +418,49 @@ const AccountsReceivable = () => {
                 </div>
             </div>
 
+            {/* BULK ACTION BAR */}
+            {selectedInvoices.length > 0 && (
+                <div className="fixed bottom-6 right-6 z-40 bg-gray-900 text-white p-4 rounded-xl shadow-2xl flex items-center gap-6 animate-fade-in-up border border-gray-700">
+                    <div>
+                        <p className="text-sm text-gray-400 font-bold uppercase tracking-wider">Seleccionado</p>
+                        <p className="text-2xl font-bold">
+                            ${invoices
+                                .filter(inv => selectedInvoices.includes(inv.id))
+                                .reduce((sum, inv) => sum + (inv.balance_pending || inv.total_amount), 0)
+                                .toFixed(2)}
+                        </p>
+                        <p className="text-xs text-gray-500">{selectedInvoices.length} facturas</p>
+                    </div>
+                    <button
+                        onClick={handleBulkPayment}
+                        className="bg-green-600 hover:bg-green-500 text-white px-6 py-3 rounded-lg font-bold shadow-lg transition-all transform hover:scale-105 flex items-center gap-2"
+                    >
+                        <DollarSign size={20} />
+                        Pagar Todo
+                    </button>
+                    <button
+                        onClick={() => setSelectedInvoices([])}
+                        className="text-gray-400 hover:text-white"
+                    >
+                        <X size={24} />
+                    </button>
+                </div>
+            )}
+
             {/* Content: Invoices Table or Client Cards */}
             {viewMode === 'invoices' ? (
                 <div className="bg-white rounded-lg shadow-md overflow-hidden animate-fade-in-up">
                     <table className="w-full">
                         <thead className="bg-gray-50">
                             <tr>
+                                <th className="p-4 w-10">
+                                    <input
+                                        type="checkbox"
+                                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                        onChange={handleSelectAll}
+                                        checked={filteredInvoices.length > 0 && selectedInvoices.length === filteredInvoices.length}
+                                    />
+                                </th>
                                 <th className="text-left p-4 font-semibold text-gray-700">Cliente</th>
                                 <th className="text-left p-4 font-semibold text-gray-700">Factura #</th>
                                 <th className="text-left p-4 font-semibold text-gray-700">Fecha Emisión</th>
@@ -358,7 +490,17 @@ const AccountsReceivable = () => {
                                     const balancePending = invoice.balance_pending || invoice.total_amount;
 
                                     return (
-                                        <tr key={invoice.id} className="hover:bg-gray-50">
+                                        <tr key={invoice.id} className={`hover:bg-gray-50 transition-colors ${selectedInvoices.includes(invoice.id) ? 'bg-blue-50' : ''}`}>
+                                            <td className="p-4">
+                                                {!invoice.paid && (
+                                                    <input
+                                                        type="checkbox"
+                                                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                                        checked={selectedInvoices.includes(invoice.id)}
+                                                        onChange={() => handleSelectInvoice(invoice.id)}
+                                                    />
+                                                )}
+                                            </td>
                                             <td className="p-4">
                                                 <div>
                                                     <p className="font-semibold text-gray-800">
@@ -481,6 +623,22 @@ const AccountsReceivable = () => {
                                             <table className="w-full text-sm">
                                                 <thead>
                                                     <tr className="text-gray-500 border-b">
+                                                        <th className="py-2 w-10">
+                                                            <input
+                                                                type="checkbox"
+                                                                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                                onChange={(e) => {
+                                                                    if (e.target.checked) {
+                                                                        const clientInvoiceIds = client.invoices.filter(i => !i.paid).map(i => i.id);
+                                                                        setSelectedInvoices(prev => [...new Set([...prev, ...clientInvoiceIds])]);
+                                                                    } else {
+                                                                        const clientInvoiceIds = client.invoices.map(i => i.id);
+                                                                        setSelectedInvoices(prev => prev.filter(id => !clientInvoiceIds.includes(id)));
+                                                                    }
+                                                                }}
+                                                                checked={client.invoices.some(i => !i.paid) && client.invoices.filter(i => !i.paid).every(i => selectedInvoices.includes(i.id))}
+                                                            />
+                                                        </th>
                                                         <th className="text-left py-2 font-medium">Factura #</th>
                                                         <th className="text-left py-2 font-medium">Vencimiento</th>
                                                         <th className="text-right py-2 font-medium">Saldo</th>
@@ -494,7 +652,17 @@ const AccountsReceivable = () => {
                                                         const isOd = inv.due_date && new Date(inv.due_date) < new Date() && !inv.paid;
 
                                                         return (
-                                                            <tr key={inv.id} className="bg-white">
+                                                            <tr key={inv.id} className={`bg-white transition-colors ${selectedInvoices.includes(inv.id) ? 'bg-blue-50' : ''}`}>
+                                                                <td className="py-3">
+                                                                    {!inv.paid && (
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                                                            checked={selectedInvoices.includes(inv.id)}
+                                                                            onChange={() => handleSelectInvoice(inv.id)}
+                                                                        />
+                                                                    )}
+                                                                </td>
                                                                 <td className="py-3 font-medium">#{inv.id}</td>
                                                                 <td className="py-3 text-gray-600">{new Date(inv.due_date).toLocaleDateString()}</td>
                                                                 <td className="py-3 text-right font-bold text-gray-800">${bal.toFixed(2)}</td>
@@ -541,13 +709,20 @@ const AccountsReceivable = () => {
             )}
 
             {/* Payment Modal */}
-            {showPaymentModal && selectedInvoice && (
+            {showPaymentModal && (selectedInvoice || isBulkPay) && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                     <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
                         <div className="p-6 border-b flex justify-between items-center">
                             <div>
-                                <h3 className="text-xl font-bold text-gray-800">Registrar Abono</h3>
-                                <p className="text-sm text-gray-600">Factura #{selectedInvoice.id}</p>
+                                <h3 className="text-xl font-bold text-gray-800">
+                                    {isBulkPay ? 'Pago Múltiple' : 'Registrar Abono'}
+                                </h3>
+                                <p className="text-sm text-gray-600">
+                                    {isBulkPay
+                                        ? `${selectedInvoices.length} facturas seleccionadas`
+                                        : `Factura #${selectedInvoice.id}`
+                                    }
+                                </p>
                             </div>
                             <button
                                 onClick={() => setShowPaymentModal(false)}
@@ -559,21 +734,31 @@ const AccountsReceivable = () => {
 
                         <div className="p-6 space-y-4">
                             {/* Customer Info */}
-                            <div className="bg-blue-50 rounded-lg p-4">
-                                <p className="text-sm text-gray-600">Cliente</p>
-                                <p className="font-bold text-lg">{selectedInvoice.customer?.name || 'Cliente General'}</p>
-                            </div>
+                            {!isBulkPay && (
+                                <div className="bg-blue-50 rounded-lg p-4">
+                                    <p className="text-sm text-gray-600">Cliente</p>
+                                    <p className="font-bold text-lg">{selectedInvoice.customer?.name || 'Cliente General'}</p>
+                                </div>
+                            )}
 
                             {/* Debt Info */}
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="bg-gray-50 rounded-lg p-4">
                                     <p className="text-sm text-gray-600">Monto Original</p>
-                                    <p className="font-bold text-lg">${Number(selectedInvoice.total_amount).toFixed(2)}</p>
+                                    <p className="font-bold text-lg">
+                                        ${isBulkPay
+                                            ? invoices.filter(inv => selectedInvoices.includes(inv.id)).reduce((sum, inv) => sum + Number(inv.total_amount), 0).toFixed(2)
+                                            : Number(selectedInvoice.total_amount).toFixed(2)
+                                        }
+                                    </p>
                                 </div>
                                 <div className="bg-red-50 rounded-lg p-4">
-                                    <p className="text-sm text-gray-600">Saldo Pendiente</p>
+                                    <p className="text-sm text-gray-600">Saldo Pendiente Total</p>
                                     <p className="font-bold text-lg text-red-600">
-                                        ${Number(selectedInvoice.balance_pending || selectedInvoice.total_amount).toFixed(2)}
+                                        ${isBulkPay
+                                            ? paymentAmount.toFixed(2) // Initial amount matches total
+                                            : Number(selectedInvoice.balance_pending || selectedInvoice.total_amount).toFixed(2)
+                                        }
                                     </p>
                                 </div>
                             </div>
@@ -590,7 +775,7 @@ const AccountsReceivable = () => {
                                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-lg font-bold"
                                     step="0.01"
                                     min="0"
-                                    max={selectedInvoice.balance_pending || selectedInvoice.total_amount}
+                                    max={isBulkPay ? 9999999 : (selectedInvoice.balance_pending || selectedInvoice.total_amount)}
                                 />
                             </div>
 
@@ -604,11 +789,11 @@ const AccountsReceivable = () => {
                                     onChange={(e) => setPaymentMethod(e.target.value)}
                                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
                                 >
-                                    <option value="Efectivo">Efectivo</option>
-                                    <option value="Transferencia">Transferencia</option>
-                                    <option value="Zelle">Zelle</option>
-                                    <option value="Pago Móvil">Pago Móvil</option>
-                                    <option value="Tarjeta">Tarjeta</option>
+                                    {paymentMethods.filter(pm => pm.is_active).map(pm => (
+                                        <option key={pm.id} value={pm.name}>
+                                            {pm.name}
+                                        </option>
+                                    ))}
                                 </select>
                             </div>
 

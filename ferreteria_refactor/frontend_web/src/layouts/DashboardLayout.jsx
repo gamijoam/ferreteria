@@ -159,70 +159,80 @@ const DashboardLayout = () => {
                                     <History size={16} />
                                     <span>Historial</span>
                                 </Link>
-                                <Link to="/returns" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center space-x-3 p-2 pl-4 rounded text-sm transition-colors ${isActive('/returns') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
-                                    <RotateCcw size={16} />
-                                    <span>Devoluciones</span>
-                                </Link>
+                                <RoleGuard allowed={['ADMIN']}>
+                                    <Link to="/returns" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center space-x-3 p-2 pl-4 rounded text-sm transition-colors ${isActive('/returns') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
+                                        <RotateCcw size={16} />
+                                        <span>Devoluciones</span>
+                                    </Link>
+                                </RoleGuard>
                             </div>
                         )}
                     </div>
                 </RoleGuard>
 
                 {/* Finanzas */}
-                <div>
-                    <button
-                        onClick={() => toggleSection('finance')}
-                        className="flex items-center justify-between w-full p-3 rounded hover:bg-slate-700 transition-colors"
-                    >
-                        <div className="flex items-center space-x-3">
-                            <DollarSign size={20} />
-                            <span className="font-medium">Finanzas</span>
-                        </div>
-                        {openSections.finance ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                    </button>
-                    {openSections.finance && (
-                        <div className="ml-4 mt-1 space-y-1">
-                            <Link to="/customers" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center space-x-3 p-2 pl-4 rounded text-sm transition-colors ${isActive('/customers') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
-                                <Users size={16} />
-                                <span>Clientes</span>
-                            </Link>
-                            <Link to="/accounts-receivable" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center space-x-3 p-2 pl-4 rounded text-sm transition-colors ${isActive('/accounts-receivable') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
-                                <FileText size={16} />
-                                <span>Cuentas por Cobrar</span>
-                            </Link>
-                            <Link to="/suppliers" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center space-x-3 p-2 pl-4 rounded text-sm transition-colors ${isActive('/suppliers') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
-                                <Truck size={16} />
-                                <span>Proveedores</span>
-                            </Link>
-                            <Link to="/accounts-payable" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center space-x-3 p-2 pl-4 rounded text-sm transition-colors ${isActive('/accounts-payable') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
-                                <Wallet size={16} />
-                                <span>Cuentas por Pagar</span>
-                            </Link>
-                        </div>
-                    )}
-                </div>
+                <RoleGuard allowed={['ADMIN', 'CASHIER']}>
+                    <div>
+                        <button
+                            onClick={() => toggleSection('finance')}
+                            className="flex items-center justify-between w-full p-3 rounded hover:bg-slate-700 transition-colors"
+                        >
+                            <div className="flex items-center space-x-3">
+                                <DollarSign size={20} />
+                                <span className="font-medium">Finanzas</span>
+                            </div>
+                            {openSections.finance ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                        </button>
+                        {openSections.finance && (
+                            <div className="ml-4 mt-1 space-y-1">
+                                <Link to="/customers" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center space-x-3 p-2 pl-4 rounded text-sm transition-colors ${isActive('/customers') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
+                                    <Users size={16} />
+                                    <span>Clientes</span>
+                                </Link>
+                                <RoleGuard allowed={['ADMIN', 'CASHIER']}>
+                                    <Link to="/accounts-receivable" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center space-x-3 p-2 pl-4 rounded text-sm transition-colors ${isActive('/accounts-receivable') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
+                                        <FileText size={16} />
+                                        <span>Cuentas por Cobrar</span>
+                                    </Link>
+                                </RoleGuard>
+                                <RoleGuard allowed={['ADMIN']}>
+                                    <Link to="/suppliers" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center space-x-3 p-2 pl-4 rounded text-sm transition-colors ${isActive('/suppliers') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
+                                        <Truck size={16} />
+                                        <span>Proveedores</span>
+                                    </Link>
+                                    <Link to="/accounts-payable" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center space-x-3 p-2 pl-4 rounded text-sm transition-colors ${isActive('/accounts-payable') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
+                                        <Wallet size={16} />
+                                        <span>Cuentas por Pagar</span>
+                                    </Link>
+                                </RoleGuard>
+                            </div>
+                        )}
+                    </div>
+                </RoleGuard>
 
                 {/* Operaciones */}
-                <div>
-                    <button
-                        onClick={() => toggleSection('operations')}
-                        className="flex items-center justify-between w-full p-3 rounded hover:bg-slate-700 transition-colors"
-                    >
-                        <div className="flex items-center space-x-3">
-                            <ShoppingBag size={20} />
-                            <span className="font-medium">Operaciones</span>
-                        </div>
-                        {openSections.operations ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                    </button>
-                    {openSections.operations && (
-                        <div className="ml-4 mt-1 space-y-1">
-                            <Link to="/purchases" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center space-x-3 p-2 pl-4 rounded text-sm transition-colors ${isActive('/purchases') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
-                                <ShoppingBag size={16} />
-                                <span>Compras</span>
-                            </Link>
-                        </div>
-                    )}
-                </div>
+                <RoleGuard allowed={['ADMIN', 'WAREHOUSE']}>
+                    <div>
+                        <button
+                            onClick={() => toggleSection('operations')}
+                            className="flex items-center justify-between w-full p-3 rounded hover:bg-slate-700 transition-colors"
+                        >
+                            <div className="flex items-center space-x-3">
+                                <ShoppingBag size={20} />
+                                <span className="font-medium">Operaciones</span>
+                            </div>
+                            {openSections.operations ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                        </button>
+                        {openSections.operations && (
+                            <div className="ml-4 mt-1 space-y-1">
+                                <Link to="/purchases" onClick={() => setIsMobileMenuOpen(false)} className={`flex items-center space-x-3 p-2 pl-4 rounded text-sm transition-colors ${isActive('/purchases') ? 'bg-blue-600' : 'hover:bg-slate-700'}`}>
+                                    <ShoppingBag size={16} />
+                                    <span>Compras</span>
+                                </Link>
+                            </div>
+                        )}
+                    </div>
+                </RoleGuard>
 
                 {/* Reportes - ADMIN ONLY */}
                 <RoleGuard allowed={['ADMIN']}>
