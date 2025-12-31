@@ -38,7 +38,8 @@ def create_default_config(config_path):
     config = configparser.ConfigParser()
     
     config['SERVIDOR'] = {
-        'url_servidor': 'wss://demo.invensoft.lat',
+        'url_primary': 'wss://demo.invensoft.lat',
+        'url_secondary': 'ws://localhost:8000',
         'nombre_caja': 'caja-1'
     }
     
@@ -56,7 +57,8 @@ def create_default_config(config_path):
     print(f"Se ha creado el archivo: {config_path}")
     print()
     print("Por favor, edite el archivo config.ini con los datos correctos:")
-    print("  - url_servidor: URL de su servidor (ej: wss://cliente1.invensoft.lat)")
+    print("  - url_primary: URL del servidor VPS (ej: wss://cliente1.invensoft.lat)")
+    print("  - url_secondary: URL del servidor Local (ej: ws://localhost:8000)")
     print("  - nombre_caja: Identificador único de esta caja (ej: caja-1)")
     print()
     print("Luego, reinicie el programa.")
@@ -86,13 +88,20 @@ def load_config():
             create_default_config(config_path)
         
         # Extract values
-        vps_url = config['SERVIDOR'].get('url_servidor', 'wss://demo.invensoft.lat')
+        # Extract values (Support backward compatibility with url_servidor)
+        url_primary = config['SERVIDOR'].get('url_primary')
+        if not url_primary:
+            url_primary = config['SERVIDOR'].get('url_servidor', 'wss://demo.invensoft.lat')
+            
+        url_secondary = config['SERVIDOR'].get('url_secondary', 'ws://localhost:8000')
+        
         client_id = config['SERVIDOR'].get('nombre_caja', 'caja-1')
         printer_mode = config['IMPRESORA'].get('modo', 'VIRTUAL').upper()
         printer_name = config['IMPRESORA'].get('nombre', 'POS-58')
         
         return {
-            'vps_url': vps_url,
+            'url_primary': url_primary,
+            'url_secondary': url_secondary,
             'client_id': client_id,
             'printer_mode': printer_mode,
             'printer_name': printer_name
@@ -107,16 +116,20 @@ def load_config():
 
 # Load configuration
 CONFIG = load_config()
-VPS_URL = CONFIG['vps_url']
+# Load configuration
+CONFIG = load_config()
+URL_PRIMARY = CONFIG['url_primary']
+URL_SECONDARY = CONFIG['url_secondary']
 CLIENT_ID = CONFIG['client_id']
 PRINTER_MODE = CONFIG['printer_mode']
 PRINTER_NAME = CONFIG['printer_name']
 
 print("="*60)
-print("Hardware Bridge v3.0 - WebSocket Client")
+print("Hardware Bridge v3.1 - Hybrid Mode")
 print("="*60)
-print(f"Servidor: {VPS_URL}")
-print(f"Caja: {CLIENT_ID}")
+print(f"Servidor Primario (VPS): {URL_PRIMARY}")
+print(f"Servidor Secundario:     {URL_SECONDARY}")
+print(f"Caja:                   {CLIENT_ID}")
 print(f"Modo Impresora: {PRINTER_MODE}")
 print(f"Nombre Impresora: {PRINTER_NAME}")
 print("="*60)
@@ -308,54 +321,60 @@ def execute_print(payload):
 # WEBSOCKET CLIENT
 # ========================================
 
-async def connect_to_vps():
-    """Connect to VPS WebSocket and listen for print commands"""
-    uri = f"{VPS_URL}/api/v1/ws/hardware/{CLIENT_ID}"
+async def connect_to_server(base_url, server_name):
+    """Connect to a Server WebSocket and listen for print commands"""
+    if not base_url or base_url.lower() == 'none':
+        print(f"⚠️ {server_name}: No URL configured, skipping.")
+        return
+
+    # Normalize URL (remove trailing slash)
+    base_url = base_url.rstrip('/')
+    # Construct URI
+    uri = f"{base_url}/api/v1/ws/hardware/{CLIENT_ID}"
     
-    print(f"\\n🔌 Connecting to {uri}...")
+    print(f"🔌 [{server_name}] Connecting to {uri}...")
     
     while True:
         try:
             async with websockets.connect(uri) as websocket:
-                print(f"✅ Connected to VPS as {CLIENT_ID}")
+                print(f"✅ [{server_name}] Connected successfully")
                 
                 # Listen for messages
                 async for message in websocket:
                     try:
                         data = json.loads(message)
-                        print(f"\\n📥 Received message: {data.get('type', 'unknown')}")
+                        print(f"\n📥 [{server_name}] Received: {data.get('type', 'unknown')}")
                         
                         if data.get('type') == 'print':
-                            print(f"🖨️ Processing print command for sale #{data.get('sale_id')}")
+                            print(f"🖨️ [{server_name}] Processing print command sale #{data.get('sale_id')}")
                             payload = data.get('payload', {})
                             
-                            success = execute_print(payload)
+                            # Run print in executor because it might be blocking (Win32)
+                            loop = asyncio.get_event_loop()
+                            success = await loop.run_in_executor(None, execute_print, payload)
                             
                             if success:
-                                print("✅ Print completed successfully")
+                                print(f"✅ [{server_name}] Print OK")
                             else:
-                                print("❌ Print failed")
+                                print(f"❌ [{server_name}] Print FAILED")
                         
                         else:
-                            print(f"⚠️ Unknown message type: {data.get('type')}")
+                            print(f"⚠️ [{server_name}] Unknown type: {data.get('type')}")
                     
-                    except json.JSONDecodeError as e:
-                        print(f"❌ Invalid JSON: {e}")
+                    except json.JSONDecodeError:
+                        print(f"❌ [{server_name}] Invalid JSON received")
                     except Exception as e:
-                        print(f"❌ Error processing message: {e}")
-                        import traceback
-                        traceback.print_exc()
+                        print(f"❌ [{server_name}] Error processing: {e}")
         
-        except websockets.exceptions.WebSocketException as e:
-            print(f"❌ WebSocket error: {e}")
-            print("🔄 Reconnecting in 5 seconds...")
+        except (websockets.exceptions.WebSocketException, OSError) as e:
+            # Connection failed or dropped
+            # Don't print stack trace for simple connection errors to keep log clean
+            print(f"❌ [{server_name}] Connection error: {e}")
+            print(f"🔄 [{server_name}] Retrying in 5s...")
             await asyncio.sleep(5)
         
         except Exception as e:
-            print(f"❌ Unexpected error: {e}")
-            import traceback
-            traceback.print_exc()
-            print("🔄 Reconnecting in 5 seconds...")
+            print(f"❌ [{server_name}] Unexpected error: {e}")
             await asyncio.sleep(5)
 
 
@@ -373,7 +392,17 @@ if __name__ == "__main__":
                 print(f"⚠️ WARNING: Printer '{PRINTER_NAME}' not found!")
         
         # Start WebSocket client
-        asyncio.run(connect_to_vps())
+        # Start WebSocket clients (Hybrid Mode)
+        print("\n🚀 Starting Hybrid Bridge...")
+        
+        async def main():
+            # Run both connections concurrently
+            await asyncio.gather(
+                connect_to_server(URL_PRIMARY, "PRIMARY"),
+                connect_to_server(URL_SECONDARY, "SECONDARY")
+            )
+
+        asyncio.run(main())
     
     except KeyboardInterrupt:
         print("\\n\\n👋 Hardware Bridge stopped by user")

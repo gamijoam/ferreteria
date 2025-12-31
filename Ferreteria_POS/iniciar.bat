@@ -24,7 +24,7 @@ echo [2/3] Esperando que el servidor inicie...
 timeout /t 4 /nobreak > nul
 
 echo [3/3] Abriendo aplicación en navegador...
-start http://localhost:8001
+start http://localhost:8000
 
 echo.
 echo ========================================
